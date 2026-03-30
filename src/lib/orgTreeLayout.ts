@@ -17,7 +17,7 @@ function flattenTree(
       id,
       type: "orgNode",
       position: { x: 0, y: 0 },
-      data: { label: node.Name, type: node.Type, code: node.Code },
+      data: { label: node.Name, type: node.Type, code: node.Code, isLeaf: !node.Children?.length, isRoot: !parentId },
     });
 
     if (parentId) {
