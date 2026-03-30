@@ -23,13 +23,13 @@ export interface Vacancy {
 }
 
 export interface OrgNode {
-  id: number;
-  code: string;
-  name: string;
-  type: string;
-  children: OrgNode[];
-  vacancies: Vacancy[];
-  emptyVacancy: EmptyVacancy[];
+  ID: number;
+  Code: string;
+  Name: string;
+  Type: string;
+  Children: OrgNode[];
+  Vacancies: Vacancy[] | null;
+  EmptyVacancy: EmptyVacancy[] | null;
 }
 
 export interface OrgNodeRow {
