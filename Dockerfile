@@ -14,11 +14,15 @@ RUN npm run build
 # ── Stage 3: production ──────────────────────────────────────
 FROM node:22-alpine
 WORKDIR /app
+
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server.js ./server.js
 COPY --from=dependencies /app/node_modules ./node_modules
 
+RUN mkdir -p /app/certs
+COPY certs/ /app/certs/
+
 ENV NODE_ENV=production
-EXPOSE 3000
+EXPOSE 3004 3447
 
 CMD ["node", "server.js"]
