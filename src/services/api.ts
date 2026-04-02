@@ -1,6 +1,6 @@
 import type { OrgNodeResponse, OrgNodesResponse, OrgNode } from "#/types/api";
 
-const BASE_URL = "http://localhost:3008";
+const BASE_URL = "/api";
 
 async function request<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {

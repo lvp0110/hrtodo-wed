@@ -1,0 +1,9 @@
+services:
+  web:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - API_URL=http://backend:3008/api
+    restart: unless-stopped
