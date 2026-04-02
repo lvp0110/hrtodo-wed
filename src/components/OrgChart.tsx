@@ -12,12 +12,18 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { orgNodesApi } from "#/services/mockApi";
+import { orgNodesApi } from "#/services/api";
 import { buildLayout } from "#/lib/orgTreeLayout";
 import type { OrgNode } from "#/types/api";
 
 function OrgNodeCard({ data }: NodeProps) {
-  const { label, type, isLeaf, isRoot } = data as { label: string; type: string; code: string; isLeaf: boolean; isRoot: boolean };
+  const { label, type, isLeaf, isRoot } = data as {
+    label: string;
+    type: string;
+    code: string;
+    isLeaf: boolean;
+    isRoot: boolean;
+  };
   return (
     <>
       {!isRoot && <Handle type="target" position={Position.Top} />}
@@ -43,7 +49,7 @@ export function OrgChart() {
 
   useEffect(() => {
     orgNodesApi
-      .getTree()
+      .getTreeVacancies()
       .then((res) => {
         const { nodes, edges } = buildLayout(res.data as OrgNode[]);
         setNodes(nodes);

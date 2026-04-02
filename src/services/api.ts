@@ -1,8 +1,4 @@
-import type {
-  OrgNodeResponse,
-  OrgNodesResponse,
-  OrgNode,
-} from "#/types/api";
+import type { OrgNodeResponse, OrgNodesResponse, OrgNode } from "#/types/api";
 
 const BASE_URL = "http://localhost:3008";
 
@@ -30,6 +26,11 @@ export const orgNodesApi = {
   /** Получить дерево относительно узла */
   getSubTree(id: number): Promise<OrgNodesResponse> {
     return request(`/orgnodes/${id}`);
+  },
+
+  /** Получить дерево относительно узла с вакансиями */
+  getTreeVacancies(): Promise<OrgNodesResponse> {
+    return request(`/orgnodes/tree/vacancies`);
   },
 
   /** Получить узел по ID (без дочерних) */

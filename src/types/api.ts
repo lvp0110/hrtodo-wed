@@ -1,25 +1,25 @@
 export interface Entity {
-  code: string;
-  name: string;
+  Code: string;
+  Name: string;
 }
 
 export interface Employer {
-  id: number;
-  firstName: string;
-  secondName: string;
-  surname: string;
-  email: string;
+  ID: number;
+  FirstName: string;
+  SecondName: string;
+  Surname: string;
+  Email: string;
 }
 
 export interface EmptyVacancy {
-  city: Entity;
-  position: Entity;
+  City: Entity;
+  Position: Entity;
 }
 
 export interface Vacancy {
-  city: Entity;
-  position: Entity;
-  employer: Employer;
+  City: Entity;
+  Position: Entity;
+  Employer: Employer;
 }
 
 export interface OrgNode {
