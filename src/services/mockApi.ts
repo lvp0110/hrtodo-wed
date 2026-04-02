@@ -30,8 +30,8 @@ const MOCK_TREE: OrgNode[] = [
             Type: "department",
             Children: [],
             Vacancies: [
-              { city: { code: "msk", name: "Москва" }, position: { code: "acc_lead", name: "Главный бухгалтер" }, employer: { id: 101, firstName: "Анна", secondName: "Петровна", surname: "Смирнова", email: "smirnova@corp.ru" } },
-              { city: { code: "msk", name: "Москва" }, position: { code: "acc_jr", name: "Бухгалтер" }, employer: { id: 102, firstName: "Елена", secondName: "Игоревна", surname: "Фёдорова", email: "fedorova@corp.ru" } },
+              { City: { Code: "msk", Name: "Москва" }, Position: { Code: "acc_lead", Name: "Главный бухгалтер" }, Employer: { ID: 101, FirstName: "Анна", SecondName: "Петровна", Surname: "Смирнова", Email: "smirnova@corp.ru" } },
+              { City: { Code: "msk", Name: "Москва" }, Position: { Code: "acc_jr", Name: "Бухгалтер" }, Employer: { ID: 102, FirstName: "Елена", SecondName: "Игоревна", Surname: "Фёдорова", Email: "fedorova@corp.ru" } },
             ],
             EmptyVacancy: null,
           },
@@ -43,8 +43,8 @@ const MOCK_TREE: OrgNode[] = [
             Children: [],
             Vacancies: null,
             EmptyVacancy: [
-              { city: { code: "msk", name: "Москва" }, position: { code: "analyst", name: "Финансовый аналитик" } },
-              { city: { code: "msk", name: "Москва" }, position: { code: "controller", name: "Контролёр" } },
+              { City: { Code: "msk", Name: "Москва" }, Position: { Code: "analyst", Name: "Финансовый аналитик" } },
+              { City: { Code: "msk", Name: "Москва" }, Position: { Code: "controller", Name: "Контролёр" } },
             ],
           },
           {
@@ -54,7 +54,7 @@ const MOCK_TREE: OrgNode[] = [
             Type: "department",
             Children: [],
             Vacancies: [
-              { city: { code: "msk", name: "Москва" }, position: { code: "treasurer", name: "Казначей" }, employer: { id: 103, firstName: "Дмитрий", secondName: "Олегович", surname: "Беляев", email: "belyaev@corp.ru" } },
+              { City: { Code: "msk", Name: "Москва" }, Position: { Code: "treasurer", Name: "Казначей" }, Employer: { ID: 103, FirstName: "Дмитрий", SecondName: "Олегович", Surname: "Беляев", Email: "belyaev@corp.ru" } },
             ],
             EmptyVacancy: null,
           },
@@ -81,11 +81,11 @@ const MOCK_TREE: OrgNode[] = [
                 Type: "team",
                 Children: [],
                 Vacancies: [
-                  { city: { code: "spb", name: "Санкт-Петербург" }, position: { code: "fe_lead", name: "Frontend Lead" }, employer: { id: 110, firstName: "Иван", secondName: "Сергеевич", surname: "Козлов", email: "kozlov@corp.ru" } },
-                  { city: { code: "spb", name: "Санкт-Петербург" }, position: { code: "fe_mid", name: "Frontend Dev" }, employer: { id: 111, firstName: "Мария", secondName: "Андреевна", surname: "Новикова", email: "novikova@corp.ru" } },
+                  { City: { Code: "spb", Name: "Санкт-Петербург" }, Position: { Code: "fe_lead", Name: "Frontend Lead" }, Employer: { ID: 110, FirstName: "Иван", SecondName: "Сергеевич", Surname: "Козлов", Email: "kozlov@corp.ru" } },
+                  { City: { Code: "spb", Name: "Санкт-Петербург" }, Position: { Code: "fe_mid", Name: "Frontend Dev" }, Employer: { ID: 111, FirstName: "Мария", SecondName: "Андреевна", Surname: "Новикова", Email: "novikova@corp.ru" } },
                 ],
                 EmptyVacancy: [
-                  { city: { code: "spb", name: "Санкт-Петербург" }, position: { code: "fe_jun", name: "Junior Frontend" } },
+                  { City: { Code: "spb", Name: "Санкт-Петербург" }, Position: { Code: "fe_jun", Name: "Junior Frontend" } },
                 ],
               },
               {
@@ -95,11 +95,11 @@ const MOCK_TREE: OrgNode[] = [
                 Type: "team",
                 Children: [],
                 Vacancies: [
-                  { city: { code: "spb", name: "Санкт-Петербург" }, position: { code: "be_lead", name: "Backend Lead" }, employer: { id: 112, firstName: "Алексей", secondName: "Николаевич", surname: "Громов", email: "gromov@corp.ru" } },
+                  { City: { Code: "spb", Name: "Санкт-Петербург" }, Position: { Code: "be_lead", Name: "Backend Lead" }, Employer: { ID: 112, FirstName: "Алексей", SecondName: "Николаевич", Surname: "Громов", Email: "gromov@corp.ru" } },
                 ],
                 EmptyVacancy: [
-                  { city: { code: "spb", name: "Санкт-Петербург" }, position: { code: "be_mid", name: "Backend Dev" } },
-                  { city: { code: "spb", name: "Санкт-Петербург" }, position: { code: "be_jun", name: "Junior Backend" } },
+                  { City: { Code: "spb", Name: "Санкт-Петербург" }, Position: { Code: "be_mid", Name: "Backend Dev" } },
+                  { City: { Code: "spb", Name: "Санкт-Петербург" }, Position: { Code: "be_jun", Name: "Junior Backend" } },
                 ],
               },
               {
@@ -110,7 +110,7 @@ const MOCK_TREE: OrgNode[] = [
                 Children: [],
                 Vacancies: null,
                 EmptyVacancy: [
-                  { city: { code: "msk", name: "Москва" }, position: { code: "mob_dev", name: "Mobile Dev" } },
+                  { City: { Code: "msk", Name: "Москва" }, Position: { Code: "mob_dev", Name: "Mobile Dev" } },
                 ],
               },
             ],
@@ -124,10 +124,10 @@ const MOCK_TREE: OrgNode[] = [
             Type: "department",
             Children: [],
             Vacancies: [
-              { city: { code: "msk", name: "Москва" }, position: { code: "qa_lead", name: "QA Lead" }, employer: { id: 113, firstName: "Светлана", secondName: "Павловна", surname: "Орлова", email: "orlova@corp.ru" } },
+              { City: { Code: "msk", Name: "Москва" }, Position: { Code: "qa_lead", Name: "QA Lead" }, Employer: { ID: 113, FirstName: "Светлана", SecondName: "Павловна", Surname: "Орлова", Email: "orlova@corp.ru" } },
             ],
             EmptyVacancy: [
-              { city: { code: "msk", name: "Москва" }, position: { code: "qa_eng", name: "QA инженер" } },
+              { City: { Code: "msk", Name: "Москва" }, Position: { Code: "qa_eng", Name: "QA инженер" } },
             ],
           },
           {
@@ -137,7 +137,7 @@ const MOCK_TREE: OrgNode[] = [
             Type: "department",
             Children: [],
             Vacancies: [
-              { city: { code: "spb", name: "Санкт-Петербург" }, position: { code: "devops_eng", name: "DevOps инженер" }, employer: { id: 114, firstName: "Роман", secondName: "Витальевич", surname: "Суворов", email: "suvorov@corp.ru" } },
+              { City: { Code: "spb", Name: "Санкт-Петербург" }, Position: { Code: "devops_eng", Name: "DevOps инженер" }, Employer: { ID: 114, FirstName: "Роман", SecondName: "Витальевич", Surname: "Суворов", Email: "suvorov@corp.ru" } },
             ],
             EmptyVacancy: null,
           },
@@ -149,7 +149,7 @@ const MOCK_TREE: OrgNode[] = [
             Children: [],
             Vacancies: null,
             EmptyVacancy: [
-              { city: { code: "msk", name: "Москва" }, position: { code: "architect", name: "Системный архитектор" } },
+              { City: { Code: "msk", Name: "Москва" }, Position: { Code: "architect", Name: "Системный архитектор" } },
             ],
           },
         ],
@@ -169,8 +169,8 @@ const MOCK_TREE: OrgNode[] = [
             Type: "department",
             Children: [],
             Vacancies: [
-              { city: { code: "msk", name: "Москва" }, position: { code: "recruiter", name: "Рекрутер" }, employer: { id: 115, firstName: "Ольга", secondName: "Дмитриевна", surname: "Васильева", email: "vasilieva@corp.ru" } },
-              { city: { code: "msk", name: "Москва" }, position: { code: "recruiter_sr", name: "Старший рекрутер" }, employer: { id: 116, firstName: "Татьяна", secondName: "Юрьевна", surname: "Лебедева", email: "lebedeva@corp.ru" } },
+              { City: { Code: "msk", Name: "Москва" }, Position: { Code: "recruiter", Name: "Рекрутер" }, Employer: { ID: 115, FirstName: "Ольга", SecondName: "Дмитриевна", Surname: "Васильева", Email: "vasilieva@corp.ru" } },
+              { City: { Code: "msk", Name: "Москва" }, Position: { Code: "recruiter_sr", Name: "Старший рекрутер" }, Employer: { ID: 116, FirstName: "Татьяна", SecondName: "Юрьевна", Surname: "Лебедева", Email: "lebedeva@corp.ru" } },
             ],
             EmptyVacancy: null,
           },
@@ -182,7 +182,7 @@ const MOCK_TREE: OrgNode[] = [
             Children: [],
             Vacancies: null,
             EmptyVacancy: [
-              { city: { code: "msk", name: "Москва" }, position: { code: "trainer", name: "Тренер" } },
+              { City: { Code: "msk", Name: "Москва" }, Position: { Code: "trainer", Name: "Тренер" } },
             ],
           },
         ],
@@ -202,16 +202,16 @@ const MOCK_TREE: OrgNode[] = [
             Type: "department",
             Children: [],
             Vacancies: [
-              { city: { code: "msk", name: "Москва" }, position: { code: "compliance_off", name: "Офицер комплаенса" }, employer: { id: 117, firstName: "Андрей", secondName: "Борисович", surname: "Кузнецов", email: "kuznetsov@corp.ru" } },
+              { City: { Code: "msk", Name: "Москва" }, Position: { Code: "compliance_off", Name: "Офицер комплаенса" }, Employer: { ID: 117, FirstName: "Андрей", SecondName: "Борисович", Surname: "Кузнецов", Email: "kuznetsov@corp.ru" } },
             ],
             EmptyVacancy: null,
           },
         ],
         Vacancies: [
-          { city: { code: "msk", name: "Москва" }, position: { code: "lawyer_lead", name: "Главный юрист" }, employer: { id: 118, firstName: "Наталья", secondName: "Геннадьевна", surname: "Морозова", email: "morozova@corp.ru" } },
+          { City: { Code: "msk", Name: "Москва" }, Position: { Code: "lawyer_lead", Name: "Главный юрист" }, Employer: { ID: 118, FirstName: "Наталья", SecondName: "Геннадьевна", Surname: "Морозова", Email: "morozova@corp.ru" } },
         ],
         EmptyVacancy: [
-          { city: { code: "msk", name: "Москва" }, position: { code: "lawyer", name: "Юрист" } },
+          { City: { Code: "msk", Name: "Москва" }, Position: { Code: "lawyer", Name: "Юрист" } },
         ],
       },
       {
@@ -227,11 +227,11 @@ const MOCK_TREE: OrgNode[] = [
             Type: "department",
             Children: [],
             Vacancies: [
-              { city: { code: "msk", name: "Москва" }, position: { code: "sales_mgr", name: "Менеджер по продажам" }, employer: { id: 119, firstName: "Виктор", secondName: "Александрович", surname: "Соколов", email: "sokolov@corp.ru" } },
-              { city: { code: "spb", name: "Санкт-Петербург" }, position: { code: "sales_mgr", name: "Менеджер по продажам" }, employer: { id: 120, firstName: "Юлия", secondName: "Ивановна", surname: "Попова", email: "popova@corp.ru" } },
+              { City: { Code: "msk", Name: "Москва" }, Position: { Code: "sales_mgr", Name: "Менеджер по продажам" }, Employer: { ID: 119, FirstName: "Виктор", SecondName: "Александрович", Surname: "Соколов", Email: "sokolov@corp.ru" } },
+              { City: { Code: "spb", Name: "Санкт-Петербург" }, Position: { Code: "sales_mgr", Name: "Менеджер по продажам" }, Employer: { ID: 120, FirstName: "Юлия", SecondName: "Ивановна", Surname: "Попова", Email: "popova@corp.ru" } },
             ],
             EmptyVacancy: [
-              { city: { code: "kzn", name: "Казань" }, position: { code: "sales_mgr", name: "Менеджер по продажам" } },
+              { City: { Code: "kzn", Name: "Казань" }, Position: { Code: "sales_mgr", Name: "Менеджер по продажам" } },
             ],
           },
           {
@@ -241,11 +241,11 @@ const MOCK_TREE: OrgNode[] = [
             Type: "department",
             Children: [],
             Vacancies: [
-              { city: { code: "msk", name: "Москва" }, position: { code: "marketing_lead", name: "Руководитель маркетинга" }, employer: { id: 121, firstName: "Екатерина", secondName: "Михайловна", surname: "Захарова", email: "zaharova@corp.ru" } },
+              { City: { Code: "msk", Name: "Москва" }, Position: { Code: "marketing_lead", Name: "Руководитель маркетинга" }, Employer: { ID: 121, FirstName: "Екатерина", SecondName: "Михайловна", Surname: "Захарова", Email: "zaharova@corp.ru" } },
             ],
             EmptyVacancy: [
-              { city: { code: "msk", name: "Москва" }, position: { code: "smm", name: "SMM специалист" } },
-              { city: { code: "msk", name: "Москва" }, position: { code: "designer", name: "Дизайнер" } },
+              { City: { Code: "msk", Name: "Москва" }, Position: { Code: "smm", Name: "SMM специалист" } },
+              { City: { Code: "msk", Name: "Москва" }, Position: { Code: "designer", Name: "Дизайнер" } },
             ],
           },
         ],
@@ -273,6 +273,11 @@ function findNode(nodes: OrgNode[], id: number): OrgNode | undefined {
 
 export const orgNodesApi = {
   async getTree(): Promise<OrgNodesResponse> {
+    await delay();
+    return { code: 200, data: MOCK_TREE };
+  },
+
+  async getTreeVacancies(): Promise<OrgNodesResponse> {
     await delay();
     return { code: 200, data: MOCK_TREE };
   },
