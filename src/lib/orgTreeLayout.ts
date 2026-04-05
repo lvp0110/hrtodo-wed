@@ -4,6 +4,7 @@ import type { OrgNode } from "#/types/api";
 const NODE_WIDTH = 280;
 const NODE_HEIGHT_BASE = 64;
 const VACANCY_ROW_HEIGHT = 46;
+const ADD_VACANCY_ROW_HEIGHT = 46; // строка "+" внизу списка вакансий
 const H_GAP = 24;
 const V_GAP = 60;
 export const ADD_NODE_WIDTH = 280;
@@ -12,7 +13,7 @@ export const ADD_NODE_HEIGHT = 80;
 function nodeHeight(node: OrgNode): number {
   const count =
     (node.Vacancies?.length ?? 0) + (node.EmptyVacancy?.length ?? 0);
-  return NODE_HEIGHT_BASE + count * VACANCY_ROW_HEIGHT;
+  return NODE_HEIGHT_BASE + count * VACANCY_ROW_HEIGHT + ADD_VACANCY_ROW_HEIGHT;
 }
 
 /** Ширина поддерева с учётом всех потомков и ноды "+" */

@@ -15,7 +15,8 @@ import { OrgNodeCard } from "#/components/OrgNodeCard";
 import { AddNodeCard } from "#/components/AddNodeCard";
 import { DeptModal } from "#/components/DeptModal";
 import { VacancyInfoModal } from "#/components/VacancyInfoModal";
-import type { DeptModalState, VacancyModalData } from "#/types/orgChart";
+import { CreateVacancyModal } from "#/components/CreateVacancyModal";
+import type { AddVacancyState, DeptModalState, VacancyModalData } from "#/types/orgChart";
 
 const nodeTypes = { orgNode: OrgNodeCard, addNode: AddNodeCard };
 
@@ -27,6 +28,7 @@ export function OrgChart() {
   const [error, setError] = useState<string>("");
   const [deptModal, setDeptModal] = useState<DeptModalState | null>(null);
   const [vacancyModal, setVacancyModal] = useState<VacancyModalData | null>(null);
+  const [addVacancyModal, setAddVacancyModal] = useState<AddVacancyState | null>(null);
 
   useEffect(() => {
     orgNodesApi
@@ -35,7 +37,14 @@ export function OrgChart() {
         const { nodes, edges } = buildLayout(res.data);
         const enriched = nodes.map((n) =>
           n.type === "orgNode"
-            ? { ...n, data: { ...n.data, onVacancyClick: setVacancyModal } }
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  onVacancyClick: setVacancyModal,
+                  onAddVacancyClick: setAddVacancyModal,
+                },
+              }
             : n,
         );
         setNodes(enriched);
@@ -120,6 +129,17 @@ export function OrgChart() {
         <VacancyInfoModal
           data={vacancyModal}
           onClose={() => setVacancyModal(null)}
+        />
+      )}
+
+      {addVacancyModal && (
+        <CreateVacancyModal
+          state={addVacancyModal}
+          onClose={() => setAddVacancyModal(null)}
+          onSubmit={(data) => {
+            console.log("Создать вакансию:", { deptId: addVacancyModal.deptId, ...data });
+            setAddVacancyModal(null);
+          }}
         />
       )}
     </>
