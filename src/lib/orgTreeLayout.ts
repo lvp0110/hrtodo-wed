@@ -3,7 +3,7 @@ import type { OrgNode } from "#/types/api";
 
 const NODE_WIDTH = 280;
 const NODE_HEIGHT_BASE = 64;
-const VACANCY_ROW_HEIGHT = 38;
+const VACANCY_ROW_HEIGHT = 46;
 const H_GAP = 24;
 const V_GAP = 60;
 export const ADD_NODE_WIDTH = 280;
