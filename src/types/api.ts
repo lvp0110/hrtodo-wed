@@ -1,56 +1,86 @@
 export interface Entity {
-  Code: string;
-  Name: string;
+  code: string;
+  name: string;
 }
 
 export interface Employer {
-  ID: number;
-  FirstName: string;
-  SecondName: string;
-  Surname: string;
-  Email: string;
+  id: number;
+  first_name: string;
+  second_name: string;
+  surname: string;
+  email: string;
 }
 
 export interface EmptyVacancy {
-  City: Entity;
-  Position: Entity;
+  position: Entity;
+  city: Entity;
 }
 
 export interface Vacancy {
-  City: Entity;
-  Position: Entity;
-  Employer: Employer;
+  id: number;
+  node_id: number;
+  position: Entity;
+  city: Entity;
+  employer: Employer;
+  is_manager: boolean;
 }
 
 export interface OrgNode {
-  ID: number;
-  Code: string;
-  Name: string;
-  Type: string;
-  Children: OrgNode[];
-  Vacancies: Vacancy[] | null;
-  EmptyVacancy: EmptyVacancy[] | null;
+  id: number;
+  code: string;
+  name: string;
+  type: string;
+  parent_id: number | null;
+  children: OrgNode[] | null;
+  vacancies: Vacancy[] | null;
+  empty_vacancy: EmptyVacancy[] | null;
 }
 
 export interface OrgNodeRow {
   id: number;
+  parent_id: number | null;
   code: string;
   name: string;
-  parentID: number;
-  typeCode: string;
+  type_code: string;
 }
 
-export interface OrgNodesResponse {
+export interface ApiResponse<T> {
   code: number;
-  data: OrgNode[];
-}
-
-export interface OrgNodeResponse {
-  code: number;
-  data: OrgNodeRow[];
+  data: T;
 }
 
 export interface ErrorResponse {
   code: number;
   error: string;
+}
+
+export type OrgNodesResponse = ApiResponse<OrgNode[]>;
+export type OrgNodeRowResponse = ApiResponse<OrgNodeRow>;
+export type VacancyResponse = ApiResponse<Vacancy>;
+export type OrgNodeResponse = ApiResponse<OrgNode>;
+
+export interface NodeCreateReq {
+  code: string;
+  name: string;
+  type_code: string;
+  parent_id: number | null;
+}
+
+export type NodeUpdateReq = NodeCreateReq;
+
+export interface VacancyReq {
+  node_id: number;
+  position_code: string;
+  position_name: string;
+  city_code: string;
+  is_manager: boolean;
+}
+
+export interface VacancyUpdateReq {
+  node_id: number;
+  user_id: number;
+  city_code: string;
+  position_code: string;
+  position_name: string;
+  is_manager: boolean;
 }

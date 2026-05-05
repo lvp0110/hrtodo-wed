@@ -1,10 +1,31 @@
-import type { OrgNodeResponse, OrgNodesResponse, OrgNode } from "#/types/api";
+import type {
+  ApiResponse,
+  NodeCreateReq,
+  NodeUpdateReq,
+  OrgNode,
+  OrgNodeRow,
+  OrgNodesResponse,
+  Vacancy,
+  VacancyReq,
+  VacancyUpdateReq,
+} from "#/types/api";
 
 const BASE_URL = "/api";
 
-async function request<T>(path: string): Promise<T> {
+type Method = "GET" | "POST" | "PUT" | "DELETE";
+
+async function request<T>(
+  path: string,
+  init: { method?: Method; body?: unknown } = {},
+): Promise<T> {
+  const { method = "GET", body } = init;
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { Accept: "application/json" },
+    method,
+    headers: {
+      Accept: "application/json",
+      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
   if (!res.ok) {
@@ -14,37 +35,62 @@ async function request<T>(path: string): Promise<T> {
     });
   }
 
+  if (res.status === 204) return undefined as T;
+
   return res.json() as Promise<T>;
 }
 
 export const orgNodesApi = {
   /** Получить всё организационное дерево */
-  getTree(): Promise<OrgNodesResponse> {
-    return request("/orgnodes");
-  },
+  getTree: (): Promise<OrgNodesResponse> => request("/orgnodes"),
 
   /** Получить дерево относительно узла */
-  getSubTree(id: number): Promise<OrgNodesResponse> {
-    return request(`/orgnodes/${id}`);
-  },
+  getSubTree: (id: number): Promise<OrgNodesResponse> =>
+    request(`/orgnodes/${id}`),
 
-  /** Получить дерево относительно узла с вакансиями */
-  getTreeVacancies(): Promise<OrgNodesResponse> {
-    return request(`/orgnodes/tree/vacancies`);
-  },
+  /** Получить дерево с вакансиями */
+  getTreeVacancies: (): Promise<OrgNodesResponse> =>
+    request("/orgnodes/tree/vacancies"),
 
   /** Получить узел по ID (без дочерних) */
-  getNode(id: number): Promise<OrgNodeResponse> {
-    return request(`/orgnodes/node/${id}`);
-  },
+  getNode: (id: number): Promise<ApiResponse<OrgNodeRow>> =>
+    request(`/orgnodes/node/${id}`),
 
-  /** Получить пустые вакансии отдела */
-  getEmptyVacancies(id: number): Promise<OrgNode> {
-    return request(`/orgnodes/${id}/vacancies/empty`);
-  },
+  /** Создать организационный узел */
+  createNode: (body: NodeCreateReq): Promise<ApiResponse<null>> =>
+    request("/orgnodes/node", { method: "POST", body }),
 
-  /** Получить занятые вакансии отдела */
-  getFilledVacancies(id: number): Promise<OrgNode> {
-    return request(`/orgnodes/${id}/vacancies/filled`);
-  },
+  /** Обновить организационный узел */
+  updateNode: (id: number, body: NodeUpdateReq): Promise<ApiResponse<null>> =>
+    request(`/orgnodes/node/${id}`, { method: "PUT", body }),
+
+  /** Удалить организационный узел */
+  deleteNode: (id: number): Promise<void> =>
+    request(`/orgnodes/node/${id}`, { method: "DELETE" }),
+};
+
+export const vacanciesApi = {
+  /** Получить вакансию по ID */
+  get: (id: number): Promise<ApiResponse<Vacancy>> =>
+    request(`/vacancies/${id}`),
+
+  /** Создать вакансию */
+  create: (body: VacancyReq): Promise<ApiResponse<null>> =>
+    request("/vacancies", { method: "POST", body }),
+
+  /** Обновить вакансию */
+  update: (id: number, body: VacancyUpdateReq): Promise<ApiResponse<null>> =>
+    request(`/vacancies/${id}`, { method: "PUT", body }),
+
+  /** Удалить вакансию */
+  delete: (id: number): Promise<void> =>
+    request(`/vacancies/${id}`, { method: "DELETE" }),
+
+  /** Получить отдел со списком пустых вакансий */
+  getEmpty: (nodeId: number): Promise<ApiResponse<OrgNode>> =>
+    request(`/vacancies/${nodeId}/vacancies/empty`),
+
+  /** Получить отдел со списком занятых вакансий */
+  getFilled: (nodeId: number): Promise<ApiResponse<OrgNode>> =>
+    request(`/vacancies/${nodeId}/vacancies/filled`),
 };
