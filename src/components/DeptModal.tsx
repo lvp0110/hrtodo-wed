@@ -8,9 +8,17 @@ interface DeptModalProps {
   state: DeptModalState;
   onClose: () => void;
   onSubmit: (data: DeptFields) => void;
+  isPending?: boolean;
+  error?: string | null;
 }
 
-export function DeptModal({ state, onClose, onSubmit }: DeptModalProps) {
+export function DeptModal({
+  state,
+  onClose,
+  onSubmit,
+  isPending = false,
+  error = null,
+}: DeptModalProps) {
   const isEdit = state.mode === "edit";
 
   const {
@@ -87,20 +95,31 @@ export function DeptModal({ state, onClose, onSubmit }: DeptModalProps) {
             />
           </div>
 
+          {error && (
+            <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
+          )}
+
           <div className="flex gap-3 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              disabled={isPending}
+              className="flex-1 px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Отмена
             </button>
             <button
               type="submit"
-              disabled={!isValid}
+              disabled={!isValid || isPending}
               className="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              {isEdit ? "Сохранить" : "Создать"}
+              {isPending
+                ? isEdit
+                  ? "Сохраняем…"
+                  : "Создаём…"
+                : isEdit
+                  ? "Сохранить"
+                  : "Создать"}
             </button>
           </div>
         </form>

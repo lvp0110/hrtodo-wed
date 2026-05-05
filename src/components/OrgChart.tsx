@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ReactFlow, Background } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -10,7 +10,7 @@ import { AddNodeCard } from "#/components/AddNodeCard";
 import { DeptModal } from "#/components/DeptModal";
 import { VacancyInfoModal } from "#/components/VacancyInfoModal";
 import { CreateVacancyModal } from "#/components/CreateVacancyModal";
-import type { OrgNode } from "#/types/api";
+import type { NodeCreateReq, OrgNode } from "#/types/api";
 import type {
   AddVacancyState,
   DeptModalState,
@@ -20,6 +20,7 @@ import type {
 const nodeTypes = { orgNode: OrgNodeCard, addNode: AddNodeCard };
 
 export function OrgChart() {
+  const queryClient = useQueryClient();
   const [deptModal, setDeptModal] = useState<DeptModalState | null>(null);
   const [vacancyModal, setVacancyModal] = useState<VacancyModalData | null>(
     null,
@@ -38,6 +39,14 @@ export function OrgChart() {
       orgNodesApi
         .getTreeVacancies()
         .then((res) => buildLayout(res.data as OrgNode[])),
+  });
+
+  const createNodeMutation = useMutation({
+    mutationFn: (body: NodeCreateReq) => orgNodesApi.createNode(body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orgTree"] });
+      setDeptModal(null);
+    },
   });
 
   const nodes = useMemo(
@@ -108,17 +117,30 @@ export function OrgChart() {
       {deptModal && (
         <DeptModal
           state={deptModal}
-          onClose={() => setDeptModal(null)}
+          onClose={() => {
+            createNodeMutation.reset();
+            setDeptModal(null);
+          }}
+          isPending={
+            deptModal.mode === "create" && createNodeMutation.isPending
+          }
+          error={
+            deptModal.mode === "create" && createNodeMutation.error
+              ? createNodeMutation.error.message
+              : null
+          }
           onSubmit={(data) => {
             if (deptModal.mode === "create") {
-              console.log("Создать отдел:", {
-                parentId: deptModal.parentId,
-                ...data,
+              createNodeMutation.mutate({
+                code: data.code,
+                name: data.name,
+                type_code: data.type,
+                parent_id: Number(deptModal.parentId),
               });
             } else {
               console.log("Сохранить отдел:", { id: deptModal.id, ...data });
+              setDeptModal(null);
             }
-            setDeptModal(null);
           }}
         />
       )}
