@@ -60,7 +60,7 @@ export function OrgNodeCard({ id, data }: NodeProps) {
           {vacancies.map((v, i) => (
             <li
               key={i}
-              className="px-4 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+              className={`px-4 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${v.is_manager ? "border-l-2 border-l-amber-400 bg-amber-50/40 dark:bg-amber-500/5" : ""}`}
               onMouseDown={stopAll}
               onClick={(e) =>
                 openVacancy(e, {
@@ -75,8 +75,20 @@ export function OrgNodeCard({ id, data }: NodeProps) {
                 })
               }
             >
-              <div className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">
-                {v.position.name}
+              <div className="flex items-center gap-1 text-xs font-medium text-gray-800 dark:text-gray-200 truncate">
+                {v.is_manager && (
+                  <svg
+                    aria-label="Руководящая должность"
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="text-amber-500 shrink-0"
+                  >
+                    <path d="M12 2l2.6 7.6H22l-6.2 4.5 2.4 7.5L12 16.9 5.8 21.6l2.4-7.5L2 9.6h7.4z" />
+                  </svg>
+                )}
+                <span className="truncate">{v.position.name}</span>
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span

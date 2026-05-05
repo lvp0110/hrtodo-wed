@@ -6,18 +6,25 @@ interface CreateVacancyModalProps {
   state: AddVacancyState;
   onClose: () => void;
   onSubmit: (data: VacancyFormFields) => void;
+  isPending?: boolean;
+  error?: string | null;
 }
 
 export function CreateVacancyModal({
   state,
   onClose,
   onSubmit,
+  isPending = false,
+  error = null,
 }: CreateVacancyModalProps) {
   const {
     register,
     handleSubmit,
     formState: { errors, isValid },
-  } = useForm<VacancyFormFields>({ mode: "onChange" });
+  } = useForm<VacancyFormFields>({
+    mode: "onChange",
+    defaultValues: { isManager: false },
+  });
 
   function handleBackdropClick(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose();
@@ -73,6 +80,17 @@ export function CreateVacancyModal({
               <p className="mt-1 text-xs text-red-400">{errors.city.message}</p>
             )}
           </div>
+
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              {...register("isManager")}
+              type="checkbox"
+              className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              Руководящая должность
+            </span>
+          </label>
 
           <div className="border-t border-gray-100 dark:border-gray-800 pt-4">
             <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
@@ -136,20 +154,25 @@ export function CreateVacancyModal({
             </div>
           </div>
 
+          {error && (
+            <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
+          )}
+
           <div className="flex gap-3 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              disabled={isPending}
+              className="flex-1 px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Отмена
             </button>
             <button
               type="submit"
-              disabled={!isValid}
+              disabled={!isValid || isPending}
               className="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              Создать
+              {isPending ? "Создаём…" : "Создать"}
             </button>
           </div>
         </form>

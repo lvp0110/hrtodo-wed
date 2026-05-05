@@ -3,14 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ReactFlow, Background } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { orgNodesApi } from "#/services/api";
+import { orgNodesApi, vacanciesApi } from "#/services/api";
 import { buildLayout } from "#/lib/orgTreeLayout";
 import { OrgNodeCard } from "#/components/OrgNodeCard";
 import { AddNodeCard } from "#/components/AddNodeCard";
 import { DeptModal } from "#/components/DeptModal";
 import { VacancyInfoModal } from "#/components/VacancyInfoModal";
 import { CreateVacancyModal } from "#/components/CreateVacancyModal";
-import type { NodeCreateReq, OrgNode } from "#/types/api";
+import type { NodeCreateReq, OrgNode, VacancyReq } from "#/types/api";
 import type {
   AddVacancyState,
   DeptModalState,
@@ -46,6 +46,14 @@ export function OrgChart() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orgTree"] });
       setDeptModal(null);
+    },
+  });
+
+  const createVacancyMutation = useMutation({
+    mutationFn: (body: VacancyReq) => vacanciesApi.create(body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orgTree"] });
+      setAddVacancyModal(null);
     },
   });
 
@@ -155,13 +163,20 @@ export function OrgChart() {
       {addVacancyModal && (
         <CreateVacancyModal
           state={addVacancyModal}
-          onClose={() => setAddVacancyModal(null)}
-          onSubmit={(data) => {
-            console.log("Создать вакансию:", {
-              deptId: addVacancyModal.deptId,
-              ...data,
-            });
+          onClose={() => {
+            createVacancyMutation.reset();
             setAddVacancyModal(null);
+          }}
+          isPending={createVacancyMutation.isPending}
+          error={createVacancyMutation.error?.message ?? null}
+          onSubmit={(data) => {
+            createVacancyMutation.mutate({
+              node_id: Number(addVacancyModal.deptId),
+              position_code: data.position,
+              position_name: data.position,
+              city_code: data.city,
+              is_manager: data.isManager,
+            });
           }}
         />
       )}

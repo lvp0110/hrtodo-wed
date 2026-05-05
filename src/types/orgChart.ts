@@ -19,6 +19,7 @@ export type AddVacancyState = {
 export type VacancyFormFields = {
   position: string;
   city: string;
+  isManager: boolean;
   surname: string;
   firstName: string;
   secondName: string;
