@@ -12,13 +12,13 @@ export const ADD_NODE_HEIGHT = 80;
 
 function nodeHeight(node: OrgNode): number {
   const count =
-    (node.Vacancies?.length ?? 0) + (node.EmptyVacancy?.length ?? 0);
+    (node.vacancies?.length ?? 0) + (node.empty_vacancy?.length ?? 0);
   return NODE_HEIGHT_BASE + count * VACANCY_ROW_HEIGHT + ADD_VACANCY_ROW_HEIGHT;
 }
 
 /** Ширина поддерева с учётом всех потомков и ноды "+" */
 function subtreeWidth(node: OrgNode): number {
-  const realChildren = node.Children ?? [];
+  const realChildren = node.children ?? [];
   const allWidths = [...realChildren.map(subtreeWidth), ADD_NODE_WIDTH];
   const totalChildrenWidth =
     allWidths.reduce((sum, w) => sum + w, 0) + H_GAP * (allWidths.length - 1);
@@ -33,7 +33,7 @@ function collectLevelHeights(
 ) {
   for (const node of nodes) {
     out.set(level, Math.max(out.get(level) ?? 0, nodeHeight(node)));
-    if (node.Children?.length) collectLevelHeights(node.Children, level + 1, out);
+    if (node.children?.length) collectLevelHeights(node.children, level + 1, out);
   }
 }
 
@@ -53,22 +53,22 @@ function placeNodes(
   heights: Map<number, number>,
   acc: { nodes: Node[]; edges: Edge[] },
 ) {
-  const id = String(node.ID);
+  const id = String(node.id);
 
-  const realChildren = node.Children ?? [];
+  const realChildren = node.children ?? [];
 
   acc.nodes.push({
     id,
     type: "orgNode",
     position: { x: centerX - NODE_WIDTH / 2, y: levelY(level, heights) },
     data: {
-      label: node.Name,
-      type: node.Type,
-      code: node.Code,
+      label: node.name,
+      type: node.type,
+      code: node.code,
       isLeaf: false,
       isRoot: !parentId,
-      vacancies: node.Vacancies ?? [],
-      emptyVacancies: node.EmptyVacancy ?? [],
+      vacancies: node.vacancies ?? [],
+      emptyVacancies: node.empty_vacancy ?? [],
       height: nodeHeight(node),
     },
   });
@@ -105,7 +105,7 @@ function placeNodes(
       y: levelY(level + 1, heights),
     },
     selectable: false,
-    data: { parentId: id, parentLabel: node.Name },
+    data: { parentId: id, parentLabel: node.name },
   });
   acc.edges.push({
     id: `${id}-${addNodeId}`,
