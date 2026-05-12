@@ -1,5 +1,7 @@
 import type {
   ApiResponse,
+  Employer,
+  Entity,
   NodeCreateReq,
   NodeUpdateReq,
   OrgNode,
@@ -93,4 +95,12 @@ export const vacanciesApi = {
   /** Получить отдел со списком занятых вакансий */
   getFilled: (nodeId: number): Promise<ApiResponse<OrgNode>> =>
     request(`/vacancies/${nodeId}/vacancies/filled`),
+};
+
+export const dictApi = {
+  /** Справочник городов */
+  getCities: (): Promise<ApiResponse<Entity[]>> => request("/dict/cities"),
+
+  /** Справочник сотрудников */
+  getEmployees: (): Promise<ApiResponse<Employer[]>> => request("/dict/employees"),
 };

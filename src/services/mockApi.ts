@@ -1,5 +1,7 @@
 import type {
   ApiResponse,
+  Employer,
+  Entity,
   NodeCreateReq,
   NodeUpdateReq,
   OrgNode,
@@ -387,6 +389,44 @@ export const vacanciesApi = {
     const node = findNode(MOCK_TREE, nodeId);
     if (!node) return notFound();
     return { code: 200, data: { ...node, empty_vacancy: null } };
+  },
+};
+
+const MOCK_CITIES: Entity[] = [
+  { code: "msk", name: "Москва" },
+  { code: "spb", name: "Санкт-Петербург" },
+  { code: "kzn", name: "Казань" },
+  { code: "nsk", name: "Новосибирск" },
+  { code: "ekb", name: "Екатеринбург" },
+];
+
+const MOCK_EMPLOYEES: Employer[] = [
+  { id: 101, first_name: "Анна", second_name: "Петровна", surname: "Смирнова", email: "smirnova@corp.ru" },
+  { id: 102, first_name: "Елена", second_name: "Игоревна", surname: "Фёдорова", email: "fedorova@corp.ru" },
+  { id: 103, first_name: "Дмитрий", second_name: "Олегович", surname: "Беляев", email: "belyaev@corp.ru" },
+  { id: 110, first_name: "Иван", second_name: "Сергеевич", surname: "Козлов", email: "kozlov@corp.ru" },
+  { id: 111, first_name: "Мария", second_name: "Андреевна", surname: "Новикова", email: "novikova@corp.ru" },
+  { id: 112, first_name: "Алексей", second_name: "Николаевич", surname: "Громов", email: "gromov@corp.ru" },
+  { id: 113, first_name: "Светлана", second_name: "Павловна", surname: "Орлова", email: "orlova@corp.ru" },
+  { id: 114, first_name: "Роман", second_name: "Витальевич", surname: "Суворов", email: "suvorov@corp.ru" },
+  { id: 115, first_name: "Ольга", second_name: "Дмитриевна", surname: "Васильева", email: "vasilieva@corp.ru" },
+  { id: 116, first_name: "Татьяна", second_name: "Юрьевна", surname: "Лебедева", email: "lebedeva@corp.ru" },
+  { id: 117, first_name: "Андрей", second_name: "Борисович", surname: "Кузнецов", email: "kuznetsov@corp.ru" },
+  { id: 118, first_name: "Наталья", second_name: "Геннадьевна", surname: "Морозова", email: "morozova@corp.ru" },
+  { id: 119, first_name: "Виктор", second_name: "Александрович", surname: "Соколов", email: "sokolov@corp.ru" },
+  { id: 120, first_name: "Юлия", second_name: "Ивановна", surname: "Попова", email: "popova@corp.ru" },
+  { id: 121, first_name: "Екатерина", second_name: "Михайловна", surname: "Захарова", email: "zaharova@corp.ru" },
+];
+
+export const dictApi = {
+  async getCities(): Promise<ApiResponse<Entity[]>> {
+    await delay();
+    return { code: 200, data: MOCK_CITIES };
+  },
+
+  async getEmployees(): Promise<ApiResponse<Employer[]>> {
+    await delay();
+    return { code: 200, data: MOCK_EMPLOYEES };
   },
 };
 

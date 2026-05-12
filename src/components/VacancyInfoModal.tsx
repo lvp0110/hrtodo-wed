@@ -13,10 +13,12 @@ function Row({ label, value }: { label: string; value: string }) {
 interface VacancyInfoModalProps {
   data: VacancyModalData;
   onClose: () => void;
+  onEdit?: () => void;
 }
 
-export function VacancyInfoModal({ data, onClose }: VacancyInfoModalProps) {
+export function VacancyInfoModal({ data, onClose, onEdit }: VacancyInfoModalProps) {
   const isVacant = !data.employer?.id;
+  const canEdit = data.id > 0 && Boolean(onEdit);
 
   function handleBackdropClick(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose();
@@ -65,13 +67,21 @@ export function VacancyInfoModal({ data, onClose }: VacancyInfoModalProps) {
           )}
         </div>
 
-        <div className="px-6 pb-5">
+        <div className="px-6 pb-5 flex gap-3">
           <button
             onClick={onClose}
-            className="w-full px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className="flex-1 px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             Закрыть
           </button>
+          {canEdit && (
+            <button
+              onClick={onEdit}
+              className="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+            >
+              Изменить
+            </button>
+          )}
         </div>
       </div>
     </div>

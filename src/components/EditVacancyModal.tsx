@@ -2,35 +2,61 @@ import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { CloseButton } from "#/components/CloseButton";
 import { dictApi } from "#/services/api";
-import type { AddVacancyState, VacancyFormFields } from "#/types/orgChart";
+import type {
+  EditVacancyFormFields,
+  VacancyModalData,
+} from "#/types/orgChart";
 
-interface CreateVacancyModalProps {
-  state: AddVacancyState;
+interface EditVacancyModalProps {
+  data: VacancyModalData;
   onClose: () => void;
-  onSubmit: (data: VacancyFormFields) => void;
+  onSubmit: (data: EditVacancyFormFields) => void;
   isPending?: boolean;
   error?: string | null;
 }
 
-export function CreateVacancyModal({
-  state,
+function employeeLabel({
+  surname,
+  first_name,
+  second_name,
+}: {
+  surname: string;
+  first_name: string;
+  second_name: string;
+}) {
+  return [surname, first_name, second_name].filter(Boolean).join(" ");
+}
+
+export function EditVacancyModal({
+  data,
   onClose,
   onSubmit,
   isPending = false,
   error = null,
-}: CreateVacancyModalProps) {
+}: EditVacancyModalProps) {
   const {
     register,
     handleSubmit,
     formState: { errors, isValid },
-  } = useForm<VacancyFormFields>({
+  } = useForm<EditVacancyFormFields>({
     mode: "onChange",
-    defaultValues: { isManager: false, cityCode: "" },
+    defaultValues: {
+      position: data.position,
+      cityCode: data.cityCode,
+      userId: data.employer?.id ?? null,
+      isManager: data.isManager,
+    },
   });
 
   const citiesQuery = useQuery({
     queryKey: ["dict", "cities"],
     queryFn: () => dictApi.getCities().then((res) => res.data),
+    staleTime: Infinity,
+  });
+
+  const employeesQuery = useQuery({
+    queryKey: ["dict", "employees"],
+    queryFn: () => dictApi.getEmployees().then((res) => res.data),
     staleTime: Infinity,
   });
 
@@ -42,6 +68,7 @@ export function CreateVacancyModal({
     "w-full px-3 py-2 text-sm rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent";
 
   const citiesDisabled = citiesQuery.isPending || citiesQuery.isError;
+  const employeesDisabled = employeesQuery.isPending || employeesQuery.isError;
 
   return (
     <div
@@ -52,10 +79,10 @@ export function CreateVacancyModal({
         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-              Новая вакансия
+              Редактирование вакансии
             </h2>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-              {state.deptName}
+              {data.deptName}
             </p>
           </div>
           <CloseButton onClick={onClose} />
@@ -68,7 +95,6 @@ export function CreateVacancyModal({
             </label>
             <input
               {...register("position", { required: "Обязательное поле" })}
-              autoFocus
               placeholder="Например: Менеджер по продажам"
               className={`${inputClass} ${errors.position ? "border-red-400 dark:border-red-500" : "border-gray-200 dark:border-gray-700"}`}
             />
@@ -105,6 +131,31 @@ export function CreateVacancyModal({
             )}
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Сотрудник
+            </label>
+            <select
+              {...register("userId", {
+                setValueAs: (v) => (v === "" || v == null ? null : Number(v)),
+              })}
+              disabled={employeesDisabled}
+              className={`${inputClass} border-gray-200 dark:border-gray-700 disabled:opacity-60`}
+            >
+              <option value="">— Без сотрудника (вакантно) —</option>
+              {employeesQuery.data?.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {employeeLabel(emp)}
+                </option>
+              ))}
+            </select>
+            {employeesQuery.isError && (
+              <p className="mt-1 text-xs text-red-400">
+                Не удалось загрузить список сотрудников
+              </p>
+            )}
+          </div>
+
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <input
               {...register("isManager")}
@@ -131,10 +182,10 @@ export function CreateVacancyModal({
             </button>
             <button
               type="submit"
-              disabled={!isValid || isPending || citiesDisabled}
+              disabled={!isValid || isPending || citiesDisabled || employeesDisabled}
               className="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              {isPending ? "Создаём…" : "Создать"}
+              {isPending ? "Сохраняем…" : "Сохранить"}
             </button>
           </div>
         </form>
