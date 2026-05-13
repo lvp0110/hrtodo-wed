@@ -14,7 +14,14 @@ export type DeptFields = { name: string; type: string; code: string };
 
 export type DeptModalState =
   | { mode: "create"; parentId: string; parentLabel: string }
-  | { mode: "edit"; id: string; name: string; type: string; code: string };
+  | {
+      mode: "edit";
+      id: string;
+      parentId: string | null;
+      name: string;
+      type: string;
+      code: string;
+    };
 
 export type AddVacancyState = {
   deptId: string;

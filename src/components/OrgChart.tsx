@@ -13,6 +13,7 @@ import { CreateVacancyModal } from "#/components/CreateVacancyModal";
 import { EditVacancyModal } from "#/components/EditVacancyModal";
 import type {
   NodeCreateReq,
+  NodeUpdateReq,
   OrgNode,
   VacancyReq,
   VacancyUpdateReq,
@@ -51,6 +52,15 @@ export function OrgChart() {
 
   const createNodeMutation = useMutation({
     mutationFn: (body: NodeCreateReq) => orgNodesApi.createNode(body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orgTree"] });
+      setDeptModal(null);
+    },
+  });
+
+  const updateNodeMutation = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: NodeUpdateReq }) =>
+      orgNodesApi.updateNode(id, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orgTree"] });
       setDeptModal(null);
@@ -129,6 +139,7 @@ export function OrgChart() {
             setDeptModal({
               mode: "edit",
               id: node.id,
+              parentId: (node.data.parentId as string | null) ?? null,
               name: node.data.label as string,
               type: node.data.type as string,
               code: node.data.code as string,
@@ -144,15 +155,18 @@ export function OrgChart() {
           state={deptModal}
           onClose={() => {
             createNodeMutation.reset();
+            updateNodeMutation.reset();
             setDeptModal(null);
           }}
           isPending={
-            deptModal.mode === "create" && createNodeMutation.isPending
+            deptModal.mode === "create"
+              ? createNodeMutation.isPending
+              : updateNodeMutation.isPending
           }
           error={
-            deptModal.mode === "create" && createNodeMutation.error
-              ? createNodeMutation.error.message
-              : null
+            (deptModal.mode === "create"
+              ? createNodeMutation.error?.message
+              : updateNodeMutation.error?.message) ?? null
           }
           onSubmit={(data) => {
             if (deptModal.mode === "create") {
@@ -163,8 +177,18 @@ export function OrgChart() {
                 parent_id: Number(deptModal.parentId),
               });
             } else {
-              console.log("Сохранить отдел:", { id: deptModal.id, ...data });
-              setDeptModal(null);
+              updateNodeMutation.mutate({
+                id: Number(deptModal.id),
+                body: {
+                  code: data.code,
+                  name: data.name,
+                  type_code: data.type,
+                  parent_id:
+                    deptModal.parentId === null
+                      ? null
+                      : Number(deptModal.parentId),
+                },
+              });
             }
           }}
         />

@@ -65,6 +65,7 @@ function placeNodes(
       label: node.name,
       type: node.type,
       code: node.code,
+      parentId: parentId ?? null,
       isLeaf: false,
       isRoot: !parentId,
       vacancies: node.vacancies ?? [],
