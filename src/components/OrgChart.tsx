@@ -15,6 +15,7 @@ import type {
   NodeCreateReq,
   NodeUpdateReq,
   OrgNode,
+  Vacancy,
   VacancyReq,
   VacancyUpdateReq,
 } from "#/types/api";
@@ -25,6 +26,25 @@ import type {
 } from "#/types/orgChart";
 
 const nodeTypes = { orgNode: OrgNodeCard, addNode: AddNodeCard };
+
+/** Кладёт/заменяет вакансию в дереве: ищет узел по node_id, обновляет по id. */
+function upsertVacancy(tree: OrgNode[], vacancy: Vacancy): OrgNode[] {
+  return tree.map((node) => {
+    if (node.id === vacancy.node_id) {
+      const existing = node.vacancies ?? [];
+      const idx = existing.findIndex((v) => v.id === vacancy.id);
+      const vacancies =
+        idx >= 0
+          ? existing.map((v, i) => (i === idx ? vacancy : v))
+          : [...existing, vacancy];
+      return { ...node, vacancies };
+    }
+    if (node.children) {
+      return { ...node, children: upsertVacancy(node.children, vacancy) };
+    }
+    return node;
+  });
+}
 
 export function OrgChart() {
   const queryClient = useQueryClient();
@@ -45,9 +65,8 @@ export function OrgChart() {
   } = useQuery({
     queryKey: ["orgTree"],
     queryFn: () =>
-      orgNodesApi
-        .getTreeVacancies()
-        .then((res) => buildLayout(res.data as OrgNode[])),
+      orgNodesApi.getTreeVacancies().then((res) => res.data as OrgNode[]),
+    select: buildLayout,
   });
 
   const createNodeMutation = useMutation({
@@ -69,8 +88,10 @@ export function OrgChart() {
 
   const createVacancyMutation = useMutation({
     mutationFn: (body: VacancyReq) => vacanciesApi.create(body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["orgTree"] });
+    onSuccess: ({ data: vacancy }) => {
+      queryClient.setQueryData<OrgNode[]>(["orgTree"], (old) =>
+        old ? upsertVacancy(old, vacancy) : old,
+      );
       setAddVacancyModal(null);
     },
   });
@@ -78,8 +99,10 @@ export function OrgChart() {
   const updateVacancyMutation = useMutation({
     mutationFn: ({ id, body }: { id: number; body: VacancyUpdateReq }) =>
       vacanciesApi.update(id, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["orgTree"] });
+    onSuccess: ({ data: vacancy }) => {
+      queryClient.setQueryData<OrgNode[]>(["orgTree"], (old) =>
+        old ? upsertVacancy(old, vacancy) : old,
+      );
       setEditVacancyModal(null);
     },
   });

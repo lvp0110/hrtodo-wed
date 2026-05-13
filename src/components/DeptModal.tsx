@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { CloseButton } from "#/components/CloseButton";
-import { dictApi } from "#/services/api";
+import { dictQueries } from "#/services/api";
 import type { DeptFields, DeptModalState } from "#/types/orgChart";
 
 export type { DeptFields };
@@ -34,11 +34,7 @@ export function DeptModal({
       : { name: "", type: "", code: "" },
   });
 
-  const nodeTypesQuery = useQuery({
-    queryKey: ["dict", "nodeTypes"],
-    queryFn: () => dictApi.getNodeTypes().then((res) => res.data),
-    staleTime: Infinity,
-  });
+  const nodeTypesQuery = useQuery(dictQueries.nodeTypes);
 
   const nodeTypesDisabled = nodeTypesQuery.isPending || nodeTypesQuery.isError;
 

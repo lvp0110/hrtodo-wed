@@ -1,3 +1,4 @@
+import { queryOptions } from "@tanstack/react-query";
 import type {
   ApiResponse,
   Employer,
@@ -108,4 +109,29 @@ export const dictApi = {
   /** Справочник типов организационных узлов */
   getNodeTypes: (): Promise<ApiResponse<OrgNodeType[]>> =>
     request("/dict/orgnode/type"),
+};
+
+/**
+ * Общие опции для справочников. Используются и в `useQuery`, и в `prefetchQuery`,
+ * чтобы данные загружались один раз и переиспользовались всеми модалками.
+ */
+export const dictQueries = {
+  cities: queryOptions({
+    queryKey: ["dict", "cities"] as const,
+    queryFn: () => dictApi.getCities().then((res) => res.data),
+    staleTime: Infinity,
+    gcTime: Infinity,
+  }),
+  employees: queryOptions({
+    queryKey: ["dict", "employees"] as const,
+    queryFn: () => dictApi.getEmployees().then((res) => res.data),
+    staleTime: Infinity,
+    gcTime: Infinity,
+  }),
+  nodeTypes: queryOptions({
+    queryKey: ["dict", "nodeTypes"] as const,
+    queryFn: () => dictApi.getNodeTypes().then((res) => res.data),
+    staleTime: Infinity,
+    gcTime: Infinity,
+  }),
 };

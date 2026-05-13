@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { CloseButton } from "#/components/CloseButton";
-import { dictApi } from "#/services/api";
+import { dictQueries } from "#/services/api";
 import type { AddVacancyState, VacancyFormFields } from "#/types/orgChart";
 
 interface CreateVacancyModalProps {
@@ -28,11 +28,7 @@ export function CreateVacancyModal({
     defaultValues: { isManager: false, cityCode: "" },
   });
 
-  const citiesQuery = useQuery({
-    queryKey: ["dict", "cities"],
-    queryFn: () => dictApi.getCities().then((res) => res.data),
-    staleTime: Infinity,
-  });
+  const citiesQuery = useQuery(dictQueries.cities);
 
   function handleBackdropClick(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose();
