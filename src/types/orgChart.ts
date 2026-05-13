@@ -1,12 +1,7 @@
 export type VacancyModalData = {
-  id: number;
-  nodeId: number;
   position: string;
-  positionCode: string;
   city: string;
-  cityCode: string;
   deptName: string;
-  isManager: boolean;
   employer: { id: number; name: string; email: string } | null;
 };
 
@@ -31,12 +26,5 @@ export type AddVacancyState = {
 export type VacancyFormFields = {
   position: string;
   cityCode: string;
-  isManager: boolean;
-};
-
-export type EditVacancyFormFields = {
-  position: string;
-  cityCode: string;
-  userId: number | null;
   isManager: boolean;
 };

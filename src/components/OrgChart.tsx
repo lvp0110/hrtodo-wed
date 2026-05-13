@@ -10,13 +10,11 @@ import { AddNodeCard } from "#/components/AddNodeCard";
 import { DeptModal } from "#/components/DeptModal";
 import { VacancyInfoModal } from "#/components/VacancyInfoModal";
 import { CreateVacancyModal } from "#/components/CreateVacancyModal";
-import { EditVacancyModal } from "#/components/EditVacancyModal";
 import type {
   NodeCreateReq,
   NodeUpdateReq,
   OrgNode,
   VacancyReq,
-  VacancyUpdateReq,
 } from "#/types/api";
 import type {
   AddVacancyState,
@@ -34,8 +32,6 @@ export function OrgChart() {
   );
   const [addVacancyModal, setAddVacancyModal] =
     useState<AddVacancyState | null>(null);
-  const [editVacancyModal, setEditVacancyModal] =
-    useState<VacancyModalData | null>(null);
 
   const {
     data: layout,
@@ -72,15 +68,6 @@ export function OrgChart() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orgTree"] });
       setAddVacancyModal(null);
-    },
-  });
-
-  const updateVacancyMutation = useMutation({
-    mutationFn: ({ id, body }: { id: number; body: VacancyUpdateReq }) =>
-      vacanciesApi.update(id, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["orgTree"] });
-      setEditVacancyModal(null);
     },
   });
 
@@ -198,10 +185,6 @@ export function OrgChart() {
         <VacancyInfoModal
           data={vacancyModal}
           onClose={() => setVacancyModal(null)}
-          onEdit={() => {
-            setEditVacancyModal(vacancyModal);
-            setVacancyModal(null);
-          }}
         />
       )}
 
@@ -221,31 +204,6 @@ export function OrgChart() {
               position_name: data.position,
               city_code: data.cityCode,
               is_manager: data.isManager,
-            });
-          }}
-        />
-      )}
-
-      {editVacancyModal && (
-        <EditVacancyModal
-          data={editVacancyModal}
-          onClose={() => {
-            updateVacancyMutation.reset();
-            setEditVacancyModal(null);
-          }}
-          isPending={updateVacancyMutation.isPending}
-          error={updateVacancyMutation.error?.message ?? null}
-          onSubmit={(data) => {
-            updateVacancyMutation.mutate({
-              id: editVacancyModal.id,
-              body: {
-                node_id: editVacancyModal.nodeId,
-                user_id: data.userId ?? 0,
-                city_code: data.cityCode,
-                position_code: data.position,
-                position_name: data.position,
-                is_manager: data.isManager,
-              },
             });
           }}
         />

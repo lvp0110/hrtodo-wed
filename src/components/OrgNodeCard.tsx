@@ -64,14 +64,9 @@ export function OrgNodeCard({ id, data }: NodeProps) {
               onMouseDown={stopAll}
               onClick={(e) =>
                 openVacancy(e, {
-                  id: v.id,
-                  nodeId: v.node_id,
                   position: v.position.name,
-                  positionCode: v.position.code,
                   city: v.city.name,
-                  cityCode: v.city.code,
                   deptName: label,
-                  isManager: v.is_manager,
                   employer: v.employer.id
                     ? {
                         id: v.employer.id,
@@ -117,14 +112,9 @@ export function OrgNodeCard({ id, data }: NodeProps) {
               onMouseDown={stopAll}
               onClick={(e) =>
                 openVacancy(e, {
-                  id: 0,
-                  nodeId: 0,
                   position: v.position.name,
-                  positionCode: v.position.code,
                   city: v.city.name,
-                  cityCode: v.city.code,
                   deptName: label,
-                  isManager: false,
                   employer: null,
                 })
               }
