@@ -1,5 +1,7 @@
 import { useForm } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import { CloseButton } from "#/components/CloseButton";
+import { dictApi } from "#/services/api";
 import type { DeptFields, DeptModalState } from "#/types/orgChart";
 
 export type { DeptFields };
@@ -29,8 +31,16 @@ export function DeptModal({
     mode: "onChange",
     defaultValues: isEdit
       ? { name: state.name, type: state.type, code: state.code }
-      : undefined,
+      : { name: "", type: "", code: "" },
   });
+
+  const nodeTypesQuery = useQuery({
+    queryKey: ["dict", "nodeTypes"],
+    queryFn: () => dictApi.getNodeTypes().then((res) => res.data),
+    staleTime: Infinity,
+  });
+
+  const nodeTypesDisabled = nodeTypesQuery.isPending || nodeTypesQuery.isError;
 
   function handleBackdropClick(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose();
@@ -75,13 +85,30 @@ export function DeptModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Тип
+              Тип <span className="text-red-400">*</span>
             </label>
-            <input
-              {...register("type")}
-              placeholder="Например: Департамент"
-              className={`${inputClass} border-gray-200 dark:border-gray-700`}
-            />
+            <select
+              {...register("type", { required: "Обязательное поле" })}
+              disabled={nodeTypesDisabled}
+              className={`${inputClass} ${errors.type ? "border-red-400 dark:border-red-500" : "border-gray-200 dark:border-gray-700"} disabled:opacity-60`}
+            >
+              <option value="" disabled hidden>
+                {nodeTypesQuery.isPending ? "Загрузка…" : "Выберите тип"}
+              </option>
+              {nodeTypesQuery.data?.map((t) => (
+                <option key={t.code} value={t.code}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            {errors.type && (
+              <p className="mt-1 text-xs text-red-400">{errors.type.message}</p>
+            )}
+            {nodeTypesQuery.isError && (
+              <p className="mt-1 text-xs text-red-400">
+                Не удалось загрузить список типов
+              </p>
+            )}
           </div>
 
           <div>
@@ -110,7 +137,7 @@ export function DeptModal({
             </button>
             <button
               type="submit"
-              disabled={!isValid || isPending}
+              disabled={!isValid || isPending || nodeTypesDisabled}
               className="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {isPending

@@ -6,6 +6,7 @@ import type {
   NodeUpdateReq,
   OrgNode,
   OrgNodeRow,
+  OrgNodeType,
   OrgNodesResponse,
   Vacancy,
   VacancyReq,
@@ -418,6 +419,13 @@ const MOCK_EMPLOYEES: Employer[] = [
   { id: 121, first_name: "Екатерина", second_name: "Михайловна", surname: "Захарова", email: "zaharova@corp.ru" },
 ];
 
+const MOCK_NODE_TYPES: OrgNodeType[] = [
+  { id: 1, code: "top", name: "Руководство" },
+  { id: 2, code: "department", name: "Департамент" },
+  { id: 3, code: "team", name: "Команда" },
+  { id: 4, code: "section", name: "Участок" },
+];
+
 export const dictApi = {
   async getCities(): Promise<ApiResponse<Entity[]>> {
     await delay();
@@ -427,6 +435,11 @@ export const dictApi = {
   async getEmployees(): Promise<ApiResponse<Employer[]>> {
     await delay();
     return { code: 200, data: MOCK_EMPLOYEES };
+  },
+
+  async getNodeTypes(): Promise<ApiResponse<OrgNodeType[]>> {
+    await delay();
+    return { code: 200, data: MOCK_NODE_TYPES };
   },
 };
 

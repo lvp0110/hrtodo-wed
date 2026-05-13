@@ -6,6 +6,7 @@ import type {
   NodeUpdateReq,
   OrgNode,
   OrgNodeRow,
+  OrgNodeType,
   OrgNodesResponse,
   Vacancy,
   VacancyReq,
@@ -103,4 +104,8 @@ export const dictApi = {
 
   /** Справочник сотрудников */
   getEmployees: (): Promise<ApiResponse<Employer[]>> => request("/dict/employees"),
+
+  /** Справочник типов организационных узлов */
+  getNodeTypes: (): Promise<ApiResponse<OrgNodeType[]>> =>
+    request("/dict/orgnode/type"),
 };

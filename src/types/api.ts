@@ -11,6 +11,12 @@ export interface Employer {
   email: string;
 }
 
+export interface OrgNodeType {
+  id: number;
+  code: string;
+  name: string;
+}
+
 export interface EmptyVacancy {
   position: Entity;
   city: Entity;
