@@ -78,11 +78,11 @@ export const vacanciesApi = {
     request(`/vacancies/${id}`),
 
   /** Создать вакансию */
-  create: (body: VacancyReq): Promise<ApiResponse<null>> =>
+  create: (body: VacancyReq): Promise<ApiResponse<Vacancy>> =>
     request("/vacancies", { method: "POST", body }),
 
   /** Обновить вакансию */
-  update: (id: number, body: VacancyUpdateReq): Promise<ApiResponse<null>> =>
+  update: (id: number, body: VacancyUpdateReq): Promise<ApiResponse<Vacancy>> =>
     request(`/vacancies/${id}`, { method: "PUT", body }),
 
   /** Удалить вакансию */

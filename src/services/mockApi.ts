@@ -364,14 +364,34 @@ export const vacanciesApi = {
     return notFound();
   },
 
-  async create(_body: VacancyReq): Promise<ApiResponse<null>> {
+  async create(body: VacancyReq): Promise<ApiResponse<Vacancy>> {
     await delay();
-    return { code: 201, data: null };
+    return {
+      code: 201,
+      data: {
+        id: Math.floor(Math.random() * 10_000) + 9000,
+        node_id: body.node_id,
+        position: { code: body.position_code, name: body.position_name },
+        city: { code: body.city_code, name: body.city_code },
+        employer: { id: 0, first_name: "", second_name: "", surname: "", email: "" },
+        is_manager: body.is_manager,
+      },
+    };
   },
 
-  async update(_id: number, _body: VacancyUpdateReq): Promise<ApiResponse<null>> {
+  async update(id: number, body: VacancyUpdateReq): Promise<ApiResponse<Vacancy>> {
     await delay();
-    return { code: 200, data: null };
+    return {
+      code: 200,
+      data: {
+        id,
+        node_id: body.node_id,
+        position: { code: body.position_code, name: body.position_name },
+        city: { code: body.city_code, name: body.city_code },
+        employer: { id: body.user_id, first_name: "", second_name: "", surname: "", email: "" },
+        is_manager: body.is_manager,
+      },
+    };
   },
 
   async delete(_id: number): Promise<void> {
