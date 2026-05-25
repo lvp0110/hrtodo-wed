@@ -27,6 +27,11 @@ export interface CountryReq {
   name: string;
 }
 
+export interface OrgNodeTypeReq {
+  code: string;
+  name: string;
+}
+
 export interface Employer {
   id: number;
   first_name: string;

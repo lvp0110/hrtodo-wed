@@ -6,11 +6,13 @@ import type {
   Country,
   CountryReq,
   Employer,
+  Entity,
   NodeCreateReq,
   NodeUpdateReq,
   OrgNode,
   OrgNodeRow,
   OrgNodeType,
+  OrgNodeTypeReq,
   OrgNodesResponse,
   Vacancy,
   VacancyReq,
@@ -103,8 +105,12 @@ export const vacanciesApi = {
 };
 
 export const dictApi = {
-  /** Справочник городов */
-  getCities: (): Promise<ApiResponse<City[]>> => request("/dict/cities"),
+  /**
+   * Справочник городов. Бэк отдаёт усечённую модель (без id и country_id),
+   * поэтому редактирование/удаление из списка невозможно — только просмотр
+   * и добавление новых через POST /cities.
+   */
+  getCities: (): Promise<ApiResponse<Entity[]>> => request("/dict/cities"),
 
   /** Справочник стран */
   getCountries: (): Promise<ApiResponse<Country[]>> => request("/dict/countries"),
@@ -149,6 +155,24 @@ export const countriesApi = {
   /** Удалить страну */
   delete: (id: number): Promise<void> =>
     request(`/country/${id}`, { method: "DELETE" }),
+};
+
+export const orgNodeTypesApi = {
+  /** Получить тип узла по ID */
+  get: (id: number): Promise<ApiResponse<OrgNodeType>> =>
+    request(`/orgnodetypes/${id}`),
+
+  /** Создать тип узла */
+  create: (body: OrgNodeTypeReq): Promise<ApiResponse<OrgNodeType>> =>
+    request("/orgnodetypes", { method: "POST", body }),
+
+  /** Обновить тип узла */
+  update: (id: number, body: OrgNodeTypeReq): Promise<ApiResponse<OrgNodeType>> =>
+    request(`/orgnodetypes/${id}`, { method: "PUT", body }),
+
+  /** Удалить тип узла */
+  delete: (id: number): Promise<void> =>
+    request(`/orgnodetypes/${id}`, { method: "DELETE" }),
 };
 
 /**

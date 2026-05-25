@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -10,14 +10,9 @@ import {
   Field,
   dictInputClass,
 } from "#/components/settings/DictFormModal";
-import type { City, CityReq } from "#/types/api";
+import type { CityReq, Entity } from "#/types/api";
 
 export const Route = createFileRoute("/settings/cities")({ component: CitiesPage });
-
-type FormState =
-  | { mode: "create" }
-  | { mode: "edit"; city: City }
-  | null;
 
 interface FormFields {
   code: string;
@@ -27,16 +22,10 @@ interface FormFields {
 
 function CitiesPage() {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState<FormState>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const citiesQuery = useQuery(dictQueries.cities);
   const countriesQuery = useQuery(dictQueries.countries);
-
-  const countryById = useMemo(() => {
-    const map = new Map<number, string>();
-    countriesQuery.data?.forEach((c) => map.set(c.id, c.name));
-    return map;
-  }, [countriesQuery.data]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["dict", "cities"] });
@@ -46,33 +35,16 @@ function CitiesPage() {
     mutationFn: (body: CityReq) => citiesApi.create(body),
     onSuccess: () => {
       invalidate();
-      setForm(null);
+      setCreateOpen(false);
     },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, body }: { id: number; body: CityReq }) =>
-      citiesApi.update(id, body),
-    onSuccess: () => {
-      invalidate();
-      setForm(null);
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => citiesApi.delete(id),
-    onSuccess: invalidate,
   });
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Города, доступные при создании вакансий.
-        </p>
+      <div className="mb-4 flex items-center justify-end">
         <button
           type="button"
-          onClick={() => setForm({ mode: "create" })}
+          onClick={() => setCreateOpen(true)}
           className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           <Plus size={16} />
@@ -80,7 +52,7 @@ function CitiesPage() {
         </button>
       </div>
 
-      <DictTable<City>
+      <DictTable<Entity>
         columns={[
           {
             key: "code",
@@ -88,55 +60,25 @@ function CitiesPage() {
             render: (r) => <span className="font-mono text-xs">{r.code}</span>,
           },
           { key: "name", header: "Название", render: (r) => r.name },
-          {
-            key: "country",
-            header: "Страна",
-            render: (r) =>
-              countryById.get(r.country_id) ?? (
-                <span className="text-gray-400">—</span>
-              ),
-          },
         ]}
         rows={citiesQuery.data ?? []}
-        rowKey={(r) => r.id}
-        onEdit={(city) => setForm({ mode: "edit", city })}
-        onDelete={(city) => {
-          if (confirm(`Удалить город «${city.name}»?`)) {
-            deleteMutation.mutate(city.id);
-          }
-        }}
+        rowKey={(r) => r.code}
         isLoading={citiesQuery.isPending}
         isError={citiesQuery.isError}
         errorMessage={citiesQuery.error?.message}
       />
 
-      {form && (
+      {createOpen && (
         <CityFormModal
-          state={form}
           countries={countriesQuery.data ?? []}
           countriesLoading={countriesQuery.isPending}
-          isPending={
-            form.mode === "create"
-              ? createMutation.isPending
-              : updateMutation.isPending
-          }
-          error={
-            (form.mode === "create"
-              ? createMutation.error?.message
-              : updateMutation.error?.message) ?? null
-          }
+          isPending={createMutation.isPending}
+          error={createMutation.error?.message ?? null}
           onClose={() => {
             createMutation.reset();
-            updateMutation.reset();
-            setForm(null);
+            setCreateOpen(false);
           }}
-          onSubmit={(data) => {
-            if (form.mode === "create") {
-              createMutation.mutate(data);
-            } else {
-              updateMutation.mutate({ id: form.city.id, body: data });
-            }
-          }}
+          onSubmit={(data) => createMutation.mutate(data)}
         />
       )}
     </>
@@ -144,7 +86,6 @@ function CitiesPage() {
 }
 
 interface CityFormModalProps {
-  state: Exclude<FormState, null>;
   countries: { id: number; name: string }[];
   countriesLoading: boolean;
   isPending: boolean;
@@ -154,7 +95,6 @@ interface CityFormModalProps {
 }
 
 function CityFormModal({
-  state,
   countries,
   countriesLoading,
   isPending,
@@ -162,26 +102,18 @@ function CityFormModal({
   onClose,
   onSubmit,
 }: CityFormModalProps) {
-  const isEdit = state.mode === "edit";
   const {
     register,
     handleSubmit,
     formState: { errors, isValid },
   } = useForm<FormFields>({
     mode: "onChange",
-    defaultValues: isEdit
-      ? {
-          code: state.city.code,
-          name: state.city.name,
-          country_id: state.city.country_id,
-        }
-      : { code: "", name: "", country_id: 0 },
+    defaultValues: { code: "", name: "", country_id: 0 },
   });
 
   return (
     <DictFormModal
-      title={isEdit ? "Редактировать город" : "Новый город"}
-      subtitle={isEdit ? state.city.name : undefined}
+      title="Новый город"
       onClose={onClose}
       onSubmit={handleSubmit((data) =>
         onSubmit({
@@ -193,8 +125,8 @@ function CityFormModal({
       isPending={isPending}
       canSubmit={isValid}
       error={error}
-      submitLabel={isEdit ? "Сохранить" : "Создать"}
-      pendingLabel={isEdit ? "Сохраняем…" : "Создаём…"}
+      submitLabel="Создать"
+      pendingLabel="Создаём…"
     >
       <Field label="Код" required error={errors.code?.message}>
         <input

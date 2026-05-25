@@ -5,6 +5,7 @@ export const Route = createFileRoute("/settings")({ component: SettingsLayout })
 const tabs = [
   { to: "/settings/cities", label: "Города" },
   { to: "/settings/countries", label: "Страны" },
+  { to: "/settings/orgnodetypes", label: "Типы узлов" },
 ] as const;
 
 function SettingsLayout() {
