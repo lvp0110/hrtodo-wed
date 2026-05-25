@@ -1,8 +1,11 @@
 import { queryOptions } from "@tanstack/react-query";
 import type {
   ApiResponse,
+  City,
+  CityReq,
+  Country,
+  CountryReq,
   Employer,
-  Entity,
   NodeCreateReq,
   NodeUpdateReq,
   OrgNode,
@@ -101,7 +104,10 @@ export const vacanciesApi = {
 
 export const dictApi = {
   /** Справочник городов */
-  getCities: (): Promise<ApiResponse<Entity[]>> => request("/dict/cities"),
+  getCities: (): Promise<ApiResponse<City[]>> => request("/dict/cities"),
+
+  /** Справочник стран */
+  getCountries: (): Promise<ApiResponse<Country[]>> => request("/dict/countries"),
 
   /** Справочник сотрудников */
   getEmployees: (): Promise<ApiResponse<Employer[]>> => request("/dict/employees"),
@@ -109,6 +115,40 @@ export const dictApi = {
   /** Справочник типов организационных узлов */
   getNodeTypes: (): Promise<ApiResponse<OrgNodeType[]>> =>
     request("/dict/orgnode/type"),
+};
+
+export const citiesApi = {
+  /** Получить город по ID */
+  get: (id: number): Promise<ApiResponse<City>> => request(`/cities/${id}`),
+
+  /** Создать город */
+  create: (body: CityReq): Promise<ApiResponse<City>> =>
+    request("/cities", { method: "POST", body }),
+
+  /** Обновить город */
+  update: (id: number, body: CityReq): Promise<ApiResponse<City>> =>
+    request(`/cities/${id}`, { method: "PUT", body }),
+
+  /** Удалить город */
+  delete: (id: number): Promise<void> =>
+    request(`/cities/${id}`, { method: "DELETE" }),
+};
+
+export const countriesApi = {
+  /** Получить страну по ID */
+  get: (id: number): Promise<ApiResponse<Country>> => request(`/country/${id}`),
+
+  /** Создать страну */
+  create: (body: CountryReq): Promise<ApiResponse<Country>> =>
+    request("/country", { method: "POST", body }),
+
+  /** Обновить страну */
+  update: (id: number, body: CountryReq): Promise<ApiResponse<Country>> =>
+    request(`/country/${id}`, { method: "PUT", body }),
+
+  /** Удалить страну */
+  delete: (id: number): Promise<void> =>
+    request(`/country/${id}`, { method: "DELETE" }),
 };
 
 /**
@@ -119,6 +159,12 @@ export const dictQueries = {
   cities: queryOptions({
     queryKey: ["dict", "cities"] as const,
     queryFn: () => dictApi.getCities().then((res) => res.data),
+    staleTime: Infinity,
+    gcTime: Infinity,
+  }),
+  countries: queryOptions({
+    queryKey: ["dict", "countries"] as const,
+    queryFn: () => dictApi.getCountries().then((res) => res.data),
     staleTime: Infinity,
     gcTime: Infinity,
   }),

@@ -3,6 +3,30 @@ export interface Entity {
   name: string;
 }
 
+export interface City {
+  id: number;
+  code: string;
+  name: string;
+  country_id: number;
+}
+
+export interface Country {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export interface CityReq {
+  code: string;
+  name: string;
+  country_id: number;
+}
+
+export interface CountryReq {
+  code: string;
+  name: string;
+}
+
 export interface Employer {
   id: number;
   first_name: string;

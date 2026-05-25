@@ -5,7 +5,7 @@ export const Route = createFileRoute("/")({ component: App });
 
 function App() {
   return (
-    <div className="fixed inset-0">
+    <div className="absolute inset-0">
       <OrgChart />
     </div>
   );

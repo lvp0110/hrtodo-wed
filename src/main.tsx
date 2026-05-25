@@ -17,6 +17,7 @@ const queryClient = new QueryClient({
 
 // Прогреваем справочники сразу при старте — модалки уже застают их в кеше.
 queryClient.prefetchQuery(dictQueries.cities);
+queryClient.prefetchQuery(dictQueries.countries);
 queryClient.prefetchQuery(dictQueries.employees);
 queryClient.prefetchQuery(dictQueries.nodeTypes);
 
