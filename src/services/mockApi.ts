@@ -388,7 +388,7 @@ export const vacanciesApi = {
         node_id: body.node_id,
         position: { code: body.position_code, name: body.position_name },
         city: { code: body.city_code, name: body.city_code },
-        employer: { id: body.user_id, first_name: "", second_name: "", surname: "", email: "" },
+        employer: { id: body.user_id ?? 0, first_name: "", second_name: "", surname: "", email: "" },
         is_manager: body.is_manager,
       },
     };

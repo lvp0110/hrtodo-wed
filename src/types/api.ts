@@ -113,7 +113,7 @@ export interface VacancyReq {
 
 export interface VacancyUpdateReq {
   node_id: number;
-  user_id: number;
+  user_id: number | null;
   city_code: string;
   position_code: string;
   position_name: string;

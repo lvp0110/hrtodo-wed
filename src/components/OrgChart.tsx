@@ -264,7 +264,7 @@ export function OrgChart() {
               id: editVacancyModal.id,
               body: {
                 node_id: editVacancyModal.nodeId,
-                user_id: data.userId ?? 0,
+                user_id: data.userId,
                 city_code: data.cityCode,
                 position_code: data.position,
                 position_name: data.position,
