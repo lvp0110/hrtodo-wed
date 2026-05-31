@@ -39,7 +39,6 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script_stop: true
           command_timeout: 30m
           envs: TG_TOKEN,TG_CHAT,COMMIT_SHA,DEPLOY_PATH,HRWEB_API_URL,HOST_PORT
           script: |
