@@ -40,7 +40,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           command_timeout: 30m
-          envs: TG_TOKEN,TG_CHAT,COMMIT_SHA,DEPLOY_PATH,HRWEB_API_URL,HOST_PORT
+          envs: TG_TOKEN,TG_CHAT,COMMIT_SHA,DEPLOY_PATH,HRWEB_API_URL,HOST_PORT,GITHUB_REPOSITORY
           script: |
             set -e
 
@@ -51,11 +51,21 @@ jobs:
                 --data-urlencode text="$1" > /dev/null || true
             }
 
-            REPO_DIR="${DEPLOY_PATH}/hr-todo-web"
+            # DEPLOY_PATH = полный путь к рабочей копии репы на сервере
+            # (например /home/deploy/hrtodo-wed). Имя каталога значения не имеет.
+            REPO_DIR="${DEPLOY_PATH}"
+            REPO_URL="https://github.com/${GITHUB_REPOSITORY}.git"
             CONTAINER_NAME="hr-todo-web"
             IMAGE_NAME="hr-todo-web:latest"
             IMAGE_PREV="hr-todo-web:prev"
             HOST_PORT="${HOST_PORT:-3005}"
+
+            # Bootstrap: если репо ещё не склонирован — клонируем.
+            if [ ! -d "$REPO_DIR/.git" ]; then
+              tg "📦 Первый запуск: клонирую репозиторий в <code>${REPO_DIR}</code>..."
+              mkdir -p "$(dirname "$REPO_DIR")"
+              git clone "$REPO_URL" "$REPO_DIR"
+            fi
 
             tg "📥 Получаю новый код (commit <code>${COMMIT_SHA:0:7}</code>)..."
             cd "$REPO_DIR"
