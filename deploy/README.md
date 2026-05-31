@@ -41,15 +41,10 @@ sudo docker run -d \
   -e API_URL="http://localhost:3008" \
   hr-todo-web:latest
 
-# nginx
-sudo cp deploy/nginx/hr-todo-web.conf /etc/nginx/sites-available/hr-todo-web
-sudo sed -i 's|<DOMAIN>|hr.example.com|g'                     /etc/nginx/sites-available/hr-todo-web
-sudo sed -i 's|<CERT_DIR>|/etc/letsencrypt/live/hr.example.com|g' /etc/nginx/sites-available/hr-todo-web
-sudo ln -sf /etc/nginx/sites-available/hr-todo-web /etc/nginx/sites-enabled/hr-todo-web
+# nginx (домен hr.constrtodo.ru, wildcard-сертификат *.constrtodo.ru уже на сервере)
+sudo cp deploy/nginx/hr_constrtodo.conf /etc/nginx/sites-available/
+sudo ln -sf /etc/nginx/sites-available/hr_constrtodo.conf /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
-
-# certbot, если ещё нет сертификата
-sudo certbot --nginx -d hr.example.com
 ```
 
 ## Что делает workflow
