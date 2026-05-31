@@ -84,6 +84,25 @@ export interface ApiResponse<T> {
   data: T;
 }
 
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface UserFullInfo {
+  user_id: string;
+  first_name: string;
+  middle_name: string;
+  last_name: string;
+  email: string;
+  role_type: string;
+  position_id: number;
+  position_type: string;
+  department_id: number;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface ErrorResponse {
   code: number;
   error: string;

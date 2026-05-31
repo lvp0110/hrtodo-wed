@@ -7,6 +7,7 @@ import type {
   CountryReq,
   Employer,
   Entity,
+  LoginRequest,
   NodeCreateReq,
   NodeUpdateReq,
   OrgNode,
@@ -14,6 +15,7 @@ import type {
   OrgNodeType,
   OrgNodeTypeReq,
   OrgNodesResponse,
+  UserFullInfo,
   Vacancy,
   VacancyReq,
   VacancyUpdateReq,
@@ -23,17 +25,50 @@ const BASE_URL = "/api";
 
 type Method = "GET" | "POST" | "PUT" | "DELETE";
 
+/**
+ * Читает значение cookie по имени. CSRF-cookie выставлен бэком без HttpOnly,
+ * поэтому доступен из JS — используется для добавления X-CSRF-Token в заголовки.
+ */
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+
+  const prefix = `${name}=`;
+  const parts = document.cookie ? document.cookie.split("; ") : [];
+
+  for (const part of parts) {
+    if (part.startsWith(prefix)) {
+      return decodeURIComponent(part.slice(prefix.length));
+    }
+  }
+
+  return null;
+}
+
 async function request<T>(
   path: string,
   init: { method?: Method; body?: unknown } = {},
 ): Promise<T> {
   const { method = "GET", body } = init;
+
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+  };
+
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  // CSRF: на мутации обязателен заголовок X-CSRF-Token, совпадающий с cookie.
+  if (method === "POST" || method === "PUT" || method === "DELETE") {
+    const csrf = readCookie("csrf_token");
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+  }
+
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
-    headers: {
-      Accept: "application/json",
-      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-    },
+    headers,
+    // Куки access_token / csrf_token приходят с бэка и должны отправляться обратно.
+    credentials: "include",
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
@@ -48,6 +83,29 @@ async function request<T>(
 
   return res.json() as Promise<T>;
 }
+
+export const authApi = {
+  /** Вход: бэк ставит HttpOnly access_token и csrf_token. */
+  login: (body: LoginRequest): Promise<ApiResponse<UserFullInfo>> =>
+    request("/login", { method: "POST", body }),
+
+  /** Проверка активной сессии — используется для условного рендера в __root. */
+  session: (): Promise<ApiResponse<UserFullInfo>> => request("/auth/session"),
+
+  /** Выход: бэк сбрасывает обе cookies. */
+  logout: (): Promise<ApiResponse<string>> =>
+    request("/auth/logout", { method: "POST" }),
+};
+
+export const authQueries = {
+  session: queryOptions({
+    queryKey: ["auth", "session"] as const,
+    queryFn: () => authApi.session().then((res) => res.data),
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
+    retry: false,
+  }),
+};
 
 export const orgNodesApi = {
   /** Получить всё организационное дерево */
