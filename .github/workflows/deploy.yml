@@ -1,0 +1,162 @@
+name: Deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Telegram (start)
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MSG=$'🚀 <b>Деплой hr-todo-web начат</b>\n'
+          MSG+="<b>Repo:</b> ${GITHUB_REPOSITORY}"$'\n'
+          MSG+="<b>Branch:</b> ${GITHUB_REF_NAME}"$'\n'
+          MSG+="<b>Commit:</b> <code>${GITHUB_SHA:0:7}</code>"$'\n'
+          MSG+="<b>Author:</b> ${GITHUB_ACTOR}"$'\n'
+          MSG+="<a href=\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\">Run #${GITHUB_RUN_NUMBER}</a>"
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d chat_id="${TG_CHAT}" \
+            -d parse_mode=HTML \
+            -d disable_web_page_preview=true \
+            --data-urlencode text="$MSG" > /dev/null
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script_stop: true
+          command_timeout: 30m
+          envs: TG_TOKEN,TG_CHAT,COMMIT_SHA,DEPLOY_PATH,HRWEB_API_URL,HOST_PORT
+          script: |
+            set -e
+
+            tg() {
+              curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+                -d chat_id="${TG_CHAT}" \
+                -d parse_mode=HTML \
+                --data-urlencode text="$1" > /dev/null || true
+            }
+
+            REPO_DIR="${DEPLOY_PATH}/hr-todo-web"
+            CONTAINER_NAME="hr-todo-web"
+            IMAGE_NAME="hr-todo-web:latest"
+            IMAGE_PREV="hr-todo-web:prev"
+            HOST_PORT="${HOST_PORT:-3005}"
+
+            tg "📥 Получаю новый код (commit <code>${COMMIT_SHA:0:7}</code>)..."
+            cd "$REPO_DIR"
+            git fetch origin master
+            git reset --hard origin/master
+
+            # Тегаем текущий образ как :prev для возможного отката.
+            sudo docker tag "$IMAGE_NAME" "$IMAGE_PREV" 2>/dev/null || true
+
+            tg "🧹 Очищаю старые образы и build cache..."
+            sudo docker image prune -f || true
+            sudo docker builder prune -af || true
+
+            tg "🔨 Собираю Docker-образ..."
+            sudo docker build -t "$IMAGE_NAME" --no-cache .
+
+            tg "♻️ Перезапускаю контейнер..."
+            sudo docker stop "$CONTAINER_NAME" 2>/dev/null || true
+            sudo docker rm "$CONTAINER_NAME" 2>/dev/null || true
+
+            sudo docker run -d \
+              --name "$CONTAINER_NAME" \
+              --restart unless-stopped \
+              -p 127.0.0.1:${HOST_PORT}:3004 \
+              -e HTTP_PORT=3004 \
+              -e API_URL="${HRWEB_API_URL}" \
+              "$IMAGE_NAME"
+
+            tg "🩺 Проверяю health check..."
+            HEALTHY=0
+            for i in 1 2 3 4 5; do
+              if curl -sf "http://127.0.0.1:${HOST_PORT}/__health" > /dev/null 2>&1; then
+                echo "Health check passed"
+                HEALTHY=1
+                break
+              fi
+              echo "Waiting for container to start... ($i/5)"
+              sleep 3
+            done
+
+            if [ "$HEALTHY" -eq 1 ]; then
+              exit 0
+            fi
+
+            tg "⚠️ Health check не прошёл, откатываюсь на предыдущий образ..."
+            sudo docker stop "$CONTAINER_NAME" 2>/dev/null || true
+            sudo docker rm "$CONTAINER_NAME" 2>/dev/null || true
+
+            if sudo docker image inspect "$IMAGE_PREV" > /dev/null 2>&1; then
+              sudo docker run -d \
+                --name "$CONTAINER_NAME" \
+                --restart unless-stopped \
+                -p 127.0.0.1:${HOST_PORT}:3004 \
+                -e HTTP_PORT=3004 \
+                -e API_URL="${HRWEB_API_URL}" \
+                "$IMAGE_PREV"
+              echo "Rolled back to previous image"
+            else
+              echo "No previous image found — manual recovery required"
+            fi
+            exit 1
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          COMMIT_SHA: ${{ github.sha }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          HRWEB_API_URL: ${{ secrets.HRWEB_API_URL }}
+          HOST_PORT: ${{ secrets.HOST_PORT }}
+
+      - name: Notify Telegram (success)
+        if: success()
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DEPLOY_DOMAIN: ${{ secrets.DEPLOY_DOMAIN }}
+        run: |
+          MSG=$'✅ <b>Деплой hr-todo-web успешно завершён</b>\n'
+          MSG+="<b>Commit:</b> <code>${GITHUB_SHA:0:7}</code>"$'\n'
+          MSG+="<b>Author:</b> ${GITHUB_ACTOR}"$'\n'
+          if [ -n "$DEPLOY_DOMAIN" ]; then
+            MSG+="<a href=\"https://${DEPLOY_DOMAIN}\">https://${DEPLOY_DOMAIN}</a>"
+          fi
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d chat_id="${TG_CHAT}" \
+            -d parse_mode=HTML \
+            -d disable_web_page_preview=true \
+            --data-urlencode text="$MSG" > /dev/null
+
+      - name: Notify Telegram (failure)
+        if: failure()
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MSG=$'❌ <b>Деплой hr-todo-web провален</b>\n'
+          MSG+="<b>Commit:</b> <code>${GITHUB_SHA:0:7}</code>"$'\n'
+          MSG+="<b>Author:</b> ${GITHUB_ACTOR}"$'\n'
+          MSG+="<a href=\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\">Логи Run #${GITHUB_RUN_NUMBER}</a>"
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d chat_id="${TG_CHAT}" \
+            -d parse_mode=HTML \
+            -d disable_web_page_preview=true \
+            --data-urlencode text="$MSG" > /dev/null

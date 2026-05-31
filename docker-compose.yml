@@ -1,13 +1,15 @@
 services:
   web:
     build: .
+    container_name: hr-todo-web
     ports:
-      - "${HTTP_PORT:-3004}:3004"
-      - "${HTTPS_PORT:-3447}:3447"
+      - "127.0.0.1:${HOST_PORT:-3005}:3004"
     environment:
-      - NODE_ENV=production
-      - API_URL=http://backend:3008
-      - USE_HTTPS=true
-      - HTTP_PORT=3004
-      - HTTPS_PORT=3447
+      NODE_ENV: production
+      HTTP_PORT: "3004"
+      API_URL: ${API_URL:-http://host.docker.internal:3008}
     restart: unless-stopped
+    extra_hosts:
+      # host.docker.internal даёт доступ к бэку, запущенному прямо на хосте,
+      # без необходимости общей docker-сети с backend-контейнером.
+      - "host.docker.internal:host-gateway"

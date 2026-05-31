@@ -2,18 +2,17 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
-import https from "https";
 import proxy from "express-http-proxy";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const HTTP_PORT = process.env.HTTP_PORT || 3004;
-const HTTPS_PORT = process.env.HTTPS_PORT || 3447;
-const USE_HTTPS = process.env.USE_HTTPS === "true";
+const HTTP_PORT = Number(process.env.HTTP_PORT) || 3004;
+const API_URL = process.env.API_URL || "http://localhost:3008";
 
-// Инъектируем переменные окружения с префиксом HRWEB_ в HTML
+// Инъектируем переменные окружения с префиксом HRWEB_ в HTML —
+// фронт читает их через window.__ENV__ во время рантайма.
 const injectEnvVariables = (html) => {
   let envScript = "<script>\n";
   envScript += "window.__ENV__ = {};\n";
@@ -29,22 +28,34 @@ const injectEnvVariables = (html) => {
   return html.replace("<head>", "<head>" + envScript);
 };
 
-// Проксируем /api/* на бэкенд
+// Проксируем /api/* на бэкенд, срезая префикс /api.
 app.use(
   "/api",
-  proxy(process.env.API_URL || "http://localhost:3008", {
+  proxy(API_URL, {
     proxyReqPathResolver: (req) => {
       const targetPath = req.originalUrl.replace(/^\/api/, "");
-      console.log(`Proxy: /api${targetPath} → ${process.env.API_URL}${targetPath}`);
+      console.log(`Proxy: /api${targetPath} → ${API_URL}${targetPath}`);
       return targetPath;
     },
-  })
+    // Сохраняем куки и Authorization-заголовки бэкенда.
+    proxyReqOptDecorator: (proxyReqOpts) => proxyReqOpts,
+    userResHeaderDecorator: (headers) => headers,
+  }),
 );
 
-// Статические ассеты
-app.use("/assets", express.static(path.join(__dirname, "dist/assets")));
+// Health-эндпоинт для smoke-test'а из deploy-скрипта.
+app.get("/__health", (_, res) => res.json({ ok: true }));
 
-// SPA fallback — index.html с инъекцией переменных окружения
+// Статические ассеты с длинным cache: имена hash'ятся vite'ом, безопасно.
+app.use(
+  "/assets",
+  express.static(path.join(__dirname, "dist/assets"), {
+    maxAge: "1y",
+    immutable: true,
+  }),
+);
+
+// SPA fallback — index.html с инъекцией env-переменных, без кеша.
 app.get("*", (_, res) => {
   const indexPath = path.join(__dirname, "dist", "index.html");
 
@@ -55,33 +66,21 @@ app.get("*", (_, res) => {
     }
 
     res.set("Content-Type", "text/html");
+    res.set("Cache-Control", "no-cache");
     res.send(injectEnvVariables(data));
   });
 });
 
-// HTTP
-app.listen(HTTP_PORT, () => {
-  console.log(`HTTP  server: http://localhost:${HTTP_PORT}`);
-  console.log(`API_URL: ${process.env.API_URL || "http://localhost:3008"}`);
+const server = app.listen(HTTP_PORT, () => {
+  console.log(`HTTP server: http://localhost:${HTTP_PORT}`);
+  console.log(`API proxy:   /api → ${API_URL}`);
 });
 
-// HTTPS
-if (USE_HTTPS) {
-  try {
-    const certPath = fs.existsSync(path.join(__dirname, "certs"))
-      ? path.join(__dirname, "certs")
-      : path.join(__dirname, "../certs");
-
-    const httpsOptions = {
-      key: fs.readFileSync(path.join(certPath, "privkey.pem")),
-      cert: fs.readFileSync(path.join(certPath, "fullchain.pem")),
-    };
-
-    https.createServer(httpsOptions, app).listen(HTTPS_PORT, () => {
-      console.log(`HTTPS server: https://localhost:${HTTPS_PORT}`);
-    });
-  } catch (error) {
-    console.error("Failed to start HTTPS server:", error.message);
-    console.log("Run ./generate-certs.sh to create certificates");
-  }
-}
+// Graceful shutdown — даём Docker корректно остановить контейнер.
+const shutdown = (signal) => {
+  console.log(`[server] ${signal} received, closing...`);
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 10_000).unref();
+};
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
