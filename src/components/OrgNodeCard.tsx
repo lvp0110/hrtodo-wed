@@ -79,6 +79,8 @@ export function OrgNodeCard({ id, data }: NodeProps) {
                         email: v.employer.email,
                       }
                     : null,
+                  jobOffer: v.job_offer_link,
+                  description: v.position_description,
                 })
               }
             >
@@ -126,6 +128,8 @@ export function OrgNodeCard({ id, data }: NodeProps) {
                   deptName: label,
                   isManager: false,
                   employer: null,
+                  jobOffer: "",
+                  description: "",
                 })
               }
             >

@@ -245,6 +245,8 @@ export function OrgChart() {
               position_name: data.position,
               city_code: data.cityCode,
               is_manager: data.isManager,
+              position_description: data.description,
+              job_offer_link: data.jobOffer,
             });
           }}
         />
@@ -269,6 +271,8 @@ export function OrgChart() {
                 position_code: data.position,
                 position_name: data.position,
                 is_manager: data.isManager,
+                position_description: data.description,
+                job_offer_link: data.jobOffer,
               },
             });
           }}

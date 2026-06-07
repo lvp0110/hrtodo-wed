@@ -10,22 +10,21 @@ import {
   Field,
   dictInputClass,
 } from "#/components/settings/DictFormModal";
-import type { CityReq, Entity } from "#/types/api";
+import type { City, CityReq, Country } from "#/types/api";
 
 export const Route = createFileRoute("/settings/cities")({ component: CitiesPage });
 
-interface FormFields {
-  code: string;
-  name: string;
-  country_id: number;
-}
+type FormState = { mode: "create" } | { mode: "edit"; city: City } | null;
 
 function CitiesPage() {
   const queryClient = useQueryClient();
-  const [createOpen, setCreateOpen] = useState(false);
+  const [form, setForm] = useState<FormState>(null);
 
   const citiesQuery = useQuery(dictQueries.cities);
   const countriesQuery = useQuery(dictQueries.countries);
+
+  const countryName = (id: number) =>
+    countriesQuery.data?.find((c) => c.id === id)?.name ?? "—";
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["dict", "cities"] });
@@ -35,8 +34,22 @@ function CitiesPage() {
     mutationFn: (body: CityReq) => citiesApi.create(body),
     onSuccess: () => {
       invalidate();
-      setCreateOpen(false);
+      setForm(null);
     },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: CityReq }) =>
+      citiesApi.update(id, body),
+    onSuccess: () => {
+      invalidate();
+      setForm(null);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => citiesApi.delete(id),
+    onSuccess: invalidate,
   });
 
   return (
@@ -44,7 +57,7 @@ function CitiesPage() {
       <div className="mb-4 flex items-center justify-end">
         <button
           type="button"
-          onClick={() => setCreateOpen(true)}
+          onClick={() => setForm({ mode: "create" })}
           className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           <Plus size={16} />
@@ -52,7 +65,7 @@ function CitiesPage() {
         </button>
       </div>
 
-      <DictTable<Entity>
+      <DictTable<City>
         columns={[
           {
             key: "code",
@@ -60,25 +73,52 @@ function CitiesPage() {
             render: (r) => <span className="font-mono text-xs">{r.code}</span>,
           },
           { key: "name", header: "Название", render: (r) => r.name },
+          {
+            key: "country",
+            header: "Страна",
+            render: (r) => countryName(r.country_id),
+          },
         ]}
         rows={citiesQuery.data ?? []}
-        rowKey={(r) => r.code}
+        rowKey={(r) => r.id}
+        onEdit={(city) => setForm({ mode: "edit", city })}
+        onDelete={(city) => {
+          if (confirm(`Удалить город «${city.name}»?`)) {
+            deleteMutation.mutate(city.id);
+          }
+        }}
         isLoading={citiesQuery.isPending}
         isError={citiesQuery.isError}
         errorMessage={citiesQuery.error?.message}
       />
 
-      {createOpen && (
+      {form && (
         <CityFormModal
+          state={form}
           countries={countriesQuery.data ?? []}
           countriesLoading={countriesQuery.isPending}
-          isPending={createMutation.isPending}
-          error={createMutation.error?.message ?? null}
+          isPending={
+            form.mode === "create"
+              ? createMutation.isPending
+              : updateMutation.isPending
+          }
+          error={
+            (form.mode === "create"
+              ? createMutation.error?.message
+              : updateMutation.error?.message) ?? null
+          }
           onClose={() => {
             createMutation.reset();
-            setCreateOpen(false);
+            updateMutation.reset();
+            setForm(null);
           }}
-          onSubmit={(data) => createMutation.mutate(data)}
+          onSubmit={(data) => {
+            if (form.mode === "create") {
+              createMutation.mutate(data);
+            } else {
+              updateMutation.mutate({ id: form.city.id, body: data });
+            }
+          }}
         />
       )}
     </>
@@ -86,7 +126,8 @@ function CitiesPage() {
 }
 
 interface CityFormModalProps {
-  countries: { id: number; name: string }[];
+  state: Exclude<FormState, null>;
+  countries: Country[];
   countriesLoading: boolean;
   isPending: boolean;
   error: string | null;
@@ -94,7 +135,14 @@ interface CityFormModalProps {
   onSubmit: (data: CityReq) => void;
 }
 
+interface FormFields {
+  code: string;
+  name: string;
+  country_id: number;
+}
+
 function CityFormModal({
+  state,
   countries,
   countriesLoading,
   isPending,
@@ -102,18 +150,26 @@ function CityFormModal({
   onClose,
   onSubmit,
 }: CityFormModalProps) {
+  const isEdit = state.mode === "edit";
   const {
     register,
     handleSubmit,
     formState: { errors, isValid },
   } = useForm<FormFields>({
     mode: "onChange",
-    defaultValues: { code: "", name: "", country_id: 0 },
+    defaultValues: isEdit
+      ? {
+          code: state.city.code,
+          name: state.city.name,
+          country_id: state.city.country_id,
+        }
+      : { code: "", name: "", country_id: 0 },
   });
 
   return (
     <DictFormModal
-      title="Новый город"
+      title={isEdit ? "Редактировать город" : "Новый город"}
+      subtitle={isEdit ? state.city.name : undefined}
       onClose={onClose}
       onSubmit={handleSubmit((data) =>
         onSubmit({
@@ -125,8 +181,8 @@ function CityFormModal({
       isPending={isPending}
       canSubmit={isValid}
       error={error}
-      submitLabel="Создать"
-      pendingLabel="Создаём…"
+      submitLabel={isEdit ? "Сохранить" : "Создать"}
+      pendingLabel={isEdit ? "Сохраняем…" : "Создаём…"}
     >
       <Field label="Код" required error={errors.code?.message}>
         <input

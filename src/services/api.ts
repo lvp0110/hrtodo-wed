@@ -6,7 +6,6 @@ import type {
   Country,
   CountryReq,
   Employer,
-  Entity,
   LoginRequest,
   NodeCreateReq,
   NodeUpdateReq,
@@ -164,11 +163,10 @@ export const vacanciesApi = {
 
 export const dictApi = {
   /**
-   * Справочник городов. Бэк отдаёт усечённую модель (без id и country_id),
-   * поэтому редактирование/удаление из списка невозможно — только просмотр
-   * и добавление новых через POST /cities.
+   * Справочник городов — полная модель City (id, code, name, country_id),
+   * что позволяет редактировать/удалять прямо из списка.
    */
-  getCities: (): Promise<ApiResponse<Entity[]>> => request("/dict/cities"),
+  getCities: (): Promise<ApiResponse<City[]>> => request("/dict/cities"),
 
   /** Справочник стран */
   getCountries: (): Promise<ApiResponse<Country[]>> => request("/dict/countries"),
@@ -236,29 +234,32 @@ export const orgNodeTypesApi = {
 /**
  * Общие опции для справочников. Используются и в `useQuery`, и в `prefetchQuery`,
  * чтобы данные загружались один раз и переиспользовались всеми модалками.
+ *
+ * Бэк отдаёт `data: null` для пустого справочника (nil-срез в Go), поэтому
+ * нормализуем в `[]` — потребители вызывают `.map` без доп. проверок.
  */
 export const dictQueries = {
   cities: queryOptions({
     queryKey: ["dict", "cities"] as const,
-    queryFn: () => dictApi.getCities().then((res) => res.data),
+    queryFn: () => dictApi.getCities().then((res) => res.data ?? []),
     staleTime: Infinity,
     gcTime: Infinity,
   }),
   countries: queryOptions({
     queryKey: ["dict", "countries"] as const,
-    queryFn: () => dictApi.getCountries().then((res) => res.data),
+    queryFn: () => dictApi.getCountries().then((res) => res.data ?? []),
     staleTime: Infinity,
     gcTime: Infinity,
   }),
   employees: queryOptions({
     queryKey: ["dict", "employees"] as const,
-    queryFn: () => dictApi.getEmployees().then((res) => res.data),
+    queryFn: () => dictApi.getEmployees().then((res) => res.data ?? []),
     staleTime: Infinity,
     gcTime: Infinity,
   }),
   nodeTypes: queryOptions({
     queryKey: ["dict", "nodeTypes"] as const,
-    queryFn: () => dictApi.getNodeTypes().then((res) => res.data),
+    queryFn: () => dictApi.getNodeTypes().then((res) => res.data ?? []),
     staleTime: Infinity,
     gcTime: Infinity,
   }),

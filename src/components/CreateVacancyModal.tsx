@@ -25,7 +25,12 @@ export function CreateVacancyModal({
     formState: { errors, isValid },
   } = useForm<VacancyFormFields>({
     mode: "onChange",
-    defaultValues: { isManager: false, cityCode: "" },
+    defaultValues: {
+      isManager: false,
+      cityCode: "",
+      description: "",
+      jobOffer: "",
+    },
   });
 
   const citiesQuery = useQuery(dictQueries.cities);
@@ -99,6 +104,30 @@ export function CreateVacancyModal({
                 Не удалось загрузить список городов
               </p>
             )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Описание вакансии
+            </label>
+            <textarea
+              {...register("description")}
+              rows={3}
+              placeholder="Обязанности, требования, условия…"
+              className={`${inputClass} border-gray-200 dark:border-gray-700 resize-y`}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Предложение о работе
+            </label>
+            <textarea
+              {...register("jobOffer")}
+              rows={3}
+              placeholder="Текст предложения о работе…"
+              className={`${inputClass} border-gray-200 dark:border-gray-700 resize-y`}
+            />
           </div>
 
           <label className="flex items-center gap-2 cursor-pointer select-none">

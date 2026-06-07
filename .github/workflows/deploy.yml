@@ -59,6 +59,10 @@ jobs:
             IMAGE_NAME="hr-todo-web:latest"
             IMAGE_PREV="hr-todo-web:prev"
             HOST_PORT="${HOST_PORT:-3005}"
+            # Общая docker-сеть с бэкендом (контейнер hrtodo-backend живёт в ней).
+            # Это compose-сеть проекта ~/work/HRTodo. Фронт подключаем к ней,
+            # чтобы server.js резолвил API_URL=http://hrtodo-backend:3008.
+            DOCKER_NETWORK="${DOCKER_NETWORK:-hrtodo_default}"
 
             # Bootstrap: если репо ещё не склонирован — клонируем.
             if [ ! -d "$REPO_DIR/.git" ]; then
@@ -89,6 +93,7 @@ jobs:
             sudo docker run -d \
               --name "$CONTAINER_NAME" \
               --restart unless-stopped \
+              --network "$DOCKER_NETWORK" \
               -p 127.0.0.1:${HOST_PORT}:3004 \
               -e HTTP_PORT=3004 \
               -e API_URL="${HRWEB_API_URL}" \
@@ -118,6 +123,7 @@ jobs:
               sudo docker run -d \
                 --name "$CONTAINER_NAME" \
                 --restart unless-stopped \
+                --network "$DOCKER_NETWORK" \
                 -p 127.0.0.1:${HOST_PORT}:3004 \
                 -e HTTP_PORT=3004 \
                 -e API_URL="${HRWEB_API_URL}" \

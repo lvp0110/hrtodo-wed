@@ -58,6 +58,8 @@ export interface Vacancy {
   city: Entity;
   employer: Employer;
   is_manager: boolean;
+  position_description: string;
+  job_offer_link: string;
 }
 
 export interface OrgNode {
@@ -66,9 +68,9 @@ export interface OrgNode {
   name: string;
   type: string;
   parent_id: number | null;
-  children: OrgNode[] | null;
-  vacancies: Vacancy[] | null;
-  empty_vacancy: EmptyVacancy[] | null;
+  children: OrgNode[];
+  vacancies: Vacancy[];
+  empty_vacancy: EmptyVacancy[];
 }
 
 export interface OrgNodeRow {
@@ -128,6 +130,8 @@ export interface VacancyReq {
   position_name: string;
   city_code: string;
   is_manager: boolean;
+  position_description: string;
+  job_offer_link: string;
 }
 
 export interface VacancyUpdateReq {
@@ -137,4 +141,6 @@ export interface VacancyUpdateReq {
   position_code: string;
   position_name: string;
   is_manager: boolean;
+  position_description: string;
+  job_offer_link: string;
 }

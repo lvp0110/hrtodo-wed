@@ -8,6 +8,8 @@ export type VacancyModalData = {
   deptName: string;
   isManager: boolean;
   employer: { id: number; name: string; email: string } | null;
+  jobOffer: string;
+  description: string;
 };
 
 export type DeptFields = { name: string; type: string; code: string };
@@ -32,6 +34,8 @@ export type VacancyFormFields = {
   position: string;
   cityCode: string;
   isManager: boolean;
+  jobOffer: string;
+  description: string;
 };
 
 export type EditVacancyFormFields = {
@@ -39,4 +43,6 @@ export type EditVacancyFormFields = {
   cityCode: string;
   userId: number | null;
   isManager: boolean;
+  jobOffer: string;
+  description: string;
 };

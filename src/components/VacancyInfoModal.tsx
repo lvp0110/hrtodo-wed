@@ -1,11 +1,23 @@
 import { CloseButton } from "#/components/CloseButton";
 import type { VacancyModalData } from "#/types/orgChart";
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({
+  label,
+  value,
+  multiline = false,
+}: {
+  label: string;
+  value: string;
+  multiline?: boolean;
+}) {
   return (
     <div>
       <div className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">{label}</div>
-      <div className="text-sm text-gray-900 dark:text-gray-100">{value}</div>
+      <div
+        className={`text-sm text-gray-900 dark:text-gray-100${multiline ? " whitespace-pre-line" : ""}`}
+      >
+        {value}
+      </div>
     </div>
   );
 }
@@ -62,6 +74,14 @@ export function VacancyInfoModal({ data, onClose }: VacancyInfoModalProps) {
                 <Row label="Email" value={data.employer.email} />
               )}
             </>
+          )}
+
+          {data.description && (
+            <Row label="Описание вакансии" value={data.description} multiline />
+          )}
+
+          {data.jobOffer && (
+            <Row label="Предложение о работе" value={data.jobOffer} multiline />
           )}
         </div>
 
