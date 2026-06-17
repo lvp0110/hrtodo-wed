@@ -19,272 +19,329 @@ const delay = (ms = 300) => new Promise<void>((r) => setTimeout(r, ms));
 // Mock data
 // ---------------------------------------------------------------------------
 
+const e = { id: 0, first_name: "", second_name: "", surname: "", email: "" };
+const v = (
+  id: number,
+  node_id: number,
+  name: string,
+  cityCode: string,
+  cityName: string,
+  is_manager = false,
+): Vacancy => ({
+  id,
+  node_id,
+  position: { code: name, name },
+  city: { code: cityCode, name: cityName },
+  employer: e,
+  is_manager,
+  position_description: "",
+  job_offer_link: "",
+});
+
 const MOCK_TREE: OrgNode[] = [
   {
     id: 1,
-    code: "ceo",
-    name: "Генеральный директор",
-    type: "top",
+    code: "akustik_group",
+    name: "Акустик Групп",
+    type: "company",
     parent_id: null,
+    vacancies: [],
+    empty_vacancy: [],
     children: [
       {
         id: 2,
-        code: "fin",
-        name: "Финансовый департамент",
-        type: "department",
+        code: "business_development",
+        name: "Business Development",
+        type: "knot",
         parent_id: 1,
-        children: [
-          {
-            id: 10,
-            code: "accounting",
-            name: "Бухгалтерия",
-            type: "department",
-            parent_id: 2,
-            children: [],
-            vacancies: [
-              { id: 1001, node_id: 10, is_manager: true, city: { code: "msk", name: "Москва" }, position: { code: "acc_lead", name: "Главный бухгалтер" }, employer: { id: 101, first_name: "Анна", second_name: "Петровна", surname: "Смирнова", email: "smirnova@corp.ru" }, position_description: "", job_offer_link: "" },
-              { id: 1002, node_id: 10, is_manager: false, city: { code: "msk", name: "Москва" }, position: { code: "acc_jr", name: "Бухгалтер" }, employer: { id: 102, first_name: "Елена", second_name: "Игоревна", surname: "Фёдорова", email: "fedorova@corp.ru" }, position_description: "", job_offer_link: "" },
-            ],
-            empty_vacancy: [],
-          },
-          {
-            id: 11,
-            code: "controlling",
-            name: "Контроллинг",
-            type: "department",
-            parent_id: 2,
-            children: [],
-            vacancies: [],
-            empty_vacancy: [
-              { city: { code: "msk", name: "Москва" }, position: { code: "analyst", name: "Финансовый аналитик" } },
-              { city: { code: "msk", name: "Москва" }, position: { code: "controller", name: "Контролёр" } },
-            ],
-          },
-          {
-            id: 12,
-            code: "treasury",
-            name: "Казначейство",
-            type: "department",
-            parent_id: 2,
-            children: [],
-            vacancies: [
-              { id: 1003, node_id: 12, is_manager: false, city: { code: "msk", name: "Москва" }, position: { code: "treasurer", name: "Казначей" }, employer: { id: 103, first_name: "Дмитрий", second_name: "Олегович", surname: "Беляев", email: "belyaev@corp.ru" }, position_description: "", job_offer_link: "" },
-            ],
-            empty_vacancy: [],
-          },
-        ],
-        vacancies: [],
+        vacancies: [v(1, 2, "Генеральный директор", "moscow", "Москва", true)],
         empty_vacancy: [],
-      },
-      {
-        id: 3,
-        code: "tech",
-        name: "Технический департамент",
-        type: "department",
-        parent_id: 1,
         children: [
           {
-            id: 13,
-            code: "dev",
-            name: "Разработка",
+            id: 3,
+            code: "directorate_for_development",
+            name: "Дирекция по развитию",
             type: "department",
-            parent_id: 3,
+            parent_id: 2,
+            vacancies: [
+              v(2, 3, "Директор по развитию бизнеса", "moscow", "Москва", true),
+              v(7, 3, "Менеджер по развити, Екат", "ekaterinburg", "Екатеринбург"),
+              v(4, 3, "Менеджер по развитию", "moscow", "Москва"),
+              v(3, 3, "Менеджер по развитию сегментов", "moscow", "Москва"),
+              v(5, 3, "Руководитель направления по работе с архитекторами", "moscow", "Москва"),
+              v(6, 3, "Торговый представитель", "moscow", "Москва"),
+              v(8, 3, "Менеджер по развитию, Питер", "st_petersburg", "Санкт-Петербург"),
+            ],
+            empty_vacancy: [],
             children: [
               {
-                id: 20,
-                code: "frontend",
-                name: "Frontend",
-                type: "team",
-                parent_id: 13,
+                id: 4,
+                code: "online_store",
+                name: "Интернет-магазин",
+                type: "site",
+                parent_id: 3,
                 children: [],
+                empty_vacancy: [],
                 vacancies: [
-                  { id: 1010, node_id: 20, is_manager: true, city: { code: "spb", name: "Санкт-Петербург" }, position: { code: "fe_lead", name: "Frontend Lead" }, employer: { id: 110, first_name: "Иван", second_name: "Сергеевич", surname: "Козлов", email: "kozlov@corp.ru" }, position_description: "", job_offer_link: "" },
-                  { id: 1011, node_id: 20, is_manager: false, city: { code: "spb", name: "Санкт-Петербург" }, position: { code: "fe_mid", name: "Frontend Dev" }, employer: { id: 111, first_name: "Мария", second_name: "Андреевна", surname: "Новикова", email: "novikova@corp.ru" }, position_description: "", job_offer_link: "" },
-                ],
-                empty_vacancy: [
-                  { city: { code: "spb", name: "Санкт-Петербург" }, position: { code: "fe_jun", name: "Junior Frontend" } },
+                  v(9, 4, "Директор по развитию", "moscow", "Москва", true),
+                  v(12, 4, "Frontend разработчик", "moscow", "Москва"),
+                  v(10, 4, "Менеджер по развитию интернет-проектов", "moscow", "Москва"),
+                  v(11, 4, "Программист Bitrix", "moscow", "Москва"),
                 ],
               },
+            ],
+          },
+          {
+            id: 5,
+            code: "department_digitalization",
+            name: "Отдел цифровизации и разработки приложений",
+            type: "department",
+            parent_id: 2,
+            vacancies: [
+              v(13, 5, "Заместитель технического директора", "moscow", "Москва", true),
+              v(14, 5, "Директор по разработке ПО", "moscow", "Москва"),
+              v(16, 5, "Инженер-конструктор, ИИ", "moscow", "Москва"),
+              v(15, 5, "Промпт-инженер по созданию визуального контента", "moscow", "Москва"),
+            ],
+            empty_vacancy: [],
+            children: [
               {
-                id: 21,
-                code: "backend",
-                name: "Backend",
-                type: "team",
-                parent_id: 13,
-                children: [],
+                id: 6,
+                code: "bim_technologies",
+                name: "BIM 3D технологии",
+                type: "site",
+                parent_id: 5,
                 vacancies: [
-                  { id: 1012, node_id: 21, is_manager: true, city: { code: "spb", name: "Санкт-Петербург" }, position: { code: "be_lead", name: "Backend Lead" }, employer: { id: 112, first_name: "Алексей", second_name: "Николаевич", surname: "Громов", email: "gromov@corp.ru" }, position_description: "", job_offer_link: "" },
+                  v(17, 6, "Директор по разработке ПО", "moscow", "Москва", true),
+                  v(18, 6, "Помощник BIM-менеджера", "moscow", "Москва"),
                 ],
-                empty_vacancy: [
-                  { city: { code: "spb", name: "Санкт-Петербург" }, position: { code: "be_mid", name: "Backend Dev" } },
-                  { city: { code: "spb", name: "Санкт-Петербург" }, position: { code: "be_jun", name: "Junior Backend" } },
+                empty_vacancy: [],
+                children: [
+                  {
+                    id: 7,
+                    code: "go_build",
+                    name: "Go Build",
+                    type: "site",
+                    parent_id: 6,
+                    children: [],
+                    empty_vacancy: [],
+                    vacancies: [
+                      v(19, 7, "проектник 1", "moscow", "Москва"),
+                      v(20, 7, "проектник 2", "moscow", "Москва"),
+                    ],
+                  },
                 ],
               },
-              {
-                id: 22,
-                code: "mobile",
-                name: "Mobile",
-                type: "team",
-                parent_id: 13,
-                children: [],
-                vacancies: [],
-                empty_vacancy: [
-                  { city: { code: "msk", name: "Москва" }, position: { code: "mob_dev", name: "Mobile Dev" } },
-                ],
-              },
             ],
-            vacancies: [],
+          },
+          {
+            id: 8,
+            code: "decotec_development_marketing",
+            name: "Развитие и маркетинг Декотек",
+            type: "department",
+            parent_id: 2,
+            children: [],
             empty_vacancy: [],
+            vacancies: [v(21, 8, "Операционный директор Декотек", "moscow", "Москва")],
           },
           {
-            id: 14,
-            code: "qa",
-            name: "Тестирование",
+            id: 9,
+            code: "marketing_directorate_ag",
+            name: "Дирекция по маркетингу АГ",
             type: "department",
-            parent_id: 3,
+            parent_id: 2,
             children: [],
-            vacancies: [
-              { id: 1013, node_id: 14, is_manager: true, city: { code: "msk", name: "Москва" }, position: { code: "qa_lead", name: "QA Lead" }, employer: { id: 113, first_name: "Светлана", second_name: "Павловна", surname: "Орлова", email: "orlova@corp.ru" }, position_description: "", job_offer_link: "" },
-            ],
-            empty_vacancy: [
-              { city: { code: "msk", name: "Москва" }, position: { code: "qa_eng", name: "QA инженер" } },
-            ],
-          },
-          {
-            id: 15,
-            code: "devops",
-            name: "DevOps",
-            type: "department",
-            parent_id: 3,
-            children: [],
-            vacancies: [
-              { id: 1014, node_id: 15, is_manager: false, city: { code: "spb", name: "Санкт-Петербург" }, position: { code: "devops_eng", name: "DevOps инженер" }, employer: { id: 114, first_name: "Роман", second_name: "Витальевич", surname: "Суворов", email: "suvorov@corp.ru" }, position_description: "", job_offer_link: "" },
-            ],
             empty_vacancy: [],
-          },
-          {
-            id: 16,
-            code: "arch",
-            name: "Архитектура",
-            type: "department",
-            parent_id: 3,
-            children: [],
-            vacancies: [],
-            empty_vacancy: [
-              { city: { code: "msk", name: "Москва" }, position: { code: "architect", name: "Системный архитектор" } },
+            vacancies: [
+              v(22, 9, "Директор по маркетингу", "moscow", "Москва", true),
+              v(23, 9, "лод", "almaty", "Алматы"),
+              v(30, 9, "Менеджер по работе с рекламными материалами", "moscow", "Москва"),
+              v(27, 9, "Продакт-менеджер", "moscow", "Москва"),
+              v(24, 9, "Руководитель отдела Product Management", "moscow", "Москва"),
+              v(32, 9, "Специалист отдела маркетинга", "moscow", "Москва"),
             ],
           },
         ],
-        vacancies: [],
+      },
+      {
+        id: 10,
+        code: "management_company",
+        name: "Управляющая компания",
+        type: "knot",
+        parent_id: 1,
+        vacancies: [v(96, 10, "Генеральный директор", "moscow", "Москва", true)],
         empty_vacancy: [],
-      },
-      {
-        id: 4,
-        code: "hr",
-        name: "HR департамент",
-        type: "department",
-        parent_id: 1,
         children: [
           {
-            id: 17,
-            code: "recruitment",
-            name: "Рекрутмент",
+            id: 11,
+            code: "finance_department",
+            name: "Финансовый департамент",
             type: "department",
-            parent_id: 4,
+            parent_id: 10,
             children: [],
-            vacancies: [
-              { id: 1015, node_id: 17, is_manager: false, city: { code: "msk", name: "Москва" }, position: { code: "recruiter", name: "Рекрутер" }, employer: { id: 115, first_name: "Ольга", second_name: "Дмитриевна", surname: "Васильева", email: "vasilieva@corp.ru" }, position_description: "", job_offer_link: "" },
-              { id: 1016, node_id: 17, is_manager: false, city: { code: "msk", name: "Москва" }, position: { code: "recruiter_sr", name: "Старший рекрутер" }, employer: { id: 116, first_name: "Татьяна", second_name: "Юрьевна", surname: "Лебедева", email: "lebedeva@corp.ru" }, position_description: "", job_offer_link: "" },
-            ],
             empty_vacancy: [],
-          },
-          {
-            id: 18,
-            code: "learning",
-            name: "Обучение и развитие",
-            type: "department",
-            parent_id: 4,
-            children: [],
-            vacancies: [],
-            empty_vacancy: [
-              { city: { code: "msk", name: "Москва" }, position: { code: "trainer", name: "Тренер" } },
-            ],
-          },
-        ],
-        vacancies: [],
-        empty_vacancy: [],
-      },
-      {
-        id: 5,
-        code: "legal",
-        name: "Юридический департамент",
-        type: "department",
-        parent_id: 1,
-        children: [
-          {
-            id: 19,
-            code: "compliance",
-            name: "Комплаенс",
-            type: "department",
-            parent_id: 5,
-            children: [],
             vacancies: [
-              { id: 1017, node_id: 19, is_manager: false, city: { code: "msk", name: "Москва" }, position: { code: "compliance_off", name: "Офицер комплаенса" }, employer: { id: 117, first_name: "Андрей", second_name: "Борисович", surname: "Кузнецов", email: "kuznetsov@corp.ru" }, position_description: "", job_offer_link: "" },
-            ],
-            empty_vacancy: [],
-          },
-        ],
-        vacancies: [
-          { id: 1018, node_id: 5, is_manager: true, city: { code: "msk", name: "Москва" }, position: { code: "lawyer_lead", name: "Главный юрист" }, employer: { id: 118, first_name: "Наталья", second_name: "Геннадьевна", surname: "Морозова", email: "morozova@corp.ru" }, position_description: "", job_offer_link: "" },
-        ],
-        empty_vacancy: [
-          { city: { code: "msk", name: "Москва" }, position: { code: "lawyer", name: "Юрист" } },
-        ],
-      },
-      {
-        id: 6,
-        code: "sales",
-        name: "Коммерческий департамент",
-        type: "department",
-        parent_id: 1,
-        children: [
-          {
-            id: 23,
-            code: "sales_team",
-            name: "Продажи",
-            type: "department",
-            parent_id: 6,
-            children: [],
-            vacancies: [
-              { id: 1019, node_id: 23, is_manager: false, city: { code: "msk", name: "Москва" }, position: { code: "sales_mgr", name: "Менеджер по продажам" }, employer: { id: 119, first_name: "Виктор", second_name: "Александрович", surname: "Соколов", email: "sokolov@corp.ru" }, position_description: "", job_offer_link: "" },
-              { id: 1020, node_id: 23, is_manager: false, city: { code: "spb", name: "Санкт-Петербург" }, position: { code: "sales_mgr", name: "Менеджер по продажам" }, employer: { id: 120, first_name: "Юлия", second_name: "Ивановна", surname: "Попова", email: "popova@corp.ru" }, position_description: "", job_offer_link: "" },
-            ],
-            empty_vacancy: [
-              { city: { code: "kzn", name: "Казань" }, position: { code: "sales_mgr", name: "Менеджер по продажам" } },
+              v(57, 11, "Финансовый директор, заместитель генерального директора", "moscow", "Москва", true),
+              v(59, 11, "Ведущий экономист", "moscow", "Москва"),
+              v(58, 11, "Заместитель Финансового директора", "moscow", "Москва"),
             ],
           },
           {
             id: 24,
-            code: "marketing",
-            name: "Маркетинг",
+            code: "personnel",
+            name: "Отдел Персонала",
             type: "department",
-            parent_id: 6,
+            parent_id: 10,
             children: [],
+            empty_vacancy: [],
             vacancies: [
-              { id: 1021, node_id: 24, is_manager: true, city: { code: "msk", name: "Москва" }, position: { code: "marketing_lead", name: "Руководитель маркетинга" }, employer: { id: 121, first_name: "Екатерина", second_name: "Михайловна", surname: "Захарова", email: "zaharova@corp.ru" }, position_description: "", job_offer_link: "" },
+              v(115, 24, "Руководитель службы персонала", "moscow", "Москва", true),
+              v(120, 24, "Менеджер по подбору персонала", "moscow", "Москва"),
+              v(118, 24, "Специалист по кадровому делопроизводству", "moscow", "Москва"),
             ],
-            empty_vacancy: [
-              { city: { code: "msk", name: "Москва" }, position: { code: "smm", name: "SMM специалист" } },
-              { city: { code: "msk", name: "Москва" }, position: { code: "designer", name: "Дизайнер" } },
+          },
+          {
+            id: 25,
+            code: "legal",
+            name: "Юридический отдел",
+            type: "department",
+            parent_id: 10,
+            children: [],
+            empty_vacancy: [],
+            vacancies: [
+              v(121, 25, "Руководитель юридического отдела", "moscow", "Москва", true),
+              v(125, 25, "Юрист", "moscow", "Москва"),
+            ],
+          },
+          {
+            id: 26,
+            code: "it_information_security",
+            name: "IT и инф.безопасность",
+            type: "department",
+            parent_id: 10,
+            children: [],
+            empty_vacancy: [],
+            vacancies: [
+              v(126, 26, "Руководитель службы ИТ", "moscow", "Москва", true),
+              v(128, 26, "Старший системный администратор", "moscow", "Москва"),
             ],
           },
         ],
-        vacancies: [],
+      },
+      {
+        id: 36,
+        code: "tex_deportament",
+        name: "Технический департамент",
+        type: "knot",
+        parent_id: 1,
+        vacancies: [
+          v(410, 36, "Технический Директор", "moscow", "Москва", true),
+          v(411, 36, "Зам. Технического директора", "moscow", "Москва"),
+          v(412, 36, "Коммерческий директор", "moscow", "Москва"),
+        ],
         empty_vacancy: [],
+        children: [
+          {
+            id: 84,
+            code: "teh_decotek",
+            name: "Тех.отдел Декотек",
+            type: "department",
+            parent_id: 36,
+            children: [],
+            empty_vacancy: [],
+            vacancies: [
+              v(426, 84, "Технический директор Декотек", "moscow", "Москва", true),
+              v(427, 84, "Инженер по поддержке проектов", "moscow", "Москва"),
+            ],
+          },
+        ],
+      },
+      {
+        id: 48,
+        code: "commercial_department",
+        name: "Коммерческий Департамент",
+        type: "knot",
+        parent_id: 1,
+        vacancies: [v(162, 48, "Генеральный директор", "moscow", "Москва", true)],
+        empty_vacancy: [],
+        children: [
+          {
+            id: 50,
+            code: "decotek",
+            name: "Декотек",
+            type: "department",
+            parent_id: 48,
+            children: [],
+            empty_vacancy: [],
+            vacancies: [
+              v(219, 50, "Директор по продажам и маркетингу", "moscow", "Москва", true),
+              v(230, 50, "Менеджер по продажам", "moscow", "Москва"),
+            ],
+          },
+          {
+            id: 51,
+            code: "td_soundblock",
+            name: "ТД Саундблок",
+            type: "department",
+            parent_id: 48,
+            children: [],
+            empty_vacancy: [],
+            vacancies: [
+              v(240, 51, "Коммерческий директор ООО ‘Саундблок’", "moscow", "Москва", true),
+              v(243, 51, "Менеджер проектных продаж", "moscow", "Москва"),
+            ],
+          },
+        ],
+      },
+      {
+        id: 59,
+        code: "production",
+        name: "Производство",
+        type: "knot",
+        parent_id: 1,
+        vacancies: [v(245, 59, "Директор по производству", "moscow", "Москва", true)],
+        empty_vacancy: [],
+        children: [
+          {
+            id: 60,
+            code: "psk_dmd",
+            name: "ПCК ДМД",
+            type: "department",
+            parent_id: 59,
+            children: [],
+            empty_vacancy: [],
+            vacancies: [
+              v(246, 60, "Начальник производства", "moscow", "Москва", true),
+              v(248, 60, "Начальник цеха", "moscow", "Москва"),
+            ],
+          },
+          {
+            id: 70,
+            code: "warehouse_complex",
+            name: "Складской комплекс",
+            type: "department",
+            parent_id: 59,
+            vacancies: [v(368, 70, "Руководитель", "moscow", "Москва", true)],
+            empty_vacancy: [],
+            children: [
+              {
+                id: 71,
+                code: "acceptance_placement_tmc",
+                name: "Участок приемки и размещения ТМЦ",
+                type: "site",
+                parent_id: 70,
+                children: [],
+                empty_vacancy: [],
+                vacancies: [
+                  v(369, 71, "Руководитель", "moscow", "Москва", true),
+                  v(370, 71, "Кладовщик", "moscow", "Москва"),
+                ],
+              },
+            ],
+          },
+        ],
       },
     ],
-    vacancies: [],
-    empty_vacancy: [],
   },
 ];
 
@@ -297,8 +354,43 @@ function findNode(nodes: OrgNode[] | null, id: number): OrgNode | undefined {
   }
 }
 
+/** Массив-владелец, в котором лежит узел: `children` родителя либо корень. */
+function findOwnerList(id: number): OrgNode[] | undefined {
+  if (MOCK_TREE.some((n) => n.id === id)) return MOCK_TREE;
+  const stack: OrgNode[] = [...MOCK_TREE];
+  while (stack.length) {
+    const n = stack.pop()!;
+    if (n.children?.some((c) => c.id === id)) return n.children;
+    if (n.children) stack.push(...n.children);
+  }
+  return undefined;
+}
+
+/** Является ли `maybeId` потомком `ancestorId` (для запрета переноса в свою ветку). */
+function isDescendant(ancestorId: number, maybeId: number): boolean {
+  const ancestor = findNode(MOCK_TREE, ancestorId);
+  const stack: OrgNode[] = [...(ancestor?.children ?? [])];
+  while (stack.length) {
+    const n = stack.pop()!;
+    if (n.id === maybeId) return true;
+    if (n.children) stack.push(...n.children);
+  }
+  return false;
+}
+
+function detach(id: number): OrgNode | undefined {
+  const owner = findOwnerList(id);
+  if (!owner) return undefined;
+  const i = owner.findIndex((n) => n.id === id);
+  return i >= 0 ? owner.splice(i, 1)[0] : undefined;
+}
+
 function notFound() {
   return Promise.reject(Object.assign(new Error("Not found"), { code: 404 }));
+}
+
+function fail(message: string, code = 400) {
+  return Promise.reject(Object.assign(new Error(message), { code }));
 }
 
 // ---------------------------------------------------------------------------
@@ -306,21 +398,23 @@ function notFound() {
 // ---------------------------------------------------------------------------
 
 export const orgNodesApi = {
+  // Чтения отдают свежий клон: мутации меняют MOCK_TREE по месту, и без нового
+  // объекта React Query (структурное сравнение) не увидел бы изменений.
   async getTree(): Promise<OrgNodesResponse> {
     await delay();
-    return { code: 200, data: MOCK_TREE };
+    return { code: 200, data: structuredClone(MOCK_TREE) };
   },
 
   async getTreeVacancies(): Promise<OrgNodesResponse> {
     await delay();
-    return { code: 200, data: MOCK_TREE };
+    return { code: 200, data: structuredClone(MOCK_TREE) };
   },
 
   async getSubTree(id: number): Promise<OrgNodesResponse> {
     await delay();
     const node = findNode(MOCK_TREE, id);
     if (!node) return notFound();
-    return { code: 200, data: [node] };
+    return { code: 200, data: [structuredClone(node)] };
   },
 
   async getNode(id: number): Promise<ApiResponse<OrgNodeRow>> {
@@ -349,8 +443,32 @@ export const orgNodesApi = {
     return { code: 200, data: null };
   },
 
-  async deleteNode(_id: number): Promise<void> {
+  async deleteNode(id: number): Promise<void> {
     await delay();
+    detach(id); // удаляет узел вместе с поддеревом
+  },
+
+  /** Перенос узла: меняем родителя (на бэке — PUT /node/:id с новым parent_id). */
+  async moveNode(id: number, newParentId: number | null): Promise<ApiResponse<null>> {
+    await delay();
+    if (id === newParentId) return fail("Узел нельзя перенести в самого себя");
+    const node = findNode(MOCK_TREE, id);
+    if (!node) return notFound();
+    if (newParentId !== null) {
+      if (!findNode(MOCK_TREE, newParentId)) return notFound();
+      if (isDescendant(id, newParentId)) {
+        return fail("Нельзя перенести узел в собственного потомка");
+      }
+    }
+    detach(id);
+    node.parent_id = newParentId;
+    if (newParentId === null) {
+      MOCK_TREE.push(node);
+    } else {
+      const parent = findNode(MOCK_TREE, newParentId)!;
+      (parent.children ??= []).push(node);
+    }
+    return { code: 200, data: null };
   },
 };
 
@@ -398,8 +516,18 @@ export const vacanciesApi = {
     };
   },
 
-  async delete(_id: number): Promise<void> {
+  async delete(id: number): Promise<void> {
     await delay();
+    const stack: OrgNode[] = [...MOCK_TREE];
+    while (stack.length) {
+      const n = stack.pop()!;
+      const i = n.vacancies?.findIndex((vac) => vac.id === id) ?? -1;
+      if (i >= 0) {
+        n.vacancies.splice(i, 1);
+        return;
+      }
+      if (n.children) stack.push(...n.children);
+    }
   },
 
   async getEmpty(nodeId: number): Promise<ApiResponse<OrgNode>> {

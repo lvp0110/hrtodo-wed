@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LogOut, Network, Settings, Users } from "lucide-react";
+import { ListTree, LogOut, Network, Settings, Users } from "lucide-react";
 import { authApi, authQueries } from "#/services/api";
 
 interface NavItemProps {
@@ -88,6 +88,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <nav className="flex flex-col gap-1">
           <NavItem to="/" icon={<Network size={16} />} label="Оргструктура" />
+          <NavItem
+            to="/structure"
+            icon={<ListTree size={16} />}
+            label="Структура"
+          />
           <NavItem
             to="/employees"
             icon={<Users size={16} />}

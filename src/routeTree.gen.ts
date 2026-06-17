@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as StructureRouteImport } from './routes/structure'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as EmployeesRouteImport } from './routes/employees'
 import { Route as IndexRouteImport } from './routes/index'
@@ -17,6 +18,11 @@ import { Route as SettingsOrgnodetypesRouteImport } from './routes/settings/orgn
 import { Route as SettingsCountriesRouteImport } from './routes/settings/countries'
 import { Route as SettingsCitiesRouteImport } from './routes/settings/cities'
 
+const StructureRoute = StructureRouteImport.update({
+  id: '/structure',
+  path: '/structure',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/employees': typeof EmployeesRoute
   '/settings': typeof SettingsRouteWithChildren
+  '/structure': typeof StructureRoute
   '/settings/cities': typeof SettingsCitiesRoute
   '/settings/countries': typeof SettingsCountriesRoute
   '/settings/orgnodetypes': typeof SettingsOrgnodetypesRoute
@@ -65,6 +72,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/employees': typeof EmployeesRoute
+  '/structure': typeof StructureRoute
   '/settings/cities': typeof SettingsCitiesRoute
   '/settings/countries': typeof SettingsCountriesRoute
   '/settings/orgnodetypes': typeof SettingsOrgnodetypesRoute
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/employees': typeof EmployeesRoute
   '/settings': typeof SettingsRouteWithChildren
+  '/structure': typeof StructureRoute
   '/settings/cities': typeof SettingsCitiesRoute
   '/settings/countries': typeof SettingsCountriesRoute
   '/settings/orgnodetypes': typeof SettingsOrgnodetypesRoute
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
     | '/'
     | '/employees'
     | '/settings'
+    | '/structure'
     | '/settings/cities'
     | '/settings/countries'
     | '/settings/orgnodetypes'
@@ -94,6 +104,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/employees'
+    | '/structure'
     | '/settings/cities'
     | '/settings/countries'
     | '/settings/orgnodetypes'
@@ -103,6 +114,7 @@ export interface FileRouteTypes {
     | '/'
     | '/employees'
     | '/settings'
+    | '/structure'
     | '/settings/cities'
     | '/settings/countries'
     | '/settings/orgnodetypes'
@@ -113,10 +125,18 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   EmployeesRoute: typeof EmployeesRoute
   SettingsRoute: typeof SettingsRouteWithChildren
+  StructureRoute: typeof StructureRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/structure': {
+      id: '/structure'
+      path: '/structure'
+      fullPath: '/structure'
+      preLoaderRoute: typeof StructureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -191,6 +211,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   EmployeesRoute: EmployeesRoute,
   SettingsRoute: SettingsRouteWithChildren,
+  StructureRoute: StructureRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

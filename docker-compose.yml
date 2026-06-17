@@ -13,3 +13,31 @@ services:
       # host.docker.internal даёт доступ к бэку, запущенному прямо на хосте,
       # без необходимости общей docker-сети с backend-контейнером.
       - "host.docker.internal:host-gateway"
+
+  # Dev-сервер с HMR. Запуск: docker compose --profile dev up web-dev
+  # Открывать http://localhost:3000 (НЕ 3005 — там прод-сборка).
+  web-dev:
+    image: node:22-slim
+    working_dir: /app
+    # node_modules ставятся внутри контейнера (linux-бинарники esbuild/
+    # lightningcss/rollup), хостовые macOS-модули в linux не запустятся.
+    command: sh -c "npm install && npm run dev -- --host --port 3000"
+    environment:
+      # Жёстко host.docker.internal: dev всегда в контейнере, а .env с
+      # API_URL=localhost:3008 (нужен для host-режима) здесь дал бы ECONNREFUSED.
+      API_URL: "http://host.docker.internal:3008"
+      # Polling для отслеживания файлов через bind-mount (macOS/Windows).
+      VITE_USE_POLLING: "true"
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - .:/app
+      # Именованный том перекрывает bind-mount: linux-node_modules не затираются
+      # хостовыми и переживают перезапуски (npm install только при первом старте).
+      - web_dev_node_modules:/app/node_modules
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    profiles: ["dev"]
+
+volumes:
+  web_dev_node_modules:

@@ -13,6 +13,14 @@ export default defineConfig({
   ],
   envPrefix: "HRWEB",
   server: {
+    // host:true — слушать 0.0.0.0, чтобы dev-сервер был доступен из контейнера.
+    host: true,
+    // В Docker на macOS/Windows события inotify через bind-mount не доходят,
+    // поэтому в dev-контейнере включаем polling (VITE_USE_POLLING=true).
+    // На хосте переменная не задана — polling выключен, CPU не греется.
+    watch: process.env.VITE_USE_POLLING
+      ? { usePolling: true, interval: 300 }
+      : undefined,
     proxy: {
       "/api": {
         target: process.env.API_URL ?? "http://localhost:3008",
