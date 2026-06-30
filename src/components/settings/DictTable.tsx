@@ -13,6 +13,7 @@ interface DictTableProps<T> {
   columns: DictColumn<T>[];
   rows: T[];
   rowKey: (row: T) => string | number;
+  onRowClick?: (row: T) => void;
   onEdit?: (row: T) => void;
   onDelete?: (row: T) => void;
   isLoading?: boolean;
@@ -25,6 +26,7 @@ export function DictTable<T>({
   columns,
   rows,
   rowKey,
+  onRowClick,
   onEdit,
   onDelete,
   isLoading = false,
@@ -93,7 +95,10 @@ export function DictTable<T>({
             rows.map((row) => (
               <tr
                 key={rowKey(row)}
-                className="text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800/40"
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                className={`text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800/40${
+                  onRowClick ? " cursor-pointer" : ""
+                }`}
               >
                 {columns.map((c) => (
                   <td
