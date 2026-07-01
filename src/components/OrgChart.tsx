@@ -265,7 +265,7 @@ export function OrgChart() {
             updateVacancyMutation.mutate({
               id: editVacancyModal.id,
               body: {
-                node_id: editVacancyModal.nodeId,
+                node_id: data.nodeId,
                 user_id: data.userId,
                 city_code: data.cityCode,
                 position_code: data.position,

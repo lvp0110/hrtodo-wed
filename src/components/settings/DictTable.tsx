@@ -3,10 +3,12 @@ import { Pencil, Trash2 } from "lucide-react";
 
 export interface DictColumn<T> {
   key: string;
-  header: string;
+  header: ReactNode;
   render: (row: T) => ReactNode;
   className?: string;
   headerClassName?: string;
+  onClick?: (row: T) => void;
+  onHeaderClick?: () => void;
 }
 
 interface DictTableProps<T> {
@@ -16,11 +18,19 @@ interface DictTableProps<T> {
   onRowClick?: (row: T) => void;
   onEdit?: (row: T) => void;
   onDelete?: (row: T) => void;
+  rowHoverVariant?: "background" | "border";
   isLoading?: boolean;
   isError?: boolean;
   errorMessage?: string | null;
   emptyMessage?: string;
 }
+
+const rowHoverClasses = {
+  background:
+    "hover:bg-gray-50 dark:hover:bg-gray-800/40",
+  border:
+    "hover:ring-1 hover:ring-inset hover:ring-gray-300 dark:hover:ring-gray-600",
+} as const;
 
 export function DictTable<T>({
   columns,
@@ -29,6 +39,7 @@ export function DictTable<T>({
   onRowClick,
   onEdit,
   onDelete,
+  rowHoverVariant = "background",
   isLoading = false,
   isError = false,
   errorMessage,
@@ -44,7 +55,10 @@ export function DictTable<T>({
             {columns.map((c) => (
               <th
                 key={c.key}
-                className={`px-4 py-3 font-medium ${c.headerClassName ?? ""}`}
+                onClick={c.onHeaderClick}
+                className={`px-4 py-3 font-medium ${c.headerClassName ?? ""}${
+                  c.onHeaderClick ? " cursor-pointer select-none" : ""
+                }`}
               >
                 {c.header}
               </th>
@@ -96,14 +110,22 @@ export function DictTable<T>({
               <tr
                 key={rowKey(row)}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
-                className={`text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800/40${
+                className={`text-gray-700 dark:text-gray-200 transition-[background-color,box-shadow] ${rowHoverClasses[rowHoverVariant]}${
                   onRowClick ? " cursor-pointer" : ""
                 }`}
               >
                 {columns.map((c) => (
                   <td
                     key={c.key}
-                    className={`px-4 py-3 align-middle ${c.className ?? ""}`}
+                    onClick={
+                      c.onClick
+                        ? (e) => {
+                            e.stopPropagation();
+                            c.onClick!(row);
+                          }
+                        : undefined
+                    }
+                    className={`px-4 py-3 align-middle${c.onClick ? " cursor-pointer" : ""} ${c.className ?? ""}`}
                   >
                     {c.render(row)}
                   </td>

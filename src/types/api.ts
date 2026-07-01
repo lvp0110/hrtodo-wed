@@ -10,6 +10,13 @@ export interface City {
   country_id: number;
 }
 
+export interface Office {
+  id: number;
+  code: string;
+  name: string;
+  city_id: number;
+}
+
 export interface Country {
   id: number;
   code: string;

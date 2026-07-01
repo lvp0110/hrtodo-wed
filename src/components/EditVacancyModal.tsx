@@ -1,12 +1,13 @@
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { CloseButton } from "#/components/CloseButton";
-import { dictQueries } from "#/services/api";
+import { dictQueries, officesApi, orgNodesApi } from "#/services/api";
 import type {
   EditVacancyFormFields,
   VacancyModalData,
 } from "#/types/orgChart";
-import type { Employer, Entity } from "#/types/api";
+import type { City, Employer, OrgNode } from "#/types/api";
 
 interface EditVacancyModalProps {
   data: VacancyModalData;
@@ -15,6 +16,11 @@ interface EditVacancyModalProps {
   isPending?: boolean;
   error?: string | null;
 }
+
+type DeptOption = {
+  id: number;
+  label: string;
+};
 
 function employeeLabel({
   surname,
@@ -26,6 +32,20 @@ function employeeLabel({
   second_name: string;
 }) {
   return [surname, first_name, second_name].filter(Boolean).join(" ");
+}
+
+function flattenOrgNodes(nodes: OrgNode[], depth = 0): DeptOption[] {
+  const result: DeptOption[] = [];
+
+  for (const node of nodes) {
+    const prefix = depth > 0 ? `${"— ".repeat(depth)}` : "";
+    result.push({ id: node.id, label: `${prefix}${node.name}` });
+    if (node.children?.length) {
+      result.push(...flattenOrgNodes(node.children, depth + 1));
+    }
+  }
+
+  return result;
 }
 
 const inputClass =
@@ -40,13 +60,23 @@ export function EditVacancyModal({
 }: EditVacancyModalProps) {
   const cities = useQuery(dictQueries.cities);
   const employees = useQuery(dictQueries.employees);
+  const orgTree = useQuery({
+    queryKey: ["orgTree"],
+    queryFn: () => orgNodesApi.getTreeVacancies().then((res) => res.data ?? []),
+  });
 
   function handleBackdropClick(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose();
   }
 
-  const dictsReady = cities.isSuccess && employees.isSuccess;
-  const dictsError = cities.isError || employees.isError;
+  const departments = useMemo(
+    () => flattenOrgNodes(orgTree.data ?? []),
+    [orgTree.data],
+  );
+
+  const dictsReady =
+    cities.isSuccess && employees.isSuccess && orgTree.isSuccess;
+  const dictsError = cities.isError || employees.isError || orgTree.isError;
 
   return (
     <div
@@ -82,6 +112,7 @@ export function EditVacancyModal({
           <EditVacancyForm
             data={data}
             cities={cities.data}
+            departments={departments}
             employees={employees.data}
             onClose={onClose}
             onSubmit={onSubmit}
@@ -96,7 +127,8 @@ export function EditVacancyModal({
 
 interface EditVacancyFormProps {
   data: VacancyModalData;
-  cities: Entity[];
+  cities: City[];
+  departments: DeptOption[];
   employees: Employer[];
   onClose: () => void;
   onSubmit: (data: EditVacancyFormFields) => void;
@@ -107,6 +139,7 @@ interface EditVacancyFormProps {
 function EditVacancyForm({
   data,
   cities,
+  departments,
   employees,
   onClose,
   onSubmit,
@@ -116,18 +149,48 @@ function EditVacancyForm({
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
+    getValues,
     formState: { errors, isValid },
   } = useForm<EditVacancyFormFields>({
     mode: "onChange",
     defaultValues: {
       position: data.position,
       cityCode: data.cityCode,
+      officeCode: data.officeCode ?? "",
+      nodeId: data.nodeId,
       userId: data.employer?.id ?? null,
       isManager: data.isManager,
       description: data.description,
       jobOffer: data.jobOffer,
     },
   });
+
+  const cityCode = watch("cityCode");
+  const selectedCityId = useMemo(
+    () => cities.find((city) => city.code === cityCode)?.id ?? null,
+    [cities, cityCode],
+  );
+
+  const officesQuery = useQuery({
+    queryKey: ["offices", "city", selectedCityId] as const,
+    queryFn: () => officesApi.getByCity(selectedCityId!).then((res) => res.data ?? []),
+    enabled: selectedCityId !== null,
+  });
+
+  useEffect(() => {
+    const currentOfficeCode = getValues("officeCode");
+    if (
+      currentOfficeCode &&
+      officesQuery.data &&
+      !officesQuery.data.some((office) => office.code === currentOfficeCode)
+    ) {
+      setValue("officeCode", "");
+    }
+  }, [cityCode, officesQuery.data, setValue, getValues]);
+
+  const officesDisabled = !cityCode || officesQuery.isPending || officesQuery.isError;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="px-6 py-5 space-y-4">
@@ -164,6 +227,60 @@ function EditVacancyForm({
         </select>
         {errors.cityCode && (
           <p className="mt-1 text-xs text-red-400">{errors.cityCode.message}</p>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Офис
+        </label>
+        <select
+          {...register("officeCode")}
+          disabled={officesDisabled}
+          className={`${inputClass} border-gray-200 dark:border-gray-700 disabled:opacity-60`}
+        >
+          <option value="">
+            {!cityCode
+              ? "Сначала выберите город"
+              : officesQuery.isPending
+                ? "Загрузка…"
+                : "— Без офиса —"}
+          </option>
+          {officesQuery.data?.map((office) => (
+            <option key={office.id} value={office.code}>
+              {office.name}
+            </option>
+          ))}
+        </select>
+        {officesQuery.isError && (
+          <p className="mt-1 text-xs text-red-400">
+            Не удалось загрузить список офисов
+          </p>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Отдел <span className="text-red-400">*</span>
+        </label>
+        <select
+          {...register("nodeId", {
+            required: "Обязательное поле",
+            setValueAs: (value) => Number(value),
+          })}
+          className={`${inputClass} ${errors.nodeId ? "border-red-400 dark:border-red-500" : "border-gray-200 dark:border-gray-700"}`}
+        >
+          <option value="" disabled hidden>
+            Выберите отдел
+          </option>
+          {departments.map((department) => (
+            <option key={department.id} value={department.id}>
+              {department.label}
+            </option>
+          ))}
+        </select>
+        {errors.nodeId && (
+          <p className="mt-1 text-xs text-red-400">{errors.nodeId.message}</p>
         )}
       </div>
 

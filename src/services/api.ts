@@ -4,6 +4,7 @@ import type {
   City,
   CityReq,
   Country,
+  Office,
   CountryReq,
   Employer,
   LoginRequest,
@@ -177,6 +178,12 @@ export const dictApi = {
   /** Справочник типов организационных узлов */
   getNodeTypes: (): Promise<ApiResponse<OrgNodeType[]>> =>
     request("/dict/orgnode/type"),
+};
+
+export const officesApi = {
+  /** Получить офисы по ID города */
+  getByCity: (cityId: number): Promise<ApiResponse<Office[]>> =>
+    request(`/offices/city/${cityId}`),
 };
 
 export const citiesApi = {

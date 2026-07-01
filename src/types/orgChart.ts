@@ -5,6 +5,8 @@ export type VacancyModalData = {
   positionCode: string;
   city: string;
   cityCode: string;
+  office?: string;
+  officeCode?: string;
   deptName: string;
   isManager: boolean;
   employer: { id: number; name: string; email: string } | null;
@@ -41,6 +43,8 @@ export type VacancyFormFields = {
 export type EditVacancyFormFields = {
   position: string;
   cityCode: string;
+  officeCode: string;
+  nodeId: number;
   userId: number | null;
   isManager: boolean;
   jobOffer: string;
