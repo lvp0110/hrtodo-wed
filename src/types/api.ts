@@ -45,6 +45,47 @@ export interface Employer {
   second_name: string;
   surname: string;
   email: string;
+  hire_date?: string;
+  gender?: string;
+  city?: Entity | null;
+  city_id?: number | null;
+  office?: (Entity & { id?: number }) | null;
+  office_id?: number | null;
+}
+
+export interface EmployeeUpdateReq {
+  first_name: string;
+  second_name: string;
+  surname: string;
+  email: string;
+  hire_date?: string;
+  gender?: string;
+  city_id?: number | null;
+  office_id?: number | null;
+}
+
+export interface EmployeeReportPosition {
+  id: number;
+  code: string;
+  name: string;
+  position_description: string;
+  job_offer_link: string;
+  node_id: number;
+  node: Entity;
+  node_type: Entity;
+  city_id: number;
+  city: Entity;
+  country_id: number;
+  country: Entity;
+  is_manager: boolean;
+  manager_id: number;
+  office_id?: number | null;
+  office?: (Entity & { id?: number }) | null;
+}
+
+export interface EmployeeReportItem {
+  employee: Employer;
+  positions: EmployeeReportPosition[];
 }
 
 export interface OrgNodeType {
@@ -54,15 +95,17 @@ export interface OrgNodeType {
 }
 
 export interface EmptyVacancy {
-  position: Entity;
-  city: Entity;
+  position?: Entity | null;
+  city?: Entity | null;
+  office?: Entity | null;
 }
 
 export interface Vacancy {
   id: number;
   node_id: number;
-  position: Entity;
-  city: Entity;
+  position?: Entity | null;
+  city?: Entity | null;
+  office?: Entity | null;
   employer: Employer;
   is_manager: boolean;
   position_description: string;

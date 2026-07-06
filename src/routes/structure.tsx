@@ -129,7 +129,7 @@ function VacancyRow({
         <Star size={12} className="shrink-0 fill-amber-400 text-amber-400" />
       )}
       <span className="truncate text-gray-700 dark:text-gray-300">
-        {vacancy.position.name}
+        {vacancy.position?.name ?? vacancy.position?.code ?? "—"}
       </span>
       <span className="text-gray-300 dark:text-gray-600">·</span>
       <span
@@ -137,10 +137,14 @@ function VacancyRow({
       >
         {employerName(vacancy)}
       </span>
-      <span className="text-gray-300 dark:text-gray-600">·</span>
-      <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
-        {vacancy.city.name}
-      </span>
+      {vacancy.city?.name && (
+        <>
+          <span className="text-gray-300 dark:text-gray-600">·</span>
+          <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
+            {vacancy.city.name}
+          </span>
+        </>
+      )}
       <button
         type="button"
         title="Удалить вакансию"
@@ -167,14 +171,18 @@ function EmptyVacancyRow({
       style={{ paddingLeft: depth * 20 + 28 }}
     >
       <span className="truncate text-gray-700 dark:text-gray-300">
-        {vacancy.position.name}
+        {vacancy.position?.name ?? vacancy.position?.code ?? "—"}
       </span>
       <span className="text-gray-300 dark:text-gray-600">·</span>
       <span className="truncate text-xs text-amber-500">Вакантно</span>
-      <span className="text-gray-300 dark:text-gray-600">·</span>
-      <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
-        {vacancy.city.name}
-      </span>
+      {vacancy.city?.name && (
+        <>
+          <span className="text-gray-300 dark:text-gray-600">·</span>
+          <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
+            {vacancy.city.name}
+          </span>
+        </>
+      )}
     </div>
   );
 }
@@ -409,7 +417,11 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
   };
 
   const onDeleteVacancy = (v: Vacancy) => {
-    if (window.confirm(`Удалить вакансию «${v.position.name}»?`)) {
+    if (
+      window.confirm(
+        `Удалить вакансию «${v.position?.name ?? v.position?.code ?? "—"}»?`,
+      )
+    ) {
       deleteVacancyMutation.mutate(v.id);
     }
   };

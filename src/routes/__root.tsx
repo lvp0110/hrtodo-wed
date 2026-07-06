@@ -8,7 +8,7 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "#/components/AppShell";
 import { LoginForm } from "#/components/LoginForm";
-import { authQueries, dictQueries } from "#/services/api";
+import { authQueries, dictQueries, employeeQueries, orgNodesApi } from "#/services/api";
 
 function RootShell() {
   const queryClient = useQueryClient();
@@ -25,7 +25,12 @@ function RootShell() {
     queryClient.prefetchQuery(dictQueries.cities);
     queryClient.prefetchQuery(dictQueries.countries);
     queryClient.prefetchQuery(dictQueries.employees);
+    queryClient.prefetchQuery(employeeQueries.report);
     queryClient.prefetchQuery(dictQueries.nodeTypes);
+    queryClient.prefetchQuery({
+      queryKey: ["orgTree"],
+      queryFn: () => orgNodesApi.getTreeVacancies().then((res) => res.data ?? []),
+    });
 
     // На случай если до логина уже был отрендерен матч роута — пересоберём данные.
     router.invalidate();

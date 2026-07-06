@@ -2,12 +2,18 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Search, Star } from "lucide-react";
-import { dictQueries, officesApi, orgNodesApi, vacanciesApi } from "#/services/api";
+import {
+  dictQueries,
+  employeeQueries,
+  officesApi,
+  orgNodesApi,
+  vacanciesApi,
+} from "#/services/api";
 import { EmployeeInfoModal } from "#/components/EmployeeInfoModal";
 import { EditVacancyModal } from "#/components/EditVacancyModal";
 import { DictTable } from "#/components/settings/DictTable";
 import { dictInputClass } from "#/components/settings/DictFormModal";
-import type { Employer, OrgNode } from "#/types/api";
+import type { EmployeeReportItem, Employer, OrgNode } from "#/types/api";
 import type { VacancyModalData } from "#/types/orgChart";
 
 export const Route = createFileRoute("/employees")({
@@ -36,6 +42,10 @@ function fullName(e: Employer) {
 
 type EmployeeVacancyInfo = {
   city: string;
+  cityCode: string;
+  office: string;
+  officeId: number | null;
+  officeCode: string;
   department: string;
   position: string;
   description: string;
@@ -82,7 +92,112 @@ function buildManagerSubordinatesMap(nodes: OrgNode[]): Map<number, Set<number>>
   return map;
 }
 
-function buildEmployeeOrgMap(nodes: OrgNode[]): Map<number, EmployeeVacancyInfo> {
+function buildEmployeeOrgMapFromReport(
+  items: EmployeeReportItem[],
+): Map<number, EmployeeVacancyInfo> {
+  const map = new Map<number, EmployeeVacancyInfo>();
+
+  for (const { employee, positions } of items) {
+    if (positions.length === 0) {
+      map.set(employee.id, {
+        city: employee.city?.name ?? "",
+        cityCode: employee.city?.code ?? "",
+        office: employee.office?.name ?? "",
+        officeId: employee.office_id ?? employee.office?.id ?? null,
+        officeCode: employee.office?.code ?? "",
+        department: "",
+        position: "",
+        description: "",
+        jobOffer: "",
+        isManager: false,
+      });
+      continue;
+    }
+
+    for (const position of positions) {
+      const prev = map.get(employee.id);
+      map.set(employee.id, {
+        city: employee.city?.name ?? position.city?.name ?? "",
+        cityCode: employee.city?.code ?? position.city?.code ?? "",
+        office: employee.office?.name ?? position.office?.name ?? "",
+        officeId:
+          employee.office_id ??
+          position.office_id ??
+          position.office?.id ??
+          null,
+        officeCode: employee.office?.code ?? position.office?.code ?? "",
+        department: position.node?.name ?? "",
+        position: position.name ?? "",
+        description: position.position_description,
+        jobOffer: position.job_offer_link,
+        isManager: position.is_manager || prev?.isManager || false,
+      });
+    }
+  }
+
+  return map;
+}
+
+function buildEmployeeVacancyMapFromReport(
+  items: EmployeeReportItem[],
+): Map<number, VacancyModalData> {
+  const map = new Map<number, VacancyModalData>();
+
+  for (const { employee, positions } of items) {
+    for (const position of positions) {
+      map.set(employee.id, {
+        id: position.id,
+        nodeId: position.node_id,
+        position: position.name ?? "",
+        positionCode: position.code ?? position.name ?? "",
+        city: position.city?.name ?? "",
+        cityCode: position.city?.code ?? "",
+        office: position.office?.name ?? "",
+        officeCode: position.office?.code ?? "",
+        deptName: position.node?.name ?? "",
+        isManager: position.is_manager,
+        employer: {
+          id: employee.id,
+          name: fullName(employee),
+          email: employee.email,
+        },
+        jobOffer: position.job_offer_link ?? "",
+        description: position.position_description ?? "",
+      });
+    }
+  }
+
+  return map;
+}
+
+function employersFromReport(
+  items: EmployeeReportItem[],
+  orgByEmployeeId: Map<number, EmployeeVacancyInfo>,
+): Employer[] {
+  return items.map(({ employee, positions }) => {
+    const position = positions[0];
+    const org = orgByEmployeeId.get(employee.id);
+    return {
+      ...employee,
+      city_id: employee.city_id ?? position?.city_id ?? null,
+      city: employee.city ?? position?.city ?? null,
+      office_id: employee.office_id ?? org?.officeId ?? position?.office_id ?? null,
+      office:
+        employee.office ??
+        (org?.officeCode
+          ? {
+              id: org.officeId ?? undefined,
+              code: org.officeCode,
+              name: org.office,
+            }
+          : (position?.office ?? null)),
+    };
+  });
+}
+
+function buildEmployeeOrgMapFromTree(
+  nodes: OrgNode[],
+): Map<number, EmployeeVacancyInfo> {
   const map = new Map<number, EmployeeVacancyInfo>();
 
   function walk(node: OrgNode) {
@@ -91,9 +206,14 @@ function buildEmployeeOrgMap(nodes: OrgNode[]): Map<number, EmployeeVacancyInfo>
       if (id) {
         const prev = map.get(id);
         map.set(id, {
-          city: vacancy.city.name,
+          city: vacancy.city?.name ?? "",
+          cityCode: vacancy.city?.code ?? "",
+          office: vacancy.office?.name ?? "",
+          officeId:
+            (vacancy.office as { id?: number } | null | undefined)?.id ?? null,
+          officeCode: vacancy.office?.code ?? "",
           department: node.name,
-          position: vacancy.position.name,
+          position: vacancy.position?.name ?? vacancy.position?.code ?? "",
           description: vacancy.position_description,
           jobOffer: vacancy.job_offer_link,
           isManager: vacancy.is_manager || prev?.isManager || false,
@@ -107,7 +227,7 @@ function buildEmployeeOrgMap(nodes: OrgNode[]): Map<number, EmployeeVacancyInfo>
   return map;
 }
 
-function buildEmployeeVacancyMap(
+function buildEmployeeVacancyMapFromTree(
   nodes: OrgNode[],
 ): Map<number, VacancyModalData> {
   const map = new Map<number, VacancyModalData>();
@@ -115,31 +235,102 @@ function buildEmployeeVacancyMap(
   function walk(node: OrgNode) {
     for (const vacancy of node.vacancies) {
       const { id } = vacancy.employer;
-      if (id) {
-        map.set(id, {
-          id: vacancy.id,
-          nodeId: vacancy.node_id,
-          position: vacancy.position.name,
-          positionCode: vacancy.position.code,
-          city: vacancy.city.name,
-          cityCode: vacancy.city.code,
-          deptName: node.name,
-          isManager: vacancy.is_manager,
-          employer: {
-            id: vacancy.employer.id,
-            name: fullName(vacancy.employer),
-            email: vacancy.employer.email,
-          },
-          jobOffer: vacancy.job_offer_link,
-          description: vacancy.position_description,
-        });
-      }
+      if (!id) continue;
+      map.set(id, {
+        id: vacancy.id,
+        nodeId: vacancy.node_id,
+        position: vacancy.position?.name ?? vacancy.position?.code ?? "",
+        positionCode: vacancy.position?.code ?? vacancy.position?.name ?? "",
+        city: vacancy.city?.name ?? "",
+        cityCode: vacancy.city?.code ?? "",
+        office: vacancy.office?.name ?? "",
+        officeCode: vacancy.office?.code ?? "",
+        deptName: node.name,
+        isManager: vacancy.is_manager,
+        employer: {
+          id: vacancy.employer.id,
+          name: fullName(vacancy.employer),
+          email: vacancy.employer.email,
+        },
+        jobOffer: vacancy.job_offer_link ?? "",
+        description: vacancy.position_description ?? "",
+      });
     }
     for (const child of node.children) walk(child);
   }
 
   for (const node of nodes) walk(node);
   return map;
+}
+
+function mergeOfficeInfo(
+  base: EmployeeVacancyInfo,
+  treeSource?: EmployeeVacancyInfo,
+): EmployeeVacancyInfo {
+  if (
+    !treeSource?.office &&
+    !treeSource?.officeCode &&
+    !treeSource?.officeId
+  ) {
+    return base;
+  }
+
+  return {
+    ...base,
+    office: treeSource.office || base.office,
+    officeId: treeSource.officeId ?? base.officeId,
+    officeCode: treeSource.officeCode || base.officeCode,
+  };
+}
+
+function mergeEmployeeOrgMaps(
+  reportMap: Map<number, EmployeeVacancyInfo>,
+  treeMap: Map<number, EmployeeVacancyInfo>,
+): Map<number, EmployeeVacancyInfo> {
+  const merged = new Map(reportMap);
+
+  for (const [id, treeInfo] of treeMap) {
+    const reportInfo = merged.get(id);
+    merged.set(
+      id,
+      reportInfo ? mergeOfficeInfo(reportInfo, treeInfo) : treeInfo,
+    );
+  }
+
+  return merged;
+}
+
+function mergeVacancyMaps(
+  reportMap: Map<number, VacancyModalData>,
+  treeMap: Map<number, VacancyModalData>,
+): Map<number, VacancyModalData> {
+  const merged = new Map(reportMap);
+
+  for (const [employeeId, treeVacancy] of treeMap) {
+    const reportVacancy = merged.get(employeeId);
+    if (!reportVacancy) {
+      merged.set(employeeId, treeVacancy);
+      continue;
+    }
+
+    merged.set(employeeId, {
+      ...reportVacancy,
+      id: treeVacancy.id,
+      nodeId: treeVacancy.nodeId,
+      positionCode: treeVacancy.positionCode || reportVacancy.positionCode,
+      city: treeVacancy.city || reportVacancy.city,
+      cityCode: treeVacancy.cityCode || reportVacancy.cityCode,
+      deptName: treeVacancy.deptName || reportVacancy.deptName,
+      office: treeVacancy.office || reportVacancy.office,
+      officeCode: treeVacancy.officeCode || reportVacancy.officeCode,
+      isManager: treeVacancy.isManager,
+      employer: treeVacancy.employer ?? reportVacancy.employer,
+      description: reportVacancy.description || treeVacancy.description,
+      jobOffer: reportVacancy.jobOffer || treeVacancy.jobOffer,
+    });
+  }
+
+  return merged;
 }
 
 function matchesFilters(
@@ -161,6 +352,7 @@ function matchesFilters(
   }
 
   if (filters.city && org?.city !== filters.city) return false;
+  if (filters.office && org?.office !== filters.office) return false;
   if (filters.department && org?.department !== filters.department) return false;
 
   return true;
@@ -176,7 +368,7 @@ function EmployeesPage() {
   const [selectedEmployee, setSelectedEmployee] = useState<Employer | null>(
     null,
   );
-  const employeesQuery = useQuery(dictQueries.employees);
+  const reportQuery = useQuery(employeeQueries.report);
   const citiesQuery = useQuery(dictQueries.cities);
   const treeQuery = useQuery({
     queryKey: ["orgTree"],
@@ -184,13 +376,26 @@ function EmployeesPage() {
   });
 
   const orgByEmployeeId = useMemo(
-    () => buildEmployeeOrgMap(treeQuery.data ?? []),
-    [treeQuery.data],
+    () =>
+      mergeEmployeeOrgMaps(
+        buildEmployeeOrgMapFromReport(reportQuery.data ?? []),
+        buildEmployeeOrgMapFromTree(treeQuery.data ?? []),
+      ),
+    [reportQuery.data, treeQuery.data],
+  );
+
+  const employees = useMemo(
+    () => employersFromReport(reportQuery.data ?? [], orgByEmployeeId),
+    [reportQuery.data, orgByEmployeeId],
   );
 
   const vacancyByEmployeeId = useMemo(
-    () => buildEmployeeVacancyMap(treeQuery.data ?? []),
-    [treeQuery.data],
+    () =>
+      mergeVacancyMaps(
+        buildEmployeeVacancyMapFromReport(reportQuery.data ?? []),
+        buildEmployeeVacancyMapFromTree(treeQuery.data ?? []),
+      ),
+    [reportQuery.data, treeQuery.data],
   );
 
   const updateVacancyMutation = useMutation({
@@ -198,6 +403,7 @@ function EmployeesPage() {
       vacanciesApi.update(id, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orgTree"] });
+      queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
       setEditVacancyModal(null);
     },
   });
@@ -220,21 +426,23 @@ function EmployeesPage() {
 
   const filterOptions = useMemo(() => {
     const cities = new Set<string>();
+    const offices = new Set<string>();
     const departments = new Set<string>();
 
     for (const info of orgByEmployeeId.values()) {
-      cities.add(info.city);
-      departments.add(info.department);
+      if (info.city) cities.add(info.city);
+      if (info.office) offices.add(info.office);
+      if (info.department) departments.add(info.department);
     }
 
     return {
       cities: [...cities].sort((a, b) => a.localeCompare(b, "ru")),
+      offices: [...offices].sort((a, b) => a.localeCompare(b, "ru")),
       departments: [...departments].sort((a, b) => a.localeCompare(b, "ru")),
     };
   }, [orgByEmployeeId]);
 
   const filteredEmployees = useMemo(() => {
-    const employees = employeesQuery.data ?? [];
     const hasTextFilters = Object.values(filters).some((value) => value.trim());
 
     let result = employees;
@@ -262,7 +470,7 @@ function EmployeesPage() {
       matchesFilters(employee, orgByEmployeeId.get(employee.id), filters),
     );
   }, [
-    employeesQuery.data,
+    employees,
     filters,
     managersOnlyFilter,
     managerFilterId,
@@ -413,14 +621,14 @@ function EmployeesPage() {
             Сотрудники
           </span>
           <div className="flex min-w-[72px] items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
-            {employeesQuery.isPending ? (
+            {reportQuery.isPending ? (
               <span className="text-gray-400">…</span>
             ) : hasFilters ? (
               <>
                 {filteredEmployees.length}
                 <span className="text-gray-400">
                   {" "}
-                  из {employeesQuery.data?.length ?? 0}
+                  из {employees.length}
                 </span>
               </>
             ) : (
@@ -502,13 +710,37 @@ function EmployeesPage() {
             className: "whitespace-nowrap",
             onClick: (r) => {
               const city = orgByEmployeeId.get(r.id)?.city;
-              if (city) setFilters((prev) => ({ ...prev, city }));
+              if (city) setFilters((prev) => ({ ...prev, city, office: "" }));
             },
             render: (r) => {
               const city = orgByEmployeeId.get(r.id)?.city;
               return city ? (
                 <span className="text-blue-600 hover:underline dark:text-blue-400">
                   {city}
+                </span>
+              ) : (
+                <span className="text-gray-400">—</span>
+              );
+            },
+          },
+          {
+            key: "office",
+            header: "Офис",
+            className: "whitespace-nowrap",
+            onClick: (r) => {
+              const org = orgByEmployeeId.get(r.id);
+              if (!org?.office) return;
+              setFilters((prev) => ({
+                ...prev,
+                city: org.city || prev.city,
+                office: org.office,
+              }));
+            },
+            render: (r) => {
+              const office = orgByEmployeeId.get(r.id)?.office;
+              return office ? (
+                <span className="text-blue-600 hover:underline dark:text-blue-400">
+                  {office}
                 </span>
               ) : (
                 <span className="text-gray-400">—</span>
@@ -554,9 +786,9 @@ function EmployeesPage() {
         ]}
         rows={filteredEmployees}
         rowKey={(r) => r.id}
-        isLoading={employeesQuery.isPending}
-        isError={employeesQuery.isError}
-        errorMessage={employeesQuery.error?.message}
+        isLoading={reportQuery.isPending}
+        isError={reportQuery.isError}
+        errorMessage={reportQuery.error?.message}
         emptyMessage={hasFilters ? "Ничего не найдено" : "Записей пока нет"}
       />
 
