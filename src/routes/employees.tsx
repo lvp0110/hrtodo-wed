@@ -5,6 +5,7 @@ import { Search, Star } from "lucide-react";
 import {
   dictQueries,
   employeeQueries,
+  employeesApi,
   officesApi,
   orgNodesApi,
   vacanciesApi,
@@ -14,6 +15,9 @@ import { EditVacancyModal } from "#/components/EditVacancyModal";
 import { DictTable } from "#/components/settings/DictTable";
 import { dictInputClass } from "#/components/settings/DictFormModal";
 import type { EmployeeReportItem, Employer, OrgNode } from "#/types/api";
+import type { EditVacancyFormFields } from "#/types/orgChart";
+import { toEmployeeUpdateReq } from "#/lib/employeeUpdate";
+import { normalizeGender } from "#/lib/employeeDisplay";
 import { toVacancyUpdateReq } from "#/lib/vacancyUpdate";
 import { formatVacancyError } from "#/lib/vacancyValidation";
 
@@ -27,6 +31,7 @@ type EmployeeFilters = {
   office: string;
   department: string;
   position: string;
+  gender: string;
 };
 
 const emptyFilters: EmployeeFilters = {
@@ -35,6 +40,7 @@ const emptyFilters: EmployeeFilters = {
   office: "",
   department: "",
   position: "",
+  gender: "",
 };
 
 function fullName(e: Employer) {
@@ -346,6 +352,13 @@ function matchesFilters(
   }
 
   if (
+    filters.gender &&
+    normalizeGender(employee.gender) !== filters.gender
+  ) {
+    return false;
+  }
+
+  if (
     filters.position &&
     !(org?.position.toLowerCase().includes(q(filters.position)) ?? false)
   ) {
@@ -400,11 +413,33 @@ function EmployeesPage() {
   );
 
   const updateVacancyMutation = useMutation({
-    mutationFn: ({ id, body }: { id: number; body: Parameters<typeof vacanciesApi.update>[1] }) =>
-      vacanciesApi.update(id, body),
+    mutationFn: async ({
+      id,
+      body,
+      formData,
+      employee,
+    }: {
+      id: number;
+      body: Parameters<typeof vacanciesApi.update>[1];
+      formData: EditVacancyFormFields;
+      employee?: Employer;
+    }) => {
+      if (
+        formData.userId &&
+        employee &&
+        normalizeGender(formData.gender) !== normalizeGender(employee.gender)
+      ) {
+        await employeesApi.update(
+          formData.userId,
+          toEmployeeUpdateReq(employee, { gender: formData.gender }),
+        );
+      }
+      return vacanciesApi.update(id, body);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orgTree"] });
       queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
+      queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
       setEditVacancyModal(null);
     },
   });
@@ -597,6 +632,23 @@ function EmployeesPage() {
                   {department}
                 </option>
               ))}
+            </select>
+          </label>
+
+          <label className="min-w-[140px]">
+            <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+              Пол
+            </span>
+            <select
+              value={filters.gender}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, gender: e.target.value }))
+              }
+              className={dictInputClass}
+            >
+              <option value="">Все</option>
+              <option value="male">Мужской</option>
+              <option value="female">Женский</option>
             </select>
           </label>
 
@@ -818,6 +870,10 @@ function EmployeesPage() {
             updateVacancyMutation.mutate({
               id: editVacancyModal.id,
               body: toVacancyUpdateReq(data),
+              formData: data,
+              employee: data.userId
+                ? employees.find((employee) => employee.id === data.userId)
+                : undefined,
             });
           }}
         />

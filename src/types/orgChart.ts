@@ -46,6 +46,7 @@ export type EditVacancyFormFields = {
   officeCode: string;
   nodeId: number;
   userId: number | null;
+  gender: string;
   isManager: boolean;
   jobOffer: string;
   description: string;

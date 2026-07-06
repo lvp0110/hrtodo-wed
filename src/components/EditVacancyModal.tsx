@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { CloseButton } from "#/components/CloseButton";
+import { GENDER_OPTIONS, formatHireDate, normalizeGender } from "#/lib/employeeDisplay";
 import { dictQueries, officesApi, orgNodesApi } from "#/services/api";
 import { findEmployeeVacancyConflict } from "#/lib/vacancyValidation";
 import type {
@@ -166,6 +167,9 @@ function EditVacancyForm({
       officeCode: data.officeCode ?? "",
       nodeId: data.nodeId,
       userId: data.employer?.id ?? null,
+      gender: normalizeGender(
+        employees.find((employee) => employee.id === data.employer?.id)?.gender,
+      ),
       isManager: data.isManager,
       description: data.description,
       jobOffer: data.jobOffer,
@@ -173,6 +177,11 @@ function EditVacancyForm({
   });
 
   const cityCode = watch("cityCode");
+  const selectedEmployeeId = watch("userId");
+  const selectedEmployee = useMemo(() => {
+    if (!selectedEmployeeId) return null;
+    return employees.find((e) => e.id === selectedEmployeeId) ?? null;
+  }, [employees, selectedEmployeeId]);
   const selectedCityId = useMemo(
     () => cities.find((city) => city.code === cityCode)?.id ?? null,
     [cities, cityCode],
@@ -194,6 +203,10 @@ function EditVacancyForm({
       setValue("officeCode", "");
     }
   }, [cityCode, officesQuery.data, setValue, getValues]);
+
+  useEffect(() => {
+    setValue("gender", normalizeGender(selectedEmployee?.gender));
+  }, [selectedEmployeeId, selectedEmployee, setValue]);
 
   const officesDisabled = !cityCode || officesQuery.isPending || officesQuery.isError;
 
@@ -334,6 +347,36 @@ function EditVacancyForm({
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Пол
+          </label>
+          <select
+            {...register("gender")}
+            disabled={!selectedEmployeeId}
+            className={`${inputClass} border-gray-200 dark:border-gray-700 disabled:opacity-60`}
+          >
+            {GENDER_OPTIONS.map((option) => (
+              <option key={option.value || "unknown"} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Дата устройства на работу
+          </label>
+          <input
+            value={formatHireDate(selectedEmployee?.hire_date)}
+            disabled
+            readOnly
+            className={`${inputClass} border-gray-200 dark:border-gray-700 disabled:opacity-60`}
+          />
+        </div>
       </div>
 
       <div>

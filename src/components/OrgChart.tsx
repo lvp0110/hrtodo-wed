@@ -3,8 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ReactFlow, Background } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { orgNodesApi, vacanciesApi } from "#/services/api";
+import { dictQueries, employeesApi, orgNodesApi, vacanciesApi } from "#/services/api";
 import { buildLayout } from "#/lib/orgTreeLayout";
+import { toEmployeeUpdateReq } from "#/lib/employeeUpdate";
+import { normalizeGender } from "#/lib/employeeDisplay";
 import { formatVacancyError } from "#/lib/vacancyValidation";
 import { toVacancyUpdateReq } from "#/lib/vacancyUpdate";
 import { OrgNodeCard } from "#/components/OrgNodeCard";
@@ -24,6 +26,7 @@ import type {
 import type {
   AddVacancyState,
   DeptModalState,
+  EditVacancyFormFields,
   VacancyModalData,
 } from "#/types/orgChart";
 
@@ -70,6 +73,7 @@ export function OrgChart() {
       orgNodesApi.getTreeVacancies().then((res) => res.data as OrgNode[]),
     select: buildLayout,
   });
+  const employeesQuery = useQuery(dictQueries.employees);
 
   const createNodeMutation = useMutation({
     mutationFn: (body: NodeCreateReq) => orgNodesApi.createNode(body),
@@ -99,12 +103,35 @@ export function OrgChart() {
   });
 
   const updateVacancyMutation = useMutation({
-    mutationFn: ({ id, body }: { id: number; body: VacancyUpdateReq }) =>
-      vacanciesApi.update(id, body),
+    mutationFn: async ({
+      id,
+      body,
+      formData,
+      employee,
+    }: {
+      id: number;
+      body: VacancyUpdateReq;
+      formData: EditVacancyFormFields;
+      employee?: Parameters<typeof toEmployeeUpdateReq>[0];
+    }) => {
+      if (
+        formData.userId &&
+        employee &&
+        normalizeGender(formData.gender) !== normalizeGender(employee.gender)
+      ) {
+        await employeesApi.update(
+          formData.userId,
+          toEmployeeUpdateReq(employee, { gender: formData.gender }),
+        );
+      }
+      return vacanciesApi.update(id, body);
+    },
     onSuccess: ({ data: vacancy }) => {
       queryClient.setQueryData<OrgNode[]>(["orgTree"], (old) =>
         old ? upsertVacancy(old, vacancy) : old,
       );
+      queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
       setEditVacancyModal(null);
     },
   });
@@ -267,6 +294,10 @@ export function OrgChart() {
             updateVacancyMutation.mutate({
               id: editVacancyModal.id,
               body: toVacancyUpdateReq(data),
+              formData: data,
+              employee: data.userId
+                ? employeesQuery.data?.find((employee) => employee.id === data.userId)
+                : undefined,
             });
           }}
         />
