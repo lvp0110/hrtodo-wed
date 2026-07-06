@@ -178,7 +178,8 @@ export interface VacancyReq {
   node_id: number;
   position_code: string;
   position_name: string;
-  city_code: string;
+  office_code?: string;
+  city_code?: string;
   is_manager: boolean;
   position_description: string;
   job_offer_link: string;
@@ -187,7 +188,7 @@ export interface VacancyReq {
 export interface VacancyUpdateReq {
   node_id: number;
   user_id: number | null;
-  city_code: string;
+  office_code?: string;
   position_code: string;
   position_name: string;
   is_manager: boolean;

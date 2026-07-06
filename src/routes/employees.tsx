@@ -14,7 +14,8 @@ import { EditVacancyModal } from "#/components/EditVacancyModal";
 import { DictTable } from "#/components/settings/DictTable";
 import { dictInputClass } from "#/components/settings/DictFormModal";
 import type { EmployeeReportItem, Employer, OrgNode } from "#/types/api";
-import type { VacancyModalData } from "#/types/orgChart";
+import { toVacancyUpdateReq } from "#/lib/vacancyUpdate";
+import { formatVacancyError } from "#/lib/vacancyValidation";
 
 export const Route = createFileRoute("/employees")({
   component: EmployeesPage,
@@ -490,15 +491,19 @@ function EmployeesPage() {
 
     return {
       name: fullName(selectedEmployee) || "Сотрудник",
-      email: selectedEmployee.email,
-      city: org?.city ?? null,
-      department: org?.department ?? null,
+      gender: selectedEmployee.gender ?? null,
       position: org?.position ?? null,
-      isOccupied: Boolean(org),
-      description: org?.description || null,
-      jobOffer: org?.jobOffer || null,
+      email: selectedEmployee.email || null,
+      city: org?.city ?? selectedEmployee.city?.name ?? null,
+      office: org?.office ?? selectedEmployee.office?.name ?? null,
+      department: org?.department ?? null,
+      hireDate: selectedEmployee.hire_date ?? null,
     };
   }, [selectedEmployee, orgByEmployeeId]);
+
+  const selectedEmployeeVacancy = selectedEmployee
+    ? vacancyByEmployeeId.get(selectedEmployee.id)
+    : undefined;
 
   return (
     <div className="absolute inset-0 overflow-auto bg-gray-50 px-8 py-6 dark:bg-gray-950">
@@ -693,14 +698,7 @@ function EmployeesPage() {
           {
             key: "name",
             header: "ФИО",
-            onClick: (employee) => {
-              const vacancy = vacancyByEmployeeId.get(employee.id);
-              if (vacancy) {
-                setEditVacancyModal(vacancy);
-                return;
-              }
-              setSelectedEmployee(employee);
-            },
+            onClick: (employee) => setSelectedEmployee(employee),
             render: (r) =>
               fullName(r) || <span className="text-gray-400">—</span>,
           },
@@ -792,6 +790,21 @@ function EmployeesPage() {
         emptyMessage={hasFilters ? "Ничего не найдено" : "Записей пока нет"}
       />
 
+      {selectedEmployeeInfo && (
+        <EmployeeInfoModal
+          data={selectedEmployeeInfo}
+          onClose={() => setSelectedEmployee(null)}
+          onEdit={
+            selectedEmployeeVacancy
+              ? () => {
+                  setEditVacancyModal(selectedEmployeeVacancy);
+                  setSelectedEmployee(null);
+                }
+              : undefined
+          }
+        />
+      )}
+
       {editVacancyModal && (
         <EditVacancyModal
           data={editVacancyModal}
@@ -800,29 +813,13 @@ function EmployeesPage() {
             setEditVacancyModal(null);
           }}
           isPending={updateVacancyMutation.isPending}
-          error={updateVacancyMutation.error?.message ?? null}
+          error={formatVacancyError(updateVacancyMutation.error?.message)}
           onSubmit={(data) => {
             updateVacancyMutation.mutate({
               id: editVacancyModal.id,
-              body: {
-                node_id: data.nodeId,
-                user_id: data.userId,
-                city_code: data.cityCode,
-                position_code: data.position,
-                position_name: data.position,
-                is_manager: data.isManager,
-                position_description: data.description,
-                job_offer_link: data.jobOffer,
-              },
+              body: toVacancyUpdateReq(data),
             });
           }}
-        />
-      )}
-
-      {selectedEmployeeInfo && (
-        <EmployeeInfoModal
-          data={selectedEmployeeInfo}
-          onClose={() => setSelectedEmployee(null)}
         />
       )}
     </div>

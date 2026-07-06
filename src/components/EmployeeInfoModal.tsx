@@ -1,49 +1,45 @@
 import { CloseButton } from "#/components/CloseButton";
+import {
+  displayValue,
+  formatGender,
+  formatHireDate,
+} from "#/lib/employeeDisplay";
 
 export type EmployeeInfoData = {
   name: string;
-  email: string;
-  city: string | null;
-  department: string | null;
+  gender: string | null;
   position: string | null;
-  isOccupied: boolean;
-  description: string | null;
-  jobOffer: string | null;
+  email: string | null;
+  city: string | null;
+  office: string | null;
+  department: string | null;
+  hireDate: string | null;
 };
 
 function Row({
   label,
   value,
-  multiline = false,
 }: {
   label: string;
   value: string;
-  multiline?: boolean;
 }) {
   return (
     <div>
       <div className="mb-0.5 text-xs text-gray-400 dark:text-gray-500">
         {label}
       </div>
-      <div
-        className={`text-sm text-gray-900 dark:text-gray-100${multiline ? " whitespace-pre-line" : ""}`}
-      >
-        {value}
-      </div>
+      <div className="text-sm text-gray-900 dark:text-gray-100">{value}</div>
     </div>
   );
-}
-
-function displayValue(value: string | null) {
-  return value?.trim() || "—";
 }
 
 interface EmployeeInfoModalProps {
   data: EmployeeInfoData;
   onClose: () => void;
+  onEdit?: () => void;
 }
 
-export function EmployeeInfoModal({ data, onClose }: EmployeeInfoModalProps) {
+export function EmployeeInfoModal({ data, onClose, onEdit }: EmployeeInfoModalProps) {
   function handleBackdropClick(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose();
   }
@@ -69,39 +65,30 @@ export function EmployeeInfoModal({ data, onClose }: EmployeeInfoModalProps) {
         </div>
 
         <div className="space-y-4 px-6 py-5">
-          <div className="flex items-center gap-2">
-            <span
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                data.isOccupied
-                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                  : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-              }`}
-            >
-              {data.isOccupied ? "Занято" : "Вакантно"}
-            </span>
-          </div>
-
+          <Row label="Пол" value={formatGender(data.gender)} />
+          <Row label="ФИО" value={displayValue(data.name)} />
+          <Row label="Должность" value={displayValue(data.position)} />
           <Row label="Email" value={displayValue(data.email)} />
           <Row label="Город" value={displayValue(data.city)} />
+          <Row label="Офис" value={displayValue(data.office)} />
           <Row label="Отдел" value={displayValue(data.department)} />
-          <Row label="Должность" value={displayValue(data.position)} />
-          <Row
-            label="Описание вакансии"
-            value={displayValue(data.description)}
-            multiline
-          />
-          <Row
-            label="Предложение о работе"
-            value={displayValue(data.jobOffer)}
-            multiline
-          />
+          <Row label="Дата устройства" value={formatHireDate(data.hireDate)} />
         </div>
 
-        <div className="px-6 pb-5">
+        <div className="flex gap-2 px-6 pb-5">
+          {onEdit && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            >
+              Редактировать
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
-            className="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+            className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
           >
             Закрыть
           </button>

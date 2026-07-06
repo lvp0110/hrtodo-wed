@@ -1,8 +1,9 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { CloseButton } from "#/components/CloseButton";
 import { dictQueries, officesApi, orgNodesApi } from "#/services/api";
+import { findEmployeeVacancyConflict } from "#/lib/vacancyValidation";
 import type {
   EditVacancyFormFields,
   VacancyModalData,
@@ -114,6 +115,7 @@ export function EditVacancyModal({
             cities={cities.data}
             departments={departments}
             employees={employees.data}
+            orgNodes={orgTree.data ?? []}
             onClose={onClose}
             onSubmit={onSubmit}
             isPending={isPending}
@@ -130,6 +132,7 @@ interface EditVacancyFormProps {
   cities: City[];
   departments: DeptOption[];
   employees: Employer[];
+  orgNodes: OrgNode[];
   onClose: () => void;
   onSubmit: (data: EditVacancyFormFields) => void;
   isPending: boolean;
@@ -141,11 +144,13 @@ function EditVacancyForm({
   cities,
   departments,
   employees,
+  orgNodes,
   onClose,
   onSubmit,
   isPending,
   error,
 }: EditVacancyFormProps) {
+  const [localError, setLocalError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -192,8 +197,31 @@ function EditVacancyForm({
 
   const officesDisabled = !cityCode || officesQuery.isPending || officesQuery.isError;
 
+  function handleFormSubmit(formData: EditVacancyFormFields) {
+    setLocalError(null);
+
+    const conflict = findEmployeeVacancyConflict(
+      orgNodes,
+      data.id,
+      formData.nodeId,
+      formData.position,
+      formData.userId,
+    );
+
+    if (conflict) {
+      setLocalError(
+        `Сотрудник уже назначен на должность «${conflict.position}» в отделе «${conflict.deptName}».`,
+      );
+      return;
+    }
+
+    onSubmit(formData);
+  }
+
+  const displayError = localError ?? error;
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="px-6 py-5 space-y-4">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="px-6 py-5 space-y-4">
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Должность <span className="text-red-400">*</span>
@@ -255,6 +283,11 @@ function EditVacancyForm({
         {officesQuery.isError && (
           <p className="mt-1 text-xs text-red-400">
             Не удалось загрузить список офисов
+          </p>
+        )}
+        {cityCode && !watch("officeCode") && (
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+            Чтобы сохранить город, выберите офис в этом городе.
           </p>
         )}
       </div>
@@ -338,8 +371,8 @@ function EditVacancyForm({
         </span>
       </label>
 
-      {error && (
-        <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
+      {displayError && (
+        <p className="text-sm text-red-500 dark:text-red-400">{displayError}</p>
       )}
 
       <div className="flex gap-3 pt-1">
