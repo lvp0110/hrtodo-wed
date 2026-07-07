@@ -32,6 +32,9 @@ type EmployeeFilters = {
   department: string;
   position: string;
   gender: string;
+  hireYear: string;
+  hireMonth: string;
+  hireDay: string;
 };
 
 const emptyFilters: EmployeeFilters = {
@@ -41,10 +44,31 @@ const emptyFilters: EmployeeFilters = {
   department: "",
   position: "",
   gender: "",
+  hireYear: "",
+  hireMonth: "",
+  hireDay: "",
 };
 
 function fullName(e: Employer) {
   return [e.surname, e.first_name, e.second_name].filter(Boolean).join(" ");
+}
+
+function normalizeHireDateForCompare(value: string | null | undefined): string {
+  if (!value?.trim()) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value.trim();
+  return parsed.toISOString().slice(0, 10);
+}
+
+function getHireDateParts(value: string | null | undefined): {
+  year: string;
+  month: string;
+  day: string;
+} | null {
+  const normalized = normalizeHireDateForCompare(value);
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  return { year: match[1], month: match[2], day: match[3] };
 }
 
 type EmployeeVacancyInfo = {
@@ -368,6 +392,13 @@ function matchesFilters(
   if (filters.city && org?.city !== filters.city) return false;
   if (filters.office && org?.office !== filters.office) return false;
   if (filters.department && org?.department !== filters.department) return false;
+  if (filters.hireYear || filters.hireMonth || filters.hireDay) {
+    const hireDateParts = getHireDateParts(employee.hire_date);
+    if (!hireDateParts) return false;
+    if (filters.hireYear && hireDateParts.year !== filters.hireYear) return false;
+    if (filters.hireMonth && hireDateParts.month !== filters.hireMonth) return false;
+    if (filters.hireDay && hireDateParts.day !== filters.hireDay) return false;
+  }
 
   return true;
 }
@@ -424,14 +455,26 @@ function EmployeesPage() {
       formData: EditVacancyFormFields;
       employee?: Employer;
     }) => {
+      const selectedHireDate = normalizeHireDateForCompare(formData.hireDate);
+      const employeeHireDate = normalizeHireDateForCompare(employee?.hire_date);
+      const shouldUpdateGender =
+        !!formData.userId &&
+        !!employee &&
+        normalizeGender(formData.gender) !== normalizeGender(employee.gender);
+      const shouldUpdateHireDate =
+        !!formData.userId && !!employee && selectedHireDate !== employeeHireDate;
+
       if (
         formData.userId &&
         employee &&
-        normalizeGender(formData.gender) !== normalizeGender(employee.gender)
+        (shouldUpdateGender || shouldUpdateHireDate)
       ) {
         await employeesApi.update(
           formData.userId,
-          toEmployeeUpdateReq(employee, { gender: formData.gender }),
+          toEmployeeUpdateReq(employee, {
+            gender: formData.gender,
+            hireDate: formData.hireDate,
+          }),
         );
       }
       return vacanciesApi.update(id, body);
@@ -464,6 +507,7 @@ function EmployeesPage() {
     const cities = new Set<string>();
     const offices = new Set<string>();
     const departments = new Set<string>();
+    const hireYears = new Set<string>();
 
     for (const info of orgByEmployeeId.values()) {
       if (info.city) cities.add(info.city);
@@ -471,12 +515,18 @@ function EmployeesPage() {
       if (info.department) departments.add(info.department);
     }
 
+    for (const employee of employees) {
+      const hireDateParts = getHireDateParts(employee.hire_date);
+      if (hireDateParts?.year) hireYears.add(hireDateParts.year);
+    }
+
     return {
       cities: [...cities].sort((a, b) => a.localeCompare(b, "ru")),
       offices: [...offices].sort((a, b) => a.localeCompare(b, "ru")),
       departments: [...departments].sort((a, b) => a.localeCompare(b, "ru")),
+      hireYears: [...hireYears].sort((a, b) => b.localeCompare(a, "ru")),
     };
-  }, [orgByEmployeeId]);
+  }, [employees, orgByEmployeeId]);
 
   const filteredEmployees = useMemo(() => {
     const hasTextFilters = Object.values(filters).some((value) => value.trim());
@@ -518,6 +568,12 @@ function EmployeesPage() {
     managersOnlyFilter ||
     managerFilterId !== null ||
     Object.values(filters).some((value) => value.trim());
+
+  const resetAllFilters = () => {
+    setFilters({ ...emptyFilters });
+    setManagersOnlyFilter(false);
+    setManagerFilterId(null);
+  };
 
   const selectedEmployeeInfo = useMemo(() => {
     if (!selectedEmployee) return null;
@@ -672,6 +728,69 @@ function EmployeesPage() {
               />
             </div>
           </label>
+
+          <div className="min-w-[260px]">
+            <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+              Дата устройства
+            </span>
+            <div className="flex gap-2">
+              <select
+                value={filters.hireYear}
+                onChange={(e) =>
+                  setFilters((prev) => ({ ...prev, hireYear: e.target.value }))
+                }
+                className={`${dictInputClass} min-w-[104px]`}
+              >
+                <option value="">Год</option>
+                {filterOptions.hireYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={filters.hireMonth}
+                onChange={(e) =>
+                  setFilters((prev) => ({ ...prev, hireMonth: e.target.value }))
+                }
+                className={`${dictInputClass} min-w-[84px]`}
+              >
+                <option value="">Месяц</option>
+                {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0")).map(
+                  (month) => (
+                    <option key={month} value={month}>
+                      {month}
+                    </option>
+                  ),
+                )}
+              </select>
+              <select
+                value={filters.hireDay}
+                onChange={(e) =>
+                  setFilters((prev) => ({ ...prev, hireDay: e.target.value }))
+                }
+                className={`${dictInputClass} min-w-[72px]`}
+              >
+                <option value="">День</option>
+                {Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0")).map(
+                  (day) => (
+                    <option key={day} value={day}>
+                      {day}
+                    </option>
+                  ),
+                )}
+              </select>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={resetAllFilters}
+            disabled={!hasFilters}
+            className="min-w-[150px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+          >
+            Сбросить фильтры
+          </button>
 
         <div className="shrink-0">
           <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
