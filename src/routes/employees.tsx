@@ -15,9 +15,8 @@ import { EditVacancyModal } from "#/components/EditVacancyModal";
 import { DictTable } from "#/components/settings/DictTable";
 import { dictInputClass } from "#/components/settings/DictFormModal";
 import type { EmployeeReportItem, Employer, OrgNode } from "#/types/api";
-import type { EditVacancyFormFields } from "#/types/orgChart";
-import { toEmployeeUpdateReq } from "#/lib/employeeUpdate";
 import { normalizeGender } from "#/lib/employeeDisplay";
+import { toEmployeeUpdateReq } from "#/lib/employeeUpdate";
 import { toVacancyUpdateReq } from "#/lib/vacancyUpdate";
 import { formatVacancyError } from "#/lib/vacancyValidation";
 
@@ -444,46 +443,34 @@ function EmployeesPage() {
   );
 
   const updateVacancyMutation = useMutation({
-    mutationFn: async ({
+    mutationFn: ({
       id,
       body,
-      formData,
-      employee,
     }: {
       id: number;
       body: Parameters<typeof vacanciesApi.update>[1];
-      formData: EditVacancyFormFields;
-      employee?: Employer;
-    }) => {
-      const selectedHireDate = normalizeHireDateForCompare(formData.hireDate);
-      const employeeHireDate = normalizeHireDateForCompare(employee?.hire_date);
-      const shouldUpdateGender =
-        !!formData.userId &&
-        !!employee &&
-        normalizeGender(formData.gender) !== normalizeGender(employee.gender);
-      const shouldUpdateHireDate =
-        !!formData.userId && !!employee && selectedHireDate !== employeeHireDate;
-
-      if (
-        formData.userId &&
-        employee &&
-        (shouldUpdateGender || shouldUpdateHireDate)
-      ) {
-        await employeesApi.update(
-          formData.userId,
-          toEmployeeUpdateReq(employee, {
-            gender: formData.gender,
-            hireDate: formData.hireDate,
-          }),
-        );
-      }
-      return vacanciesApi.update(id, body);
-    },
+    }) => vacanciesApi.update(id, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orgTree"] });
       queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
       queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
       setEditVacancyModal(null);
+    },
+  });
+
+  const updateEmployeeMutation = useMutation({
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: number;
+      body: Parameters<typeof employeesApi.update>[1];
+    }) => employeesApi.update(id, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
+      queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
+      queryClient.invalidateQueries({ queryKey: ["orgTree"] });
+      setSelectedEmployee(null);
     },
   });
 
@@ -574,27 +561,6 @@ function EmployeesPage() {
     setManagersOnlyFilter(false);
     setManagerFilterId(null);
   };
-
-  const selectedEmployeeInfo = useMemo(() => {
-    if (!selectedEmployee) return null;
-
-    const org = orgByEmployeeId.get(selectedEmployee.id);
-
-    return {
-      name: fullName(selectedEmployee) || "Сотрудник",
-      gender: selectedEmployee.gender ?? null,
-      position: org?.position ?? null,
-      email: selectedEmployee.email || null,
-      city: org?.city ?? selectedEmployee.city?.name ?? null,
-      office: org?.office ?? selectedEmployee.office?.name ?? null,
-      department: org?.department ?? null,
-      hireDate: selectedEmployee.hire_date ?? null,
-    };
-  }, [selectedEmployee, orgByEmployeeId]);
-
-  const selectedEmployeeVacancy = selectedEmployee
-    ? vacancyByEmployeeId.get(selectedEmployee.id)
-    : undefined;
 
   return (
     <div className="absolute inset-0 overflow-auto bg-gray-50 px-8 py-6 dark:bg-gray-950">
@@ -938,8 +904,8 @@ function EmployeesPage() {
             key: "position",
             header: "Должность",
             onClick: (r) => {
-              const position = orgByEmployeeId.get(r.id)?.position;
-              if (position) setFilters((prev) => ({ ...prev, position }));
+              const vacancy = vacancyByEmployeeId.get(r.id);
+              if (vacancy) setEditVacancyModal(vacancy);
             },
             render: (r) => {
               const position = orgByEmployeeId.get(r.id)?.position;
@@ -961,18 +927,21 @@ function EmployeesPage() {
         emptyMessage={hasFilters ? "Ничего не найдено" : "Записей пока нет"}
       />
 
-      {selectedEmployeeInfo && (
+      {selectedEmployee && (
         <EmployeeInfoModal
-          data={selectedEmployeeInfo}
-          onClose={() => setSelectedEmployee(null)}
-          onEdit={
-            selectedEmployeeVacancy
-              ? () => {
-                  setEditVacancyModal(selectedEmployeeVacancy);
-                  setSelectedEmployee(null);
-                }
-              : undefined
-          }
+          employee={selectedEmployee}
+          onClose={() => {
+            updateEmployeeMutation.reset();
+            setSelectedEmployee(null);
+          }}
+          isPending={updateEmployeeMutation.isPending}
+          error={updateEmployeeMutation.error?.message ?? null}
+          onSubmit={(fields) => {
+            updateEmployeeMutation.mutate({
+              id: selectedEmployee.id,
+              body: toEmployeeUpdateReq(selectedEmployee, fields),
+            });
+          }}
         />
       )}
 
@@ -989,10 +958,6 @@ function EmployeesPage() {
             updateVacancyMutation.mutate({
               id: editVacancyModal.id,
               body: toVacancyUpdateReq(data),
-              formData: data,
-              employee: data.userId
-                ? employees.find((employee) => employee.id === data.userId)
-                : undefined,
             });
           }}
         />

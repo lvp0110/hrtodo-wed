@@ -1,5 +1,13 @@
 import type { EmployeeUpdateReq, Employer } from "#/types/api";
 
+export type EmployeeEditFields = {
+  surname: string;
+  first_name: string;
+  second_name: string;
+  gender: string;
+  hireDate: string;
+};
+
 function normalizeHireDateForApi(value: string | undefined): string | undefined {
   if (!value?.trim()) return undefined;
   const trimmed = value.trim();
@@ -9,16 +17,16 @@ function normalizeHireDateForApi(value: string | undefined): string | undefined 
 
 export function toEmployeeUpdateReq(
   employee: Employer,
-  fields: { gender?: string; hireDate?: string },
+  fields: EmployeeEditFields,
 ): EmployeeUpdateReq {
   const hireDateForApi =
     normalizeHireDateForApi(fields.hireDate) ??
     normalizeHireDateForApi(employee.hire_date);
 
   return {
-    first_name: employee.first_name,
-    second_name: employee.second_name,
-    surname: employee.surname,
+    surname: fields.surname.trim(),
+    first_name: fields.first_name.trim(),
+    second_name: fields.second_name.trim(),
     email: employee.email,
     gender: fields.gender || undefined,
     hire_date: hireDateForApi,
