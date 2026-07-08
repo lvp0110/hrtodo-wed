@@ -3,7 +3,7 @@ import type { Vacancy, EmptyVacancy } from "#/types/api";
 import type { AddVacancyState, VacancyModalData } from "#/types/orgChart";
 
 function employerName(v: Vacancy): string {
-  if (!v.employer.id) return "Вакантно";
+  if (!v.employer?.id) return "Вакантно";
   const { first_name, second_name, surname } = v.employer;
   return [surname, first_name, second_name].filter(Boolean).join(" ");
 }
@@ -74,7 +74,7 @@ export function OrgNodeCard({ id, data }: NodeProps) {
                   officeCode: v.office?.code,
                   deptName: label,
                   isManager: v.is_manager,
-                  employer: v.employer.id
+                  employer: v.employer?.id
                     ? {
                         id: v.employer.id,
                         name: employerName(v),
@@ -105,7 +105,7 @@ export function OrgNodeCard({ id, data }: NodeProps) {
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span
-                  className={`text-xs truncate ${v.employer.id ? "text-gray-600 dark:text-gray-400" : "text-amber-500"}`}
+                  className={`text-xs truncate ${v.employer?.id ? "text-gray-600 dark:text-gray-400" : "text-amber-500"}`}
                 >
                   {employerName(v)}
                 </span>

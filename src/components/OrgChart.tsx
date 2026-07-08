@@ -91,9 +91,12 @@ export function OrgChart() {
   const createVacancyMutation = useMutation({
     mutationFn: (body: VacancyReq) => vacanciesApi.create(body),
     onSuccess: ({ data: vacancy }) => {
-      queryClient.setQueryData<OrgNode[]>(["orgTree"], (old) =>
-        old ? upsertVacancy(old, vacancy) : old,
-      );
+      if (vacancy) {
+        queryClient.setQueryData<OrgNode[]>(["orgTree"], (old) =>
+          old ? upsertVacancy(old, vacancy) : old,
+        );
+      }
+      queryClient.invalidateQueries({ queryKey: ["orgTree"] });
       setAddVacancyModal(null);
     },
   });
@@ -247,6 +250,7 @@ export function OrgChart() {
               node_id: Number(addVacancyModal.deptId),
               position_code: data.position,
               position_name: data.position,
+              user_id: null,
               city_code: data.cityCode,
               is_manager: data.isManager,
               position_description: data.description,

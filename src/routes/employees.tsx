@@ -42,6 +42,8 @@ type EmployeeFilters = {
   hireDay: string;
 };
 
+type RowKindFilter = "all" | "employee" | "vacancy";
+
 const emptyFilters: EmployeeFilters = {
   name: "",
   city: "",
@@ -88,6 +90,21 @@ type EmployeeVacancyInfo = {
   jobOffer: string;
   isManager: boolean;
 };
+
+type EmployeesTableRow =
+  | {
+      kind: "employee";
+      id: number;
+      employee: Employer;
+      org: EmployeeVacancyInfo | undefined;
+      vacancy: VacancyModalData | undefined;
+    }
+  | {
+      kind: "vacancy";
+      id: string;
+      org: EmployeeVacancyInfo;
+      vacancy: VacancyModalData;
+    };
 
 function collectEmployeeIdsInNodeAndDescendants(node: OrgNode): Set<number> {
   const ids = new Set<number>();
@@ -369,6 +386,58 @@ function mergeVacancyMaps(
   return merged;
 }
 
+function collectVacantRowsFromTree(nodes: OrgNode[]): EmployeesTableRow[] {
+  const rows: EmployeesTableRow[] = [];
+
+  function walk(node: OrgNode) {
+    for (const vacancy of node.vacancies ?? []) {
+      if (vacancy.employer?.id) continue;
+      const position = vacancy.position?.name ?? vacancy.position?.code ?? "";
+      const city = vacancy.city?.name ?? "";
+      const cityCode = vacancy.city?.code ?? "";
+      const office = vacancy.office?.name ?? "";
+      const officeCode = vacancy.office?.code ?? "";
+
+      rows.push({
+        kind: "vacancy",
+        id: `vacancy-${vacancy.id}`,
+        org: {
+          city,
+          cityCode,
+          office,
+          officeId:
+            (vacancy.office as { id?: number } | null | undefined)?.id ?? null,
+          officeCode,
+          department: node.name,
+          position,
+          description: vacancy.position_description ?? "",
+          jobOffer: vacancy.job_offer_link ?? "",
+          isManager: vacancy.is_manager,
+        },
+        vacancy: {
+          id: vacancy.id,
+          nodeId: vacancy.node_id,
+          position,
+          positionCode: vacancy.position?.code ?? vacancy.position?.name ?? "",
+          city,
+          cityCode,
+          office,
+          officeCode,
+          deptName: node.name,
+          isManager: vacancy.is_manager,
+          employer: null,
+          jobOffer: vacancy.job_offer_link ?? "",
+          description: vacancy.position_description ?? "",
+        },
+      });
+    }
+    for (const child of node.children ?? []) walk(child);
+  }
+
+  for (const node of nodes ?? []) walk(node);
+  return rows;
+}
+
 function matchesFilters(
   employee: Employer,
   org: EmployeeVacancyInfo | undefined,
@@ -411,6 +480,7 @@ function matchesFilters(
 function EmployeesPage() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<EmployeeFilters>(emptyFilters);
+  const [rowKindFilter, setRowKindFilter] = useState<RowKindFilter>("all");
   const [managersOnlyFilter, setManagersOnlyFilter] = useState(false);
   const [managerFilterId, setManagerFilterId] = useState<number | null>(null);
   const [editVacancyModal, setEditVacancyModal] =
@@ -447,6 +517,11 @@ function EmployeesPage() {
         buildEmployeeVacancyMapFromTree(treeQuery.data ?? []),
       ),
     [reportQuery.data, treeQuery.data],
+  );
+
+  const vacantRows = useMemo(
+    () => collectVacantRowsFromTree(treeQuery.data ?? []),
+    [treeQuery.data],
   );
 
   const updateVacancyMutation = useMutation({
@@ -488,6 +563,16 @@ function EmployeesPage() {
       queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
       queryClient.invalidateQueries({ queryKey: ["orgTree"] });
       setSelectedEmployee(null);
+    },
+  });
+
+  const deleteVacancyMutation = useMutation({
+    mutationFn: (id: number) => vacanciesApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orgTree"] });
+      queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
+      queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
+      if (editVacancyModal) setEditVacancyModal(null);
     },
   });
 
@@ -573,6 +658,11 @@ function EmployeesPage() {
       if (info.office) offices.add(info.office);
       if (info.department) departments.add(info.department);
     }
+    for (const row of vacantRows) {
+      if (row.org.city) cities.add(row.org.city);
+      if (row.org.office) offices.add(row.org.office);
+      if (row.org.department) departments.add(row.org.department);
+    }
 
     for (const employee of employees) {
       const hireDateParts = getHireDateParts(employee.hire_date);
@@ -585,51 +675,111 @@ function EmployeesPage() {
       departments: [...departments].sort((a, b) => a.localeCompare(b, "ru")),
       hireYears: [...hireYears].sort((a, b) => b.localeCompare(a, "ru")),
     };
-  }, [employees, orgByEmployeeId]);
+  }, [employees, orgByEmployeeId, vacantRows]);
 
-  const filteredEmployees = useMemo(() => {
+  const tableRows = useMemo<EmployeesTableRow[]>(
+    () => [
+      ...employees.map((employee) => ({
+        kind: "employee" as const,
+        id: employee.id,
+        employee,
+        org: orgByEmployeeId.get(employee.id),
+        vacancy: vacancyByEmployeeId.get(employee.id),
+      })),
+      ...vacantRows,
+    ],
+    [employees, orgByEmployeeId, vacancyByEmployeeId, vacantRows],
+  );
+
+  const filteredRows = useMemo(() => {
     const hasTextFilters = Object.values(filters).some((value) => value.trim());
 
-    let result = employees;
+    let result = tableRows;
 
     if (managersOnlyFilter) {
-      result = employees.filter(
-        (employee) => orgByEmployeeId.get(employee.id)?.isManager,
+      result = tableRows.filter(
+        (row) => row.kind === "employee" && row.org?.isManager,
       );
     } else if (managerFilterId !== null) {
       const subordinates = subordinatesByManagerId.get(managerFilterId);
-      const team = employees.filter(
-        (employee) =>
-          employee.id === managerFilterId ||
-          (subordinates?.has(employee.id) ?? false),
+      const team = tableRows.filter(
+        (row) =>
+          row.kind === "employee" &&
+          (row.employee.id === managerFilterId ||
+            (subordinates?.has(row.employee.id) ?? false)),
       );
-      const manager = team.find((employee) => employee.id === managerFilterId);
+      const manager = team.find(
+        (row) => row.kind === "employee" && row.employee.id === managerFilterId,
+      );
       result = manager
-        ? [manager, ...team.filter((employee) => employee.id !== managerFilterId)]
+        ? [
+            manager,
+            ...team.filter(
+              (row) =>
+                !(row.kind === "employee" && row.employee.id === managerFilterId),
+            ),
+          ]
         : team;
     }
 
-    if (!hasTextFilters) return result;
+    if (!hasTextFilters) {
+      if (rowKindFilter === "all") return result;
+      return result.filter((row) => row.kind === rowKindFilter);
+    }
 
-    return result.filter((employee) =>
-      matchesFilters(employee, orgByEmployeeId.get(employee.id), filters),
-    );
+    const textFiltered = result.filter((row) => {
+      if (row.kind === "vacancy") {
+        const org = row.org;
+        const q = (value: string) => value.trim().toLowerCase();
+        if (filters.name && !"вакантно".includes(q(filters.name))) return false;
+        if (filters.gender || filters.hireYear || filters.hireMonth || filters.hireDay)
+          return false;
+        if (
+          filters.position &&
+          !org.position.toLowerCase().includes(q(filters.position))
+        )
+          return false;
+        if (filters.city && org.city !== filters.city) return false;
+        if (filters.office && org.office !== filters.office) return false;
+        if (filters.department && org.department !== filters.department) return false;
+        return true;
+      }
+
+      return matchesFilters(row.employee, row.org, filters);
+    });
+
+    if (rowKindFilter === "all") return textFiltered;
+    return textFiltered.filter((row) => row.kind === rowKindFilter);
   }, [
-    employees,
+    tableRows,
     filters,
+    rowKindFilter,
     managersOnlyFilter,
     managerFilterId,
-    orgByEmployeeId,
     subordinatesByManagerId,
   ]);
 
   const hasFilters =
+    rowKindFilter !== "all" ||
     managersOnlyFilter ||
     managerFilterId !== null ||
     Object.values(filters).some((value) => value.trim());
 
+  const employeeCounts = useMemo(() => {
+    const total = tableRows.filter((row) => row.kind === "employee").length;
+    const filtered = filteredRows.filter((row) => row.kind === "employee").length;
+    return { total, filtered };
+  }, [tableRows, filteredRows]);
+
+  const vacancyCounts = useMemo(() => {
+    const total = tableRows.filter((row) => row.kind === "vacancy").length;
+    const filtered = filteredRows.filter((row) => row.kind === "vacancy").length;
+    return { total, filtered };
+  }, [tableRows, filteredRows]);
+
   const resetAllFilters = () => {
     setFilters({ ...emptyFilters });
+    setRowKindFilter("all");
     setManagersOnlyFilter(false);
     setManagerFilterId(null);
   };
@@ -834,25 +984,66 @@ function EmployeesPage() {
           <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
             Сотрудники
           </span>
-          <div className="flex min-w-[72px] items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
+          <button
+            type="button"
+            onClick={() =>
+              setRowKindFilter((prev) => (prev === "employee" ? "all" : "employee"))
+            }
+            className={`flex min-w-[72px] items-center rounded-lg border px-3 py-2 text-sm transition-colors ${
+              rowKindFilter === "employee"
+                ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-300"
+                : "border-gray-200 bg-white text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+            }`}
+          >
             {reportQuery.isPending ? (
               <span className="text-gray-400">…</span>
             ) : hasFilters ? (
               <>
-                {filteredEmployees.length}
+                {employeeCounts.filtered}
                 <span className="text-gray-400">
                   {" "}
-                  из {employees.length}
+                  из {employeeCounts.total}
                 </span>
               </>
             ) : (
-              filteredEmployees.length
+              employeeCounts.total
             )}
-          </div>
+          </button>
+        </div>
+
+        <div className="shrink-0">
+          <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+            Вакансии
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              setRowKindFilter((prev) => (prev === "vacancy" ? "all" : "vacancy"))
+            }
+            className={`flex min-w-[72px] items-center rounded-lg border px-3 py-2 text-sm transition-colors ${
+              rowKindFilter === "vacancy"
+                ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-300"
+                : "border-gray-200 bg-white text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+            }`}
+          >
+            {reportQuery.isPending ? (
+              <span className="text-gray-400">…</span>
+            ) : hasFilters ? (
+              <>
+                {vacancyCounts.filtered}
+                <span className="text-gray-400">
+                  {" "}
+                  из {vacancyCounts.total}
+                </span>
+              </>
+            ) : (
+              vacancyCounts.total
+            )}
+          </button>
         </div>
       </div>
 
-      <DictTable<Employer>
+      <DictTable<EmployeesTableRow>
         rowHoverVariant="border"
         columns={[
           {
@@ -880,22 +1071,22 @@ function EmployeesPage() {
             },
             className: "text-center",
             onClick: (r) => {
-              if (!orgByEmployeeId.get(r.id)?.isManager) return;
+              if (r.kind !== "employee" || !r.org?.isManager) return;
               setManagersOnlyFilter(false);
-              setManagerFilterId((prev) => (prev === r.id ? null : r.id));
+              setManagerFilterId((prev) => (prev === r.employee.id ? null : r.employee.id));
             },
             render: (r) =>
-              orgByEmployeeId.get(r.id)?.isManager ? (
+              r.kind === "employee" && r.org?.isManager ? (
                 <Star
                   size={12}
                   aria-label="Руководитель"
                   title={
-                    managerFilterId === r.id
+                    managerFilterId === r.employee.id
                       ? "Сбросить фильтр"
                       : "Показать подчинённых"
                   }
                   className={`mx-auto shrink-0 ${
-                    managerFilterId === r.id
+                    managerFilterId === r.employee.id
                       ? "fill-amber-500 text-amber-500"
                       : "fill-amber-400 text-amber-400"
                   }`}
@@ -907,20 +1098,26 @@ function EmployeesPage() {
           {
             key: "name",
             header: "ФИО",
-            onClick: (employee) => setSelectedEmployee(employee),
+            onClick: (row) => {
+              if (row.kind === "employee") setSelectedEmployee(row.employee);
+            },
             render: (r) =>
-              fullName(r) || <span className="text-gray-400">—</span>,
+              r.kind === "employee" ? (
+                fullName(r.employee) || <span className="text-gray-400">—</span>
+              ) : (
+                <span className="text-amber-500">Вакантно</span>
+              ),
           },
           {
             key: "city",
             header: "Город",
             className: "whitespace-nowrap",
             onClick: (r) => {
-              const city = orgByEmployeeId.get(r.id)?.city;
+              const city = r.org?.city;
               if (city) setFilters((prev) => ({ ...prev, city, office: "" }));
             },
             render: (r) => {
-              const city = orgByEmployeeId.get(r.id)?.city;
+              const city = r.org?.city;
               return city ? (
                 <span className="text-blue-600 hover:underline dark:text-blue-400">
                   {city}
@@ -935,7 +1132,7 @@ function EmployeesPage() {
             header: "Офис",
             className: "whitespace-nowrap",
             onClick: (r) => {
-              const org = orgByEmployeeId.get(r.id);
+              const org = r.org;
               if (!org?.office) return;
               setFilters((prev) => ({
                 ...prev,
@@ -944,7 +1141,7 @@ function EmployeesPage() {
               }));
             },
             render: (r) => {
-              const office = orgByEmployeeId.get(r.id)?.office;
+              const office = r.org?.office;
               return office ? (
                 <span className="text-blue-600 hover:underline dark:text-blue-400">
                   {office}
@@ -958,11 +1155,11 @@ function EmployeesPage() {
             key: "department",
             header: "Отдел",
             onClick: (r) => {
-              const department = orgByEmployeeId.get(r.id)?.department;
+              const department = r.org?.department;
               if (department) setFilters((prev) => ({ ...prev, department }));
             },
             render: (r) => {
-              const department = orgByEmployeeId.get(r.id)?.department;
+              const department = r.org?.department;
               return department ? (
                 <span className="text-blue-600 hover:underline dark:text-blue-400">
                   {department}
@@ -976,11 +1173,11 @@ function EmployeesPage() {
             key: "position",
             header: "Должность",
             onClick: (r) => {
-              const vacancy = vacancyByEmployeeId.get(r.id);
+              const vacancy = r.vacancy;
               if (vacancy) setEditVacancyModal(vacancy);
             },
             render: (r) => {
-              const position = orgByEmployeeId.get(r.id)?.position;
+              const position = r.org?.position;
               return position ? (
                 <span className="text-blue-600 hover:underline dark:text-blue-400">
                   {position}
@@ -991,19 +1188,29 @@ function EmployeesPage() {
             },
           },
         ]}
-        rows={filteredEmployees}
+        rows={filteredRows}
         rowKey={(r) => r.id}
         isLoading={reportQuery.isPending}
         isError={reportQuery.isError}
         errorMessage={reportQuery.error?.message}
         emptyMessage={hasFilters ? "Ничего не найдено" : "Записей пока нет"}
-        onDelete={(employee) => {
-          const employeeName = fullName(employee) || "этого сотрудника";
+        onDelete={(row) => {
+          if (row.kind === "employee") {
+            const employeeName = fullName(row.employee) || "этого сотрудника";
+            const confirmed = window.confirm(
+              `Удалить ${employeeName}? Действие необратимо.`,
+            );
+            if (!confirmed) return;
+            deleteEmployeeMutation.mutate(row.employee.id);
+            return;
+          }
+
+          const vacancyTitle = row.org.position || "эту вакансию";
           const confirmed = window.confirm(
-            `Удалить ${employeeName}? Действие необратимо.`,
+            `Удалить вакансию «${vacancyTitle}»? Действие необратимо.`,
           );
           if (!confirmed) return;
-          deleteEmployeeMutation.mutate(employee.id);
+          deleteVacancyMutation.mutate(row.vacancy.id);
         }}
         topRow={
           <EmployeeAddRow
