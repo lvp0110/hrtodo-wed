@@ -6,6 +6,7 @@ import type {
   Country,
   Office,
   CountryReq,
+  EmployeeCreateReq,
   EmployeeReportItem,
   EmployeeUpdateReq,
   Employer,
@@ -169,9 +170,17 @@ export const employeesApi = {
   get: (id: number): Promise<ApiResponse<Employer>> =>
     request(`/employees/${id}`),
 
+  /** Создать сотрудника — POST /employees */
+  create: (body: EmployeeCreateReq): Promise<ApiResponse<Employer>> =>
+    request("/employees", { method: "POST", body }),
+
   /** Обновить сотрудника — PUT /employees/{id} */
   update: (id: number, body: EmployeeUpdateReq): Promise<ApiResponse<Employer>> =>
     request(`/employees/${id}`, { method: "PUT", body }),
+
+  /** Удалить сотрудника — DELETE /employees/{id} */
+  delete: (id: number): Promise<void> =>
+    request(`/employees/${id}`, { method: "DELETE" }),
 };
 
 export const employeeQueries = {

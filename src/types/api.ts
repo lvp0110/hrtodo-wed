@@ -53,6 +53,15 @@ export interface Employer {
   office_id?: number | null;
 }
 
+export interface EmployeeCreateReq {
+  first_name: string;
+  second_name: string;
+  surname: string;
+  email?: string;
+  hire_date?: string;
+  gender?: string;
+}
+
 export interface EmployeeUpdateReq {
   first_name: string;
   second_name: string;
@@ -178,6 +187,7 @@ export interface VacancyReq {
   node_id: number;
   position_code: string;
   position_name: string;
+  user_id?: number | null;
   office_code?: string;
   city_code?: string;
   is_manager: boolean;

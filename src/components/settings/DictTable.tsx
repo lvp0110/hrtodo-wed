@@ -23,6 +23,8 @@ interface DictTableProps<T> {
   isError?: boolean;
   errorMessage?: string | null;
   emptyMessage?: string;
+  topRow?: ReactNode;
+  footerRow?: ReactNode;
 }
 
 const rowHoverClasses = {
@@ -44,6 +46,8 @@ export function DictTable<T>({
   isError = false,
   errorMessage,
   emptyMessage = "Записей пока нет",
+  topRow,
+  footerRow,
 }: DictTableProps<T>) {
   const showActions = Boolean(onEdit || onDelete);
 
@@ -104,6 +108,8 @@ export function DictTable<T>({
             </tr>
           )}
 
+          {!isLoading && !isError && topRow}
+
           {!isLoading &&
             !isError &&
             rows.map((row) => (
@@ -158,6 +164,8 @@ export function DictTable<T>({
                 )}
               </tr>
             ))}
+
+          {!isLoading && !isError && footerRow}
         </tbody>
       </table>
     </div>

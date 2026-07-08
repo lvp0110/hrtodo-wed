@@ -151,6 +151,24 @@ function EditVacancyForm({
   error,
 }: EditVacancyFormProps) {
   const [localError, setLocalError] = useState<string | null>(null);
+  const employeeOptions = useMemo(() => {
+    if (!data.employer?.id) return employees;
+    const alreadyExists = employees.some((employee) => employee.id === data.employer?.id);
+    if (alreadyExists) return employees;
+
+    const [surname = "", first_name = "", second_name = ""] = data.employer.name.split(" ");
+    return [
+      ...employees,
+      {
+        id: data.employer.id,
+        surname,
+        first_name,
+        second_name,
+        email: data.employer.email ?? "",
+      } as Employer,
+    ];
+  }, [employees, data.employer]);
+
   const {
     register,
     handleSubmit,
@@ -328,7 +346,7 @@ function EditVacancyForm({
           className={`${inputClass} border-gray-200 dark:border-gray-700`}
         >
           <option value="">— Без сотрудника (вакантно) —</option>
-          {employees.map((emp) => (
+          {employeeOptions.map((emp) => (
             <option key={emp.id} value={emp.id}>
               {employeeLabel(emp)}
             </option>

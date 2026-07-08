@@ -11,12 +11,18 @@ import {
   vacanciesApi,
 } from "#/services/api";
 import { EmployeeInfoModal } from "#/components/EmployeeInfoModal";
+import { EmployeeAddRow } from "#/components/EmployeeAddRow";
 import { EditVacancyModal } from "#/components/EditVacancyModal";
 import { DictTable } from "#/components/settings/DictTable";
 import { dictInputClass } from "#/components/settings/DictFormModal";
 import type { EmployeeReportItem, Employer, OrgNode } from "#/types/api";
+import type { VacancyModalData } from "#/types/orgChart";
 import { normalizeGender } from "#/lib/employeeDisplay";
-import { toEmployeeUpdateReq } from "#/lib/employeeUpdate";
+import {
+  toEmployeeCreateReq,
+  toEmployeeUpdateReq,
+  type EmployeeVacancyCreateFields,
+} from "#/lib/employeeUpdate";
 import { toVacancyUpdateReq } from "#/lib/vacancyUpdate";
 import { formatVacancyError } from "#/lib/vacancyValidation";
 
@@ -412,6 +418,7 @@ function EmployeesPage() {
   const [selectedEmployee, setSelectedEmployee] = useState<Employer | null>(
     null,
   );
+  const [addRowKey, setAddRowKey] = useState(0);
   const reportQuery = useQuery(employeeQueries.report);
   const citiesQuery = useQuery(dictQueries.cities);
   const treeQuery = useQuery({
@@ -471,6 +478,71 @@ function EmployeesPage() {
       queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
       queryClient.invalidateQueries({ queryKey: ["orgTree"] });
       setSelectedEmployee(null);
+    },
+  });
+
+  const deleteEmployeeMutation = useMutation({
+    mutationFn: (id: number) => employeesApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
+      queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
+      queryClient.invalidateQueries({ queryKey: ["orgTree"] });
+      setSelectedEmployee(null);
+    },
+  });
+
+  const createEmployeeVacancyMutation = useMutation({
+    mutationFn: async (data: EmployeeVacancyCreateFields) => {
+      const shouldCreateEmployee =
+        Boolean(data.surname.trim()) || Boolean(data.first_name.trim());
+      let employeeId: number | null = null;
+
+      if (shouldCreateEmployee) {
+        const employeeRes = await employeesApi.create(toEmployeeCreateReq(data));
+        employeeId = employeeRes.data.id;
+      }
+
+      const vacancyRes = await vacanciesApi.create({
+        node_id: data.nodeId,
+        position_code: data.position,
+        position_name: data.position,
+        user_id: employeeId,
+        city_code: data.cityCode,
+        office_code: data.officeCode || undefined,
+        is_manager: data.isManager,
+        position_description: "",
+        job_offer_link: "",
+      });
+
+      // Ensure the newly created vacancy is explicitly assigned to the new employee.
+      if (employeeId) {
+        await vacanciesApi.update(vacancyRes.data.id, {
+          node_id: data.nodeId,
+          user_id: employeeId,
+          office_code: data.officeCode || undefined,
+          position_code: data.position,
+          position_name: data.position,
+          is_manager: data.isManager,
+          position_description: "",
+          job_offer_link: "",
+        });
+      }
+
+      if (employeeId && (data.cityId || data.officeId)) {
+        await employeesApi.update(employeeId, {
+          ...toEmployeeCreateReq(data),
+          email: "",
+          city_id: data.cityId,
+          office_id: data.officeId,
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orgTree"] });
+      queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
+      queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
+      createEmployeeVacancyMutation.reset();
+      setAddRowKey((key) => key + 1);
     },
   });
 
@@ -925,6 +997,25 @@ function EmployeesPage() {
         isError={reportQuery.isError}
         errorMessage={reportQuery.error?.message}
         emptyMessage={hasFilters ? "Ничего не найдено" : "Записей пока нет"}
+        onDelete={(employee) => {
+          const employeeName = fullName(employee) || "этого сотрудника";
+          const confirmed = window.confirm(
+            `Удалить ${employeeName}? Действие необратимо.`,
+          );
+          if (!confirmed) return;
+          deleteEmployeeMutation.mutate(employee.id);
+        }}
+        topRow={
+          <EmployeeAddRow
+            key={addRowKey}
+            columnsCount={6}
+            cities={citiesQuery.data ?? []}
+            orgNodes={treeQuery.data ?? []}
+            isPending={createEmployeeVacancyMutation.isPending}
+            error={formatVacancyError(createEmployeeVacancyMutation.error?.message)}
+            onSubmit={(data) => createEmployeeVacancyMutation.mutate(data)}
+          />
+        }
       />
 
       {selectedEmployee && (
