@@ -166,10 +166,6 @@ export const employeesApi = {
   getReport: (): Promise<ApiResponse<EmployeeReportItem[]>> =>
     request("/employees/report"),
 
-  /** Получить сотрудника по ID — GET /employees/{id} */
-  get: (id: number): Promise<ApiResponse<Employer>> =>
-    request(`/employees/${id}`),
-
   /** Создать сотрудника — POST /employees */
   create: (body: EmployeeCreateReq): Promise<ApiResponse<Employer>> =>
     request("/employees", { method: "POST", body }),
@@ -265,15 +261,6 @@ export const orgNodeTypesApi = {
  * Бэк отдаёт `data: null` для пустого справочника (nil-срез в Go), поэтому
  * нормализуем в `[]` — потребители вызывают `.map` без доп. проверок.
  */
-export const officeQueries = {
-  byCity: (cityId: number) =>
-    queryOptions({
-      queryKey: ["offices", "city", cityId] as const,
-      queryFn: () => officesApi.getByCity(cityId).then((res) => res.data ?? []),
-      staleTime: 1000 * 60 * 5,
-    }),
-};
-
 export const dictQueries = {
   cities: queryOptions({
     queryKey: ["dict", "cities"] as const,

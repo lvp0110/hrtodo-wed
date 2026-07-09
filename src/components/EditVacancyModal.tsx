@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { CloseButton } from "#/components/CloseButton";
+import { DepartmentTreeSelect } from "#/components/DepartmentTreeSelect";
 import { dictQueries, officesApi, orgNodesApi } from "#/services/api";
 import { findEmployeeVacancyConflict } from "#/lib/vacancyValidation";
 import type {
@@ -18,11 +19,6 @@ interface EditVacancyModalProps {
   error?: string | null;
 }
 
-type DeptOption = {
-  id: number;
-  label: string;
-};
-
 function employeeLabel({
   surname,
   first_name,
@@ -33,20 +29,6 @@ function employeeLabel({
   second_name: string;
 }) {
   return [surname, first_name, second_name].filter(Boolean).join(" ");
-}
-
-function flattenOrgNodes(nodes: OrgNode[], depth = 0): DeptOption[] {
-  const result: DeptOption[] = [];
-
-  for (const node of nodes) {
-    const prefix = depth > 0 ? `${"— ".repeat(depth)}` : "";
-    result.push({ id: node.id, label: `${prefix}${node.name}` });
-    if (node.children?.length) {
-      result.push(...flattenOrgNodes(node.children, depth + 1));
-    }
-  }
-
-  return result;
 }
 
 const inputClass =
@@ -69,11 +51,6 @@ export function EditVacancyModal({
   function handleBackdropClick(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose();
   }
-
-  const departments = useMemo(
-    () => flattenOrgNodes(orgTree.data ?? []),
-    [orgTree.data],
-  );
 
   const dictsReady =
     cities.isSuccess && employees.isSuccess && orgTree.isSuccess;
@@ -113,7 +90,6 @@ export function EditVacancyModal({
           <EditVacancyForm
             data={data}
             cities={cities.data}
-            departments={departments}
             employees={employees.data}
             orgNodes={orgTree.data ?? []}
             onClose={onClose}
@@ -130,7 +106,6 @@ export function EditVacancyModal({
 interface EditVacancyFormProps {
   data: VacancyModalData;
   cities: City[];
-  departments: DeptOption[];
   employees: Employer[];
   orgNodes: OrgNode[];
   onClose: () => void;
@@ -142,7 +117,6 @@ interface EditVacancyFormProps {
 function EditVacancyForm({
   data,
   cities,
-  departments,
   employees,
   orgNodes,
   onClose,
@@ -191,6 +165,7 @@ function EditVacancyForm({
   });
 
   const cityCode = watch("cityCode");
+  const nodeId = watch("nodeId");
   const selectedCityId = useMemo(
     () => cities.find((city) => city.code === cityCode)?.id ?? null,
     [cities, cityCode],
@@ -240,6 +215,12 @@ function EditVacancyForm({
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="px-6 py-5 space-y-4">
+      <input
+        type="hidden"
+        {...register("nodeId", {
+          validate: (value) => value > 0 || "Обязательное поле",
+        })}
+      />
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Должность <span className="text-red-400">*</span>
@@ -314,22 +295,16 @@ function EditVacancyForm({
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Отдел <span className="text-red-400">*</span>
         </label>
-        <select
-          {...register("nodeId", {
-            required: "Обязательное поле",
-            setValueAs: (value) => Number(value),
-          })}
-          className={`${inputClass} ${errors.nodeId ? "border-red-400 dark:border-red-500" : "border-gray-200 dark:border-gray-700"}`}
-        >
-          <option value="" disabled hidden>
-            Выберите отдел
-          </option>
-          {departments.map((department) => (
-            <option key={department.id} value={department.id}>
-              {department.label}
-            </option>
-          ))}
-        </select>
+        <DepartmentTreeSelect
+          variant="node"
+          tree={orgNodes}
+          value={nodeId}
+          onChange={(value) =>
+            setValue("nodeId", value, { shouldValidate: true })
+          }
+          placeholder="Выберите отдел"
+          className={errors.nodeId ? "rounded-lg ring-2 ring-red-400" : ""}
+        />
         {errors.nodeId && (
           <p className="mt-1 text-xs text-red-400">{errors.nodeId.message}</p>
         )}

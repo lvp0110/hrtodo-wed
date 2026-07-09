@@ -1,6 +1,6 @@
 import type { OrgNode } from "#/types/api";
 
-export type VacancyConflict = {
+type VacancyConflict = {
   vacancyId: number;
   deptName: string;
   position: string;

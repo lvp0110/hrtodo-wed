@@ -17,6 +17,7 @@ import { DictTable } from "#/components/settings/DictTable";
 import { dictInputClass } from "#/components/settings/DictFormModal";
 import type { EmployeeReportItem, Employer, OrgNode } from "#/types/api";
 import type { VacancyModalData } from "#/types/orgChart";
+import { DepartmentTreeSelect } from "#/components/DepartmentTreeSelect";
 import { normalizeGender } from "#/lib/employeeDisplay";
 import {
   toEmployeeCreateReq,
@@ -649,18 +650,15 @@ function EmployeesPage() {
   const filterOptions = useMemo(() => {
     const cities = new Set<string>();
     const offices = new Set<string>();
-    const departments = new Set<string>();
     const hireYears = new Set<string>();
 
     for (const info of orgByEmployeeId.values()) {
       if (info.city) cities.add(info.city);
       if (info.office) offices.add(info.office);
-      if (info.department) departments.add(info.department);
     }
     for (const row of vacantRows) {
       if (row.org.city) cities.add(row.org.city);
       if (row.org.office) offices.add(row.org.office);
-      if (row.org.department) departments.add(row.org.department);
     }
 
     for (const employee of employees) {
@@ -671,7 +669,6 @@ function EmployeesPage() {
     return {
       cities: [...cities].sort((a, b) => a.localeCompare(b, "ru")),
       offices: [...offices].sort((a, b) => a.localeCompare(b, "ru")),
-      departments: [...departments].sort((a, b) => a.localeCompare(b, "ru")),
       hireYears: [...hireYears].sort((a, b) => b.localeCompare(a, "ru")),
     };
   }, [employees, orgByEmployeeId, vacantRows]);
@@ -858,24 +855,19 @@ function EmployeesPage() {
             </select>
           </label>
 
-          <label className="min-w-[180px]">
+          <label className="block w-[360px] shrink-0">
             <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              Отдел
+              Отделы
             </span>
-            <select
+            <DepartmentTreeSelect
+              variant="filter"
+              tree={treeQuery.data ?? []}
+              isLoading={treeQuery.isPending}
               value={filters.department}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, department: e.target.value }))
+              onChange={(department) =>
+                setFilters((prev) => ({ ...prev, department }))
               }
-              className={dictInputClass}
-            >
-              <option value="">Все отделы</option>
-              {filterOptions.departments.map((department) => (
-                <option key={department} value={department}>
-                  {department}
-                </option>
-              ))}
-            </select>
+            />
           </label>
 
           <label className="min-w-[140px]">

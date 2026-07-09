@@ -1,16 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { dictInputClass } from "#/components/settings/DictFormModal";
+import { DepartmentTreeSelect } from "#/components/DepartmentTreeSelect";
 import { GENDER_OPTIONS } from "#/lib/employeeDisplay";
 import type { EmployeeVacancyCreateFields } from "#/lib/employeeUpdate";
 import { officesApi } from "#/services/api";
 import type { City, OrgNode } from "#/types/api";
-
-type DeptOption = {
-  id: number;
-  label: string;
-};
 
 const emptyDraft: EmployeeVacancyCreateFields = {
   surname: "",
@@ -27,20 +23,6 @@ const emptyDraft: EmployeeVacancyCreateFields = {
   position: "",
   isManager: false,
 };
-
-function flattenOrgNodes(nodes: OrgNode[], depth = 0): DeptOption[] {
-  const result: DeptOption[] = [];
-
-  for (const node of nodes) {
-    const prefix = depth > 0 ? `${"— ".repeat(depth)}` : "";
-    result.push({ id: node.id, label: `${prefix}${node.name}` });
-    if (node.children?.length) {
-      result.push(...flattenOrgNodes(node.children, depth + 1));
-    }
-  }
-
-  return result;
-}
 
 const compactInputClass = `${dictInputClass} min-w-0 px-2 py-1.5 text-xs`;
 
@@ -64,11 +46,6 @@ export function EmployeeAddRow({
   const [isExpanded, setIsExpanded] = useState(false);
   const [draft, setDraft] = useState<EmployeeVacancyCreateFields>(emptyDraft);
   const [localError, setLocalError] = useState<string | null>(null);
-
-  const departments = useMemo(
-    () => flattenOrgNodes(orgNodes),
-    [orgNodes],
-  );
 
   const officesQuery = useQuery({
     queryKey: ["offices", "city", draft.cityId] as const,
@@ -263,18 +240,14 @@ export function EmployeeAddRow({
           </select>
         </td>
         <td className="px-4 py-3 align-top">
-          <select
-            value={draft.nodeId || ""}
-            onChange={(e) => updateDraft("nodeId", Number(e.target.value))}
-            className={`${compactInputClass} min-w-[140px]`}
-          >
-            <option value="">Отдел *</option>
-            {departments.map((department) => (
-              <option key={department.id} value={department.id}>
-                {department.label}
-              </option>
-            ))}
-          </select>
+          <DepartmentTreeSelect
+            variant="node"
+            tree={orgNodes}
+            value={draft.nodeId}
+            onChange={(nodeId) => updateDraft("nodeId", nodeId)}
+            placeholder="Отдел *"
+            compact
+          />
         </td>
         <td className="px-4 py-3 align-top">
           <input

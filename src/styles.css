@@ -49,7 +49,7 @@
 
 html,
 body,
-#app {
+#root {
   min-height: 100%;
 }
 

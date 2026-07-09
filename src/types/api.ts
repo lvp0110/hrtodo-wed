@@ -132,14 +132,6 @@ export interface OrgNode {
   empty_vacancy: EmptyVacancy[];
 }
 
-export interface OrgNodeRow {
-  id: number;
-  parent_id: number | null;
-  code: string;
-  name: string;
-  type_code: string;
-}
-
 export interface ApiResponse<T> {
   code: number;
   data: T;
@@ -164,15 +156,7 @@ export interface UserFullInfo {
   created_at: string;
 }
 
-export interface ErrorResponse {
-  code: number;
-  error: string;
-}
-
 export type OrgNodesResponse = ApiResponse<OrgNode[]>;
-export type OrgNodeRowResponse = ApiResponse<OrgNodeRow>;
-export type VacancyResponse = ApiResponse<Vacancy>;
-export type OrgNodeResponse = ApiResponse<OrgNode>;
 
 export interface NodeCreateReq {
   code: string;

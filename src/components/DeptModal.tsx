@@ -1,10 +1,9 @@
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { CloseButton } from "#/components/CloseButton";
+import { selectableOrgNodeTypes } from "#/lib/orgNodeTypes";
 import { dictQueries } from "#/services/api";
 import type { DeptFields, DeptModalState } from "#/types/orgChart";
-
-export type { DeptFields };
 
 interface DeptModalProps {
   state: DeptModalState;
@@ -35,8 +34,15 @@ export function DeptModal({
   });
 
   const nodeTypesQuery = useQuery(dictQueries.nodeTypes);
+  const nodeTypeOptions = selectableOrgNodeTypes(
+    nodeTypesQuery.data ?? [],
+    isEdit ? state.type : undefined,
+  );
 
-  const nodeTypesDisabled = nodeTypesQuery.isPending || nodeTypesQuery.isError;
+  const nodeTypesDisabled =
+    nodeTypesQuery.isPending ||
+    nodeTypesQuery.isError ||
+    nodeTypeOptions.length === 0;
 
   function handleBackdropClick(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose();
@@ -91,7 +97,7 @@ export function DeptModal({
               <option value="" disabled hidden>
                 {nodeTypesQuery.isPending ? "Загрузка…" : "Выберите тип"}
               </option>
-              {nodeTypesQuery.data?.map((t) => (
+              {nodeTypeOptions.map((t) => (
                 <option key={t.code} value={t.code}>
                   {t.name}
                 </option>
