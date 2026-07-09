@@ -10,6 +10,10 @@ import {
   orgNodesApi,
   vacanciesApi,
 } from "#/services/api";
+import {
+  AssignEmployeeModal,
+  type AssignEmployeeFormFields,
+} from "#/components/AssignEmployeeModal";
 import { EmployeeInfoModal } from "#/components/EmployeeInfoModal";
 import { EmployeeAddRow } from "#/components/EmployeeAddRow";
 import { EditVacancyModal } from "#/components/EditVacancyModal";
@@ -486,6 +490,10 @@ function EmployeesPage() {
   const [managerFilterId, setManagerFilterId] = useState<number | null>(null);
   const [editVacancyModal, setEditVacancyModal] =
     useState<VacancyModalData | null>(null);
+  const [assignEmployeeTarget, setAssignEmployeeTarget] = useState<{
+    vacancy: VacancyModalData;
+    org: EmployeeVacancyInfo;
+  } | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<Employer | null>(
     null,
   );
@@ -574,6 +582,58 @@ function EmployeesPage() {
       queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
       queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
       if (editVacancyModal) setEditVacancyModal(null);
+    },
+  });
+
+  const assignEmployeeMutation = useMutation({
+    mutationFn: async ({
+      vacancy,
+      org,
+      fields,
+    }: {
+      vacancy: VacancyModalData;
+      org: EmployeeVacancyInfo;
+      fields: AssignEmployeeFormFields;
+    }) => {
+      let employeeId: number;
+
+      if (fields.mode === "existing") {
+        if (!fields.existingUserId) {
+          throw new Error("Выберите сотрудника");
+        }
+        employeeId = fields.existingUserId;
+      } else {
+        const employeeRes = await employeesApi.create(toEmployeeCreateReq(fields));
+        employeeId = employeeRes.data.id;
+
+        const cityId =
+          citiesQuery.data?.find((city) => city.code === org.cityCode)?.id ?? null;
+        if (cityId || org.officeId) {
+          await employeesApi.update(employeeId, {
+            ...toEmployeeCreateReq(fields),
+            city_id: cityId,
+            office_id: org.officeId,
+          });
+        }
+      }
+
+      await vacanciesApi.update(vacancy.id, {
+        node_id: vacancy.nodeId,
+        user_id: employeeId,
+        office_code: vacancy.officeCode,
+        position_code: vacancy.position,
+        position_name: vacancy.position,
+        is_manager: vacancy.isManager,
+        position_description: vacancy.description,
+        job_offer_link: vacancy.jobOffer,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orgTree"] });
+      queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
+      queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
+      assignEmployeeMutation.reset();
+      setAssignEmployeeTarget(null);
     },
   });
 
@@ -1088,13 +1148,19 @@ function EmployeesPage() {
             key: "name",
             header: "ФИО",
             onClick: (row) => {
-              if (row.kind === "employee") setSelectedEmployee(row.employee);
+              if (row.kind === "employee") {
+                setSelectedEmployee(row.employee);
+                return;
+              }
+              setAssignEmployeeTarget({ vacancy: row.vacancy, org: row.org });
             },
             render: (r) =>
               r.kind === "employee" ? (
                 fullName(r.employee) || <span className="text-gray-400">—</span>
               ) : (
-                <span className="text-amber-500">Вакантно</span>
+                <span className="cursor-pointer text-amber-500 hover:underline">
+                  Вакантно
+                </span>
               ),
           },
           {
@@ -1245,6 +1311,25 @@ function EmployeesPage() {
             updateVacancyMutation.mutate({
               id: editVacancyModal.id,
               body: toVacancyUpdateReq(data),
+            });
+          }}
+        />
+      )}
+
+      {assignEmployeeTarget && (
+        <AssignEmployeeModal
+          vacancy={assignEmployeeTarget.vacancy}
+          onClose={() => {
+            assignEmployeeMutation.reset();
+            setAssignEmployeeTarget(null);
+          }}
+          isPending={assignEmployeeMutation.isPending}
+          error={formatVacancyError(assignEmployeeMutation.error?.message)}
+          onSubmit={(fields) => {
+            assignEmployeeMutation.mutate({
+              vacancy: assignEmployeeTarget.vacancy,
+              org: assignEmployeeTarget.org,
+              fields,
             });
           }}
         />

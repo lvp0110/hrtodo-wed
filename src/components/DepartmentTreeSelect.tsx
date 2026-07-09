@@ -278,7 +278,7 @@ export function DepartmentTreeSelect(props: DepartmentTreeSelectProps) {
       {isOpen && (
         <div
           role="listbox"
-          className="absolute inset-x-0 top-full z-50 mt-1 max-h-72 w-full overflow-x-hidden overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+          className="absolute inset-x-0 top-full z-50 mt-1 h-auto w-full overflow-x-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
         >
           <button
             type="button"
@@ -294,7 +294,7 @@ export function DepartmentTreeSelect(props: DepartmentTreeSelectProps) {
             {rootLabel}
           </button>
 
-          <div className="sticky top-0 z-10 border-b border-gray-100 bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900">
+          <div className="border-b border-gray-100 bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900">
             <input
               ref={searchInputRef}
               type="search"
