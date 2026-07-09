@@ -616,7 +616,6 @@ function EmployeesPage() {
       if (employeeId && (data.cityId || data.officeId)) {
         await employeesApi.update(employeeId, {
           ...toEmployeeCreateReq(data),
-          email: "",
           city_id: data.cityId,
           office_id: data.officeId,
         });
@@ -989,7 +988,7 @@ function EmployeesPage() {
             onClick={() =>
               setRowKindFilter((prev) => (prev === "employee" ? "all" : "employee"))
             }
-            className={`flex min-w-[72px] items-center rounded-lg border px-3 py-2 text-sm transition-colors ${
+            className={`inline-flex min-w-[72px] items-center justify-center rounded-lg border px-3 py-2 text-sm transition-colors ${
               rowKindFilter === "employee"
                 ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-300"
                 : "border-gray-200 bg-white text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
@@ -998,13 +997,12 @@ function EmployeesPage() {
             {reportQuery.isPending ? (
               <span className="text-gray-400">…</span>
             ) : hasFilters ? (
-              <>
+              <span className="inline-flex items-center gap-1.5">
                 {employeeCounts.filtered}
                 <span className="text-gray-400">
-                  {" "}
                   из {employeeCounts.total}
                 </span>
-              </>
+              </span>
             ) : (
               employeeCounts.total
             )}
@@ -1020,7 +1018,7 @@ function EmployeesPage() {
             onClick={() =>
               setRowKindFilter((prev) => (prev === "vacancy" ? "all" : "vacancy"))
             }
-            className={`flex min-w-[72px] items-center rounded-lg border px-3 py-2 text-sm transition-colors ${
+            className={`inline-flex min-w-[72px] items-center justify-center rounded-lg border px-3 py-2 text-sm transition-colors ${
               rowKindFilter === "vacancy"
                 ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-300"
                 : "border-gray-200 bg-white text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
@@ -1029,13 +1027,12 @@ function EmployeesPage() {
             {reportQuery.isPending ? (
               <span className="text-gray-400">…</span>
             ) : hasFilters ? (
-              <>
+              <span className="inline-flex items-center gap-1.5">
                 {vacancyCounts.filtered}
                 <span className="text-gray-400">
-                  {" "}
                   из {vacancyCounts.total}
                 </span>
-              </>
+              </span>
             ) : (
               vacancyCounts.total
             )}

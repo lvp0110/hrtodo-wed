@@ -16,6 +16,7 @@ const emptyDraft: EmployeeVacancyCreateFields = {
   surname: "",
   first_name: "",
   second_name: "",
+  email: "",
   gender: "",
   hireDate: "",
   cityCode: "",

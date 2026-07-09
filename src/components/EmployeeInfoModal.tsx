@@ -43,6 +43,7 @@ export function EmployeeInfoModal({
       surname: employee.surname,
       first_name: employee.first_name,
       second_name: employee.second_name,
+      email: employee.email ?? "",
       gender: normalizeGender(employee.gender),
       hireDate: toDateInputValue(employee.hire_date),
     },
@@ -99,6 +100,31 @@ export function EmployeeInfoModal({
               {...register("second_name")}
               className={`${inputClass} border-gray-200 dark:border-gray-700`}
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Эл. почта
+            </label>
+            <input
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              {...register("email", {
+                validate: (value) => {
+                  const trimmed = value.trim();
+                  if (!trimmed) return true;
+                  return (
+                    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) ||
+                    "Некорректный email"
+                  );
+                },
+              })}
+              className={`${inputClass} ${errors.email ? "border-red-400 dark:border-red-500" : "border-gray-200 dark:border-gray-700"}`}
+            />
+            {errors.email && (
+              <p className="mt-1 text-xs text-red-400">{errors.email.message}</p>
+            )}
           </div>
 
           <div>
