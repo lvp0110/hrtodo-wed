@@ -6,6 +6,7 @@
 }
 
 :root {
+  --tsrd-font-size: 10px;
   --sea-ink: #173a40;
   --lagoon-deep: #328f97;
   --sand: #e7f0e8;
@@ -127,4 +128,57 @@ button,
 a {
   transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease,
     transform 180ms ease;
+}
+
+@media (min-width: 1024px) and (max-width: 1069px) {
+  .employees-page {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .employees-dict-table table {
+    table-layout: fixed;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+  }
+
+  .employees-dict-table th,
+  .employees-dict-table td {
+    padding: 0.375rem 0.5rem;
+  }
+
+  .employees-dict-table th:first-child,
+  .employees-dict-table td:first-child {
+    width: 2rem;
+  }
+
+  .employees-dict-table th:last-child,
+  .employees-dict-table td:last-child {
+    width: 2.5rem;
+  }
+
+  .employees-dict-table th:nth-child(2),
+  .employees-dict-table td:nth-child(2) {
+    width: 17%;
+  }
+
+  .employees-dict-table th:nth-child(3),
+  .employees-dict-table td:nth-child(3) {
+    width: 11%;
+  }
+
+  .employees-dict-table th:nth-child(4),
+  .employees-dict-table td:nth-child(4) {
+    width: 13%;
+  }
+
+  .employees-dict-table th:nth-child(5),
+  .employees-dict-table td:nth-child(5) {
+    width: 22%;
+  }
+
+  .employees-dict-table th:nth-child(6),
+  .employees-dict-table td:nth-child(6) {
+    width: 22%;
+  }
 }

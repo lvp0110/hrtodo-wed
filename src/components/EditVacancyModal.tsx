@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { CloseButton } from "#/components/CloseButton";
 import { DepartmentTreeSelect } from "#/components/DepartmentTreeSelect";
+import { EmployeeSelect } from "#/components/EmployeeSelect";
 import { dictQueries, officesApi, orgNodesApi } from "#/services/api";
 import { findEmployeeVacancyConflict } from "#/lib/vacancyValidation";
 import type {
@@ -17,18 +18,6 @@ interface EditVacancyModalProps {
   onSubmit: (data: EditVacancyFormFields) => void;
   isPending?: boolean;
   error?: string | null;
-}
-
-function employeeLabel({
-  surname,
-  first_name,
-  second_name,
-}: {
-  surname: string;
-  first_name: string;
-  second_name: string;
-}) {
-  return [surname, first_name, second_name].filter(Boolean).join(" ");
 }
 
 const inputClass =
@@ -58,11 +47,11 @@ export function EditVacancyModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
       onMouseDown={handleBackdropClick}
     >
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden">
+        <div className="shrink-0 px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
               Редактирование вакансии
@@ -74,30 +63,32 @@ export function EditVacancyModal({
           <CloseButton onClick={onClose} />
         </div>
 
-        {dictsError && (
-          <div className="px-6 py-8 text-sm text-red-500 dark:text-red-400">
-            Не удалось загрузить справочники
-          </div>
-        )}
+        <div className="overflow-y-auto flex-1 min-h-0">
+          {dictsError && (
+            <div className="px-6 py-8 text-sm text-red-500 dark:text-red-400">
+              Не удалось загрузить справочники
+            </div>
+          )}
 
-        {!dictsError && !dictsReady && (
-          <div className="px-6 py-8 text-sm text-gray-400 dark:text-gray-500">
-            Загрузка справочников…
-          </div>
-        )}
+          {!dictsError && !dictsReady && (
+            <div className="px-6 py-8 text-sm text-gray-400 dark:text-gray-500">
+              Загрузка справочников…
+            </div>
+          )}
 
-        {dictsReady && (
-          <EditVacancyForm
-            data={data}
-            cities={cities.data}
-            employees={employees.data}
-            orgNodes={orgTree.data ?? []}
-            onClose={onClose}
-            onSubmit={onSubmit}
-            isPending={isPending}
-            error={error}
-          />
-        )}
+          {dictsReady && (
+            <EditVacancyForm
+              data={data}
+              cities={cities.data}
+              employees={employees.data}
+              orgNodes={orgTree.data ?? []}
+              onClose={onClose}
+              onSubmit={onSubmit}
+              isPending={isPending}
+              error={error}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
@@ -314,19 +305,11 @@ function EditVacancyForm({
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Сотрудник
         </label>
-        <select
-          {...register("userId", {
-            setValueAs: (v) => (v === "" || v == null ? null : Number(v)),
-          })}
-          className={`${inputClass} border-gray-200 dark:border-gray-700`}
-        >
-          <option value="">— Без сотрудника (вакантно) —</option>
-          {employeeOptions.map((emp) => (
-            <option key={emp.id} value={emp.id}>
-              {employeeLabel(emp)}
-            </option>
-          ))}
-        </select>
+        <EmployeeSelect
+          employees={employeeOptions}
+          value={watch("userId")}
+          onChange={(userId) => setValue("userId", userId, { shouldValidate: true })}
+        />
       </div>
 
       <div>

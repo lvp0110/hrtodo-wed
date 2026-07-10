@@ -59,7 +59,7 @@ export const Route = createRootRoute({
   component: () => (
     <>
       <RootShell />
-      <TanStackRouterDevtools />
+      <TanStackRouterDevtools position="bottom-right" />
     </>
   ),
 });

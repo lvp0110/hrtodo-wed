@@ -15,7 +15,8 @@ import {
   type AssignEmployeeFormFields,
 } from "#/components/AssignEmployeeModal";
 import { EmployeeInfoModal } from "#/components/EmployeeInfoModal";
-import { EmployeeAddRow } from "#/components/EmployeeAddRow";
+import { EmployeeAddRow, EmployeeAddCard } from "#/components/EmployeeAddRow";
+import { EmployeesRowCard } from "#/components/EmployeesRowCard";
 import { EditVacancyModal } from "#/components/EditVacancyModal";
 import { DictTable } from "#/components/settings/DictTable";
 import { dictInputClass } from "#/components/settings/DictFormModal";
@@ -841,30 +842,31 @@ function EmployeesPage() {
   };
 
   return (
-    <div className="absolute inset-0 overflow-auto bg-gray-50 px-8 py-6 dark:bg-gray-950">
-      <div className="mb-6 flex flex-wrap items-end gap-3">
-        <label className="min-w-[160px] flex-1">
-            <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              ФИО
-            </span>
-            <div className="relative">
-              <Search
-                size={15}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-              <input
-                type="search"
-                value={filters.name}
-                onChange={(e) =>
-                  setFilters((prev) => ({ ...prev, name: e.target.value }))
-                }
-                placeholder="Поиск по ФИО"
-                className={`${dictInputClass} pl-9`}
-              />
-            </div>
-          </label>
+    <div className="employees-page absolute inset-0 overflow-auto bg-gray-50 px-4 py-6 min-[1070px]:px-8 dark:bg-gray-950">
+      <div className="mb-6 flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:gap-3">
+        <label className="max-md:w-full min-w-[160px] flex-1">
+          <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+            ФИО
+          </span>
+          <div className="relative">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+            <input
+              type="search"
+              value={filters.name}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, name: e.target.value }))
+              }
+              placeholder="Поиск по ФИО"
+              className={`${dictInputClass} pl-9`}
+            />
+          </div>
+        </label>
 
-          <label className="min-w-[140px]">
+        <div className="flex w-full gap-3 md:contents">
+          <label className="max-md:min-w-0 max-md:flex-1 min-w-[140px]">
             <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
               Город
             </span>
@@ -888,7 +890,7 @@ function EmployeesPage() {
             </select>
           </label>
 
-          <label className="min-w-[160px]">
+          <label className="max-md:min-w-0 max-md:flex-1 min-w-[160px]">
             <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
               Офис
             </span>
@@ -914,23 +916,46 @@ function EmployeesPage() {
               ))}
             </select>
           </label>
+        </div>
 
-          <label className="block w-[360px] shrink-0">
-            <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              Отделы
-            </span>
-            <DepartmentTreeSelect
-              variant="filter"
-              tree={treeQuery.data ?? []}
-              isLoading={treeQuery.isPending}
-              value={filters.department}
-              onChange={(department) =>
-                setFilters((prev) => ({ ...prev, department }))
-              }
+        <label className="block max-md:w-full w-[360px] shrink-0">
+          <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+            Отделы
+          </span>
+          <DepartmentTreeSelect
+            variant="filter"
+            tree={treeQuery.data ?? []}
+            isLoading={treeQuery.isPending}
+            value={filters.department}
+            onChange={(department) =>
+              setFilters((prev) => ({ ...prev, department }))
+            }
+          />
+        </label>
+
+        <label className="max-md:w-full min-w-[160px] flex-1">
+          <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+            Должность
+          </span>
+          <div className="relative">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
             />
-          </label>
+            <input
+              type="search"
+              value={filters.position}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, position: e.target.value }))
+              }
+              placeholder="Поиск по должности"
+              className={`${dictInputClass} pl-9`}
+            />
+          </div>
+        </label>
 
-          <label className="min-w-[140px]">
+        <div className="flex w-full gap-3 md:contents">
+          <label className="max-md:min-w-[120px] max-md:shrink-0 min-w-[140px]">
             <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
               Пол
             </span>
@@ -947,28 +972,7 @@ function EmployeesPage() {
             </select>
           </label>
 
-          <label className="min-w-[160px] flex-1">
-            <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              Должность
-            </span>
-            <div className="relative">
-              <Search
-                size={15}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-              <input
-                type="search"
-                value={filters.position}
-                onChange={(e) =>
-                  setFilters((prev) => ({ ...prev, position: e.target.value }))
-                }
-                placeholder="Поиск по должности"
-                className={`${dictInputClass} pl-9`}
-              />
-            </div>
-          </label>
-
-          <div className="min-w-[260px]">
+          <div className="max-md:min-w-0 max-md:flex-1 min-w-[260px]">
             <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
               Дата устройства
             </span>
@@ -978,7 +982,7 @@ function EmployeesPage() {
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, hireYear: e.target.value }))
                 }
-                className={`${dictInputClass} min-w-[104px]`}
+                className={`${dictInputClass} max-md:min-w-0 max-md:flex-1 min-w-[104px]`}
               >
                 <option value="">Год</option>
                 {filterOptions.hireYears.map((year) => (
@@ -992,7 +996,7 @@ function EmployeesPage() {
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, hireMonth: e.target.value }))
                 }
-                className={`${dictInputClass} min-w-[84px]`}
+                className={`${dictInputClass} max-md:min-w-0 max-md:flex-1 min-w-[84px]`}
               >
                 <option value="">Месяц</option>
                 {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0")).map(
@@ -1008,7 +1012,7 @@ function EmployeesPage() {
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, hireDay: e.target.value }))
                 }
-                className={`${dictInputClass} min-w-[72px]`}
+                className={`${dictInputClass} max-md:min-w-0 max-md:flex-1 min-w-[72px]`}
               >
                 <option value="">День</option>
                 {Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0")).map(
@@ -1021,7 +1025,9 @@ function EmployeesPage() {
               </select>
             </div>
           </div>
+        </div>
 
+        <div className="flex w-full flex-wrap items-end gap-3 md:contents">
           <button
             type="button"
             onClick={resetAllFilters}
@@ -1031,69 +1037,182 @@ function EmployeesPage() {
             Сбросить фильтры
           </button>
 
-        <div className="shrink-0">
-          <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-            Сотрудники
-          </span>
-          <button
-            type="button"
-            onClick={() =>
-              setRowKindFilter((prev) => (prev === "employee" ? "all" : "employee"))
-            }
-            className={`inline-flex min-w-[72px] items-center justify-center rounded-lg border px-3 py-2 text-sm transition-colors ${
-              rowKindFilter === "employee"
-                ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-300"
-                : "border-gray-200 bg-white text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
-            }`}
-          >
-            {reportQuery.isPending ? (
-              <span className="text-gray-400">…</span>
-            ) : hasFilters ? (
-              <span className="inline-flex items-center gap-1.5">
-                {employeeCounts.filtered}
-                <span className="text-gray-400">
-                  из {employeeCounts.total}
+          <div className="shrink-0">
+            <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+              Сотрудники
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                setRowKindFilter((prev) => (prev === "employee" ? "all" : "employee"))
+              }
+              className={`inline-flex min-w-[72px] items-center justify-center rounded-lg border px-3 py-2 text-sm transition-colors ${
+                rowKindFilter === "employee"
+                  ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-300"
+                  : "border-gray-200 bg-white text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+              }`}
+            >
+              {reportQuery.isPending ? (
+                <span className="text-gray-400">…</span>
+              ) : hasFilters ? (
+                <span className="inline-flex items-center gap-1.5">
+                  {employeeCounts.filtered}
+                  <span className="text-gray-400">
+                    из {employeeCounts.total}
+                  </span>
                 </span>
-              </span>
-            ) : (
-              employeeCounts.total
-            )}
-          </button>
-        </div>
+              ) : (
+                employeeCounts.total
+              )}
+            </button>
+          </div>
 
-        <div className="shrink-0">
-          <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-            Вакансии
-          </span>
-          <button
-            type="button"
-            onClick={() =>
-              setRowKindFilter((prev) => (prev === "vacancy" ? "all" : "vacancy"))
-            }
-            className={`inline-flex min-w-[72px] items-center justify-center rounded-lg border px-3 py-2 text-sm transition-colors ${
-              rowKindFilter === "vacancy"
-                ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-300"
-                : "border-gray-200 bg-white text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
-            }`}
-          >
-            {reportQuery.isPending ? (
-              <span className="text-gray-400">…</span>
-            ) : hasFilters ? (
-              <span className="inline-flex items-center gap-1.5">
-                {vacancyCounts.filtered}
-                <span className="text-gray-400">
-                  из {vacancyCounts.total}
+          <div className="shrink-0">
+            <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+              Вакансии
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                setRowKindFilter((prev) => (prev === "vacancy" ? "all" : "vacancy"))
+              }
+              className={`inline-flex min-w-[72px] items-center justify-center rounded-lg border px-3 py-2 text-sm transition-colors ${
+                rowKindFilter === "vacancy"
+                  ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-300"
+                  : "border-gray-200 bg-white text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+              }`}
+            >
+              {reportQuery.isPending ? (
+                <span className="text-gray-400">…</span>
+              ) : hasFilters ? (
+                <span className="inline-flex items-center gap-1.5">
+                  {vacancyCounts.filtered}
+                  <span className="text-gray-400">
+                    из {vacancyCounts.total}
+                  </span>
                 </span>
-              </span>
-            ) : (
-              vacancyCounts.total
-            )}
-          </button>
+              ) : (
+                vacancyCounts.total
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
       <DictTable<EmployeesTableRow>
         rowHoverVariant="border"
+        wrapperClassName="employees-dict-table"
+        renderMobileCard={(row, actions) => {
+          const nameColumn = row.kind === "employee"
+            ? fullName(row.employee) || <span className="text-gray-400">—</span>
+            : <span className="text-amber-500">Вакантно</span>;
+
+          const headerOnClick = () => {
+            if (row.kind === "employee") {
+              setSelectedEmployee(row.employee);
+              return;
+            }
+            setAssignEmployeeTarget({ vacancy: row.vacancy, org: row.org });
+          };
+
+          const city = row.org?.city;
+          const office = row.org?.office;
+          const department = row.org?.department;
+          const position = row.org?.position;
+
+          return (
+            <EmployeesRowCard
+              headerLeading={
+                row.kind === "employee" && row.org?.isManager ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManagersOnlyFilter(false);
+                      setManagerFilterId((prev) =>
+                        prev === row.employee.id ? null : row.employee.id,
+                      );
+                    }}
+                    aria-label="Руководитель"
+                    title={
+                      managerFilterId === row.employee.id
+                        ? "Сбросить фильтр"
+                        : "Показать подчинённых"
+                    }
+                    className="mt-0.5 shrink-0"
+                  >
+                    <Star
+                      size={14}
+                      className={
+                        managerFilterId === row.employee.id
+                          ? "fill-amber-500 text-amber-500"
+                          : "fill-amber-400 text-amber-400"
+                      }
+                    />
+                  </button>
+                ) : undefined
+              }
+              headerContent={nameColumn}
+              headerOnClick={headerOnClick}
+              actions={actions}
+              fields={[
+                {
+                  key: "city",
+                  label: "Город",
+                  onClick: city
+                    ? () => setFilters((prev) => ({ ...prev, city, office: "" }))
+                    : undefined,
+                  content: city ? (
+                    <span className="text-blue-600 dark:text-blue-400">{city}</span>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  ),
+                },
+                {
+                  key: "office",
+                  label: "Офис",
+                  onClick:
+                    office && row.org
+                      ? () =>
+                          setFilters((prev) => ({
+                            ...prev,
+                            city: row.org!.city || prev.city,
+                            office,
+                          }))
+                      : undefined,
+                  content: office ? (
+                    <span className="text-blue-600 dark:text-blue-400">{office}</span>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  ),
+                },
+                {
+                  key: "department",
+                  label: "Отдел",
+                  onClick: department
+                    ? () => setFilters((prev) => ({ ...prev, department }))
+                    : undefined,
+                  content: department ? (
+                    <span className="text-blue-600 dark:text-blue-400">{department}</span>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  ),
+                },
+                {
+                  key: "position",
+                  label: "Должность",
+                  onClick: row.vacancy
+                    ? () => setEditVacancyModal(row.vacancy!)
+                    : undefined,
+                  content: position ? (
+                    <span className="text-blue-600 dark:text-blue-400">{position}</span>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  ),
+                },
+              ]}
+            />
+          );
+        }}
         columns={[
           {
             key: "isManager",
@@ -1147,6 +1266,8 @@ function EmployeesPage() {
           {
             key: "name",
             header: "ФИО",
+            headerClassName: "whitespace-normal break-normal",
+            className: "w-max whitespace-normal break-normal align-top",
             onClick: (row) => {
               if (row.kind === "employee") {
                 setSelectedEmployee(row.employee);
@@ -1166,7 +1287,8 @@ function EmployeesPage() {
           {
             key: "city",
             header: "Город",
-            className: "whitespace-nowrap",
+            headerClassName: "w-px",
+            className: "w-px whitespace-nowrap",
             onClick: (r) => {
               const city = r.org?.city;
               if (city) setFilters((prev) => ({ ...prev, city, office: "" }));
@@ -1185,7 +1307,8 @@ function EmployeesPage() {
           {
             key: "office",
             header: "Офис",
-            className: "whitespace-nowrap",
+            headerClassName: "w-px",
+            className: "w-px whitespace-nowrap",
             onClick: (r) => {
               const org = r.org;
               if (!org?.office) return;
@@ -1209,6 +1332,8 @@ function EmployeesPage() {
           {
             key: "department",
             header: "Отдел",
+            headerClassName: "whitespace-normal break-normal",
+            className: "w-max whitespace-normal break-normal align-top",
             onClick: (r) => {
               const department = r.org?.department;
               if (department) setFilters((prev) => ({ ...prev, department }));
@@ -1227,6 +1352,8 @@ function EmployeesPage() {
           {
             key: "position",
             header: "Должность",
+            headerClassName: "whitespace-normal break-normal",
+            className: "w-max whitespace-normal break-normal align-top",
             onClick: (r) => {
               const vacancy = r.vacancy;
               if (vacancy) setEditVacancyModal(vacancy);
@@ -1271,6 +1398,16 @@ function EmployeesPage() {
           <EmployeeAddRow
             key={addRowKey}
             columnsCount={6}
+            cities={citiesQuery.data ?? []}
+            orgNodes={treeQuery.data ?? []}
+            isPending={createEmployeeVacancyMutation.isPending}
+            error={formatVacancyError(createEmployeeVacancyMutation.error?.message)}
+            onSubmit={(data) => createEmployeeVacancyMutation.mutate(data)}
+          />
+        }
+        topRowMobile={
+          <EmployeeAddCard
+            key={addRowKey}
             cities={citiesQuery.data ?? []}
             orgNodes={treeQuery.data ?? []}
             isPending={createEmployeeVacancyMutation.isPending}

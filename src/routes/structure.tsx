@@ -261,7 +261,7 @@ function TreeNode({
           size={14}
           className="shrink-0 text-gray-300 dark:text-gray-600"
         />
-        <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+        <span className="text-[length:var(--tsrd-font-size)] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
           {node.type}
         </span>
         <span className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
