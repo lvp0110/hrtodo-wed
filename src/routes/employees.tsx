@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Search, Star } from "lucide-react";
+import { FileSpreadsheet, Search, Star } from "lucide-react";
 import {
   dictQueries,
   employeeQueries,
@@ -42,6 +42,7 @@ export const Route = createFileRoute("/employees")({
 
 type EmployeeFilters = {
   name: string;
+  country: string;
   city: string;
   office: string;
   department: string;
@@ -56,6 +57,7 @@ type RowKindFilter = "all" | "employee" | "vacancy";
 
 const emptyFilters: EmployeeFilters = {
   name: "",
+  country: "",
   city: "",
   office: "",
   department: "",
@@ -489,6 +491,7 @@ function matchesFilters(
   employee: Employer,
   org: EmployeeVacancyInfo | undefined,
   filters: EmployeeFilters,
+  cityCountryByName: Map<string, string>,
 ): boolean {
   const q = (value: string) => value.trim().toLowerCase();
 
@@ -510,6 +513,12 @@ function matchesFilters(
     return false;
   }
 
+  if (
+    filters.country &&
+    (org?.city ? cityCountryByName.get(org.city) : undefined) !== filters.country
+  ) {
+    return false;
+  }
   if (filters.city && org?.city !== filters.city) return false;
   if (filters.office && org?.office !== filters.office) return false;
   if (filters.department && org?.department !== filters.department) return false;
@@ -542,6 +551,7 @@ function EmployeesPage() {
   const [addRowKey, setAddRowKey] = useState(0);
   const reportQuery = useQuery(employeeQueries.report);
   const citiesQuery = useQuery(dictQueries.cities);
+  const countriesQuery = useQuery(dictQueries.countries);
   const treeQuery = useQuery({
     queryKey: ["orgTree"],
     queryFn: () => orgNodesApi.getTreeVacancies().then((res) => res.data ?? []),
@@ -773,6 +783,18 @@ function EmployeesPage() {
     enabled: selectedCityId !== null,
   });
 
+  const cityCountryByName = useMemo(() => {
+    const countryNameById = new Map(
+      (countriesQuery.data ?? []).map((country) => [country.id, country.name]),
+    );
+    const map = new Map<string, string>();
+    for (const city of citiesQuery.data ?? []) {
+      const countryName = countryNameById.get(city.country_id);
+      if (countryName) map.set(city.name, countryName);
+    }
+    return map;
+  }, [citiesQuery.data, countriesQuery.data]);
+
   const filterOptions = useMemo(() => {
     const cities = new Set<string>();
     const offices = new Set<string>();
@@ -792,12 +814,27 @@ function EmployeesPage() {
       if (hireDateParts?.year) hireYears.add(hireDateParts.year);
     }
 
+    const cityList = [...cities].sort((a, b) => a.localeCompare(b, "ru"));
+    const countries = new Set<string>();
+    for (const city of cityList) {
+      const country = cityCountryByName.get(city);
+      if (country) countries.add(country);
+    }
+
     return {
-      cities: [...cities].sort((a, b) => a.localeCompare(b, "ru")),
+      countries: [...countries].sort((a, b) => a.localeCompare(b, "ru")),
+      cities: cityList,
       offices: [...offices].sort((a, b) => a.localeCompare(b, "ru")),
       hireYears: [...hireYears].sort((a, b) => b.localeCompare(a, "ru")),
     };
-  }, [employees, orgByEmployeeId, vacantRows]);
+  }, [employees, orgByEmployeeId, vacantRows, cityCountryByName]);
+
+  const citiesForCountry = useMemo(() => {
+    if (!filters.country) return filterOptions.cities;
+    return filterOptions.cities.filter(
+      (city) => cityCountryByName.get(city) === filters.country,
+    );
+  }, [filterOptions.cities, filters.country, cityCountryByName]);
 
   const tableRows = useMemo<EmployeesTableRow[]>(
     () => [
@@ -861,13 +898,20 @@ function EmployeesPage() {
           !org.position.toLowerCase().includes(q(filters.position))
         )
           return false;
+        if (
+          filters.country &&
+          (org.city ? cityCountryByName.get(org.city) : undefined) !==
+            filters.country
+        ) {
+          return false;
+        }
         if (filters.city && org.city !== filters.city) return false;
         if (filters.office && org.office !== filters.office) return false;
         if (filters.department && org.department !== filters.department) return false;
         return true;
       }
 
-      return matchesFilters(row.employee, row.org, filters);
+      return matchesFilters(row.employee, row.org, filters, cityCountryByName);
     });
 
     if (rowKindFilter === "all") return textFiltered;
@@ -879,6 +923,7 @@ function EmployeesPage() {
     managersOnlyFilter,
     managerFilterId,
     subordinatesByManagerId,
+    cityCountryByName,
   ]);
 
   const hasFilters =
@@ -933,6 +978,31 @@ function EmployeesPage() {
         <div className="flex w-full gap-3 md:contents">
           <label className="max-md:min-w-0 max-md:flex-1 min-w-[140px]">
             <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+              Страна
+            </span>
+            <select
+              value={filters.country}
+              onChange={(e) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  country: e.target.value,
+                  city: "",
+                  office: "",
+                }))
+              }
+              className={dictInputClass}
+            >
+              <option value="">Все страны</option>
+              {filterOptions.countries.map((country) => (
+                <option key={country} value={country}>
+                  {country}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="max-md:min-w-0 max-md:flex-1 min-w-[140px]">
+            <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
               Город
             </span>
             <select
@@ -944,10 +1014,15 @@ function EmployeesPage() {
                   office: "",
                 }))
               }
-              className={dictInputClass}
+              disabled={Boolean(filters.country) && citiesForCountry.length === 0}
+              className={`${dictInputClass} disabled:opacity-60`}
             >
-              <option value="">Все города</option>
-              {filterOptions.cities.map((city) => (
+              <option value="">
+                {filters.country && citiesForCountry.length === 0
+                  ? "Нет городов"
+                  : "Все города"}
+              </option>
+              {citiesForCountry.map((city) => (
                 <option key={city} value={city}>
                   {city}
                 </option>
@@ -1100,6 +1175,19 @@ function EmployeesPage() {
             className="min-w-[150px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
           >
             Сбросить фильтры
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              // TODO: выгрузка filteredRows в Excel через API
+            }}
+            disabled={filteredRows.length === 0}
+            title="Выгрузить в Excel"
+            aria-label="Выгрузить в Excel"
+            className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-emerald-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-emerald-400 dark:hover:bg-gray-700"
+          >
+            <FileSpreadsheet size={20} />
           </button>
 
           <div className="shrink-0">
