@@ -15,7 +15,11 @@ import {
   type AssignEmployeeFormFields,
 } from "#/components/AssignEmployeeModal";
 import { EmployeeInfoModal } from "#/components/EmployeeInfoModal";
-import { EmployeeAddRow, EmployeeAddCard } from "#/components/EmployeeAddRow";
+import {
+  EmployeeAddRow,
+  EmployeeAddCard,
+  clearEmployeeAddDraft,
+} from "#/components/EmployeeAddRow";
 import { EmployeesRowCard } from "#/components/EmployeesRowCard";
 import { EditVacancyModal } from "#/components/EditVacancyModal";
 import { DictTable } from "#/components/settings/DictTable";
@@ -111,6 +115,43 @@ type EmployeesTableRow =
       org: EmployeeVacancyInfo;
       vacancy: VacancyModalData;
     };
+
+/** Все вакансии сотрудника в дереве — перед DELETE нужно снять назначение. */
+function collectVacanciesForEmployee(
+  nodes: OrgNode[],
+  employeeId: number,
+): VacancyModalData[] {
+  const result: VacancyModalData[] = [];
+
+  function walk(node: OrgNode) {
+    for (const vacancy of node.vacancies) {
+      if (vacancy.employer.id !== employeeId) continue;
+      result.push({
+        id: vacancy.id,
+        nodeId: vacancy.node_id,
+        position: vacancy.position?.name ?? vacancy.position?.code ?? "",
+        positionCode: vacancy.position?.code ?? vacancy.position?.name ?? "",
+        city: vacancy.city?.name ?? "",
+        cityCode: vacancy.city?.code ?? "",
+        office: vacancy.office?.name ?? "",
+        officeCode: vacancy.office?.code ?? "",
+        deptName: node.name,
+        isManager: vacancy.is_manager,
+        employer: {
+          id: vacancy.employer.id,
+          name: fullName(vacancy.employer),
+          email: vacancy.employer.email,
+        },
+        jobOffer: vacancy.job_offer_link ?? "",
+        description: vacancy.position_description ?? "",
+      });
+    }
+    for (const child of node.children) walk(child);
+  }
+
+  for (const node of nodes) walk(node);
+  return result;
+}
 
 function collectEmployeeIdsInNodeAndDescendants(node: OrgNode): Set<number> {
   const ids = new Set<number>();
@@ -567,7 +608,28 @@ function EmployeesPage() {
   });
 
   const deleteEmployeeMutation = useMutation({
-    mutationFn: (id: number) => employeesApi.delete(id),
+    mutationFn: async ({
+      employeeId,
+      vacancies,
+    }: {
+      employeeId: number;
+      vacancies: VacancyModalData[];
+    }) => {
+      // Бэк не удаляет сотрудника, пока он назначен на вакансию (404).
+      for (const vacancy of vacancies) {
+        await vacanciesApi.update(vacancy.id, {
+          node_id: vacancy.nodeId,
+          user_id: null,
+          office_code: vacancy.officeCode || undefined,
+          position_code: vacancy.positionCode || vacancy.position,
+          position_name: vacancy.position,
+          is_manager: vacancy.isManager,
+          position_description: vacancy.description,
+          job_offer_link: vacancy.jobOffer,
+        });
+      }
+      await employeesApi.delete(employeeId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
       queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
@@ -649,6 +711,8 @@ function EmployeesPage() {
         employeeId = employeeRes.data.id;
       }
 
+      const positionDescription = data.comment.trim();
+
       const vacancyRes = await vacanciesApi.create({
         node_id: data.nodeId,
         position_code: data.position,
@@ -657,7 +721,7 @@ function EmployeesPage() {
         city_code: data.cityCode,
         office_code: data.officeCode || undefined,
         is_manager: data.isManager,
-        position_description: "",
+        position_description: positionDescription,
         job_offer_link: "",
       });
 
@@ -670,7 +734,7 @@ function EmployeesPage() {
           position_code: data.position,
           position_name: data.position,
           is_manager: data.isManager,
-          position_description: "",
+          position_description: positionDescription,
           job_offer_link: "",
         });
       }
@@ -687,6 +751,7 @@ function EmployeesPage() {
       queryClient.invalidateQueries({ queryKey: ["orgTree"] });
       queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
       queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
+      clearEmployeeAddDraft();
       createEmployeeVacancyMutation.reset();
       setAddRowKey((key) => key + 1);
     },
@@ -1379,11 +1444,28 @@ function EmployeesPage() {
         onDelete={(row) => {
           if (row.kind === "employee") {
             const employeeName = fullName(row.employee) || "этого сотрудника";
+            const vacancies = collectVacanciesForEmployee(
+              treeQuery.data ?? [],
+              row.employee.id,
+            );
+            // row.vacancy может быть из отчёта, если дерева ещё нет
+            if (
+              vacancies.length === 0 &&
+              row.vacancy &&
+              row.vacancy.employer?.id === row.employee.id
+            ) {
+              vacancies.push(row.vacancy);
+            }
             const confirmed = window.confirm(
-              `Удалить ${employeeName}? Действие необратимо.`,
+              vacancies.length > 0
+                ? `Удалить ${employeeName}? Вакансия останется свободной. Действие необратимо.`
+                : `Удалить ${employeeName}? Действие необратимо.`,
             );
             if (!confirmed) return;
-            deleteEmployeeMutation.mutate(row.employee.id);
+            deleteEmployeeMutation.mutate({
+              employeeId: row.employee.id,
+              vacancies,
+            });
             return;
           }
 

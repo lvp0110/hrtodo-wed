@@ -1,5 +1,5 @@
 export const GENDER_OPTIONS = [
-  { value: "", label: "Не указан" },
+  { value: "", label: "Пол" },
   { value: "male", label: "Мужской" },
   { value: "female", label: "Женский" },
 ] as const;

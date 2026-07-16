@@ -67,6 +67,7 @@ export function AssignEmployeeModal({
       surname: "",
       first_name: "",
       second_name: "",
+      phone: "",
       email: "",
       gender: "",
       hireDate: "",
@@ -224,6 +225,18 @@ export function AssignEmployeeModal({
                   </label>
                   <input
                     {...register("second_name")}
+                    className={`${inputClass} border-gray-200 dark:border-gray-700`}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Телефон
+                  </label>
+                  <input
+                    type="tel"
+                    autoComplete="tel"
+                    {...register("phone")}
                     className={`${inputClass} border-gray-200 dark:border-gray-700`}
                   />
                 </div>
