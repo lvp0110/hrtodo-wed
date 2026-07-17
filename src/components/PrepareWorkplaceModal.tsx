@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
@@ -6,8 +6,25 @@ import { CloseButton } from "#/components/CloseButton";
 import { GENDER_OPTIONS } from "#/lib/employeeDisplay";
 import type { EmployeeVacancyCreateFields } from "#/lib/employeeUpdate";
 import { findOrgNodeById } from "#/lib/orgTree";
-import { officesApi } from "#/services/api";
-import type { City, OrgNode } from "#/types/api";
+import { dictQueries, officesApi } from "#/services/api";
+import type { City, Employer, OrgNode } from "#/types/api";
+
+function employeeLabel({
+  surname,
+  first_name,
+  second_name,
+}: Pick<Employer, "surname" | "first_name" | "second_name">) {
+  return [surname, first_name, second_name].filter(Boolean).join(" ");
+}
+
+function matchesEmployeeQuery(employee: Employer, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    employeeLabel(employee).toLowerCase().includes(q) ||
+    employee.email.toLowerCase().includes(q)
+  );
+}
 
 const inputClass =
   "w-full max-w-xs px-2 py-1.5 text-sm rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent border-gray-200 dark:border-gray-700";
@@ -45,6 +62,7 @@ interface PrepareWorkplaceModalProps {
   orgNodes: OrgNode[];
   onClose: () => void;
   onApply: (data: EmployeeVacancyCreateFields) => void;
+  onMessageChange: (message: string) => void;
 }
 
 export function PrepareWorkplaceModal({
@@ -53,12 +71,21 @@ export function PrepareWorkplaceModal({
   orgNodes,
   onClose,
   onApply,
+  onMessageChange,
 }: PrepareWorkplaceModalProps) {
   const [hireDate, setHireDate] = useState(initial.hireDate);
   const [recipientEmail, setRecipientEmail] = useState("");
   const [tasks, setTasks] = useState(DEFAULT_TASKS);
   const [questions, setQuestions] = useState(DEFAULT_QUESTIONS);
   const [listsOpen, setListsOpen] = useState(false);
+  const [recipientOpen, setRecipientOpen] = useState(false);
+  const [recipientSearch, setRecipientSearch] = useState("");
+  const recipientRef = useRef<HTMLDivElement>(null);
+  const recipientSearchRef = useRef<HTMLInputElement>(null);
+
+  const message = initial.message ?? "";
+
+  const employeesQuery = useQuery(dictQueries.employees);
 
   const officesQuery = useQuery({
     queryKey: ["offices", "city", initial.cityId] as const,
@@ -67,8 +94,67 @@ export function PrepareWorkplaceModal({
     enabled: initial.cityId !== null,
   });
 
+  const employeesWithEmail = useMemo(
+    () =>
+      (employeesQuery.data ?? []).filter((employee) =>
+        Boolean(employee.email?.trim()),
+      ),
+    [employeesQuery.data],
+  );
+
+  const selectedRecipient = useMemo(
+    () =>
+      employeesWithEmail.find(
+        (employee) =>
+          employee.email.toLowerCase() === recipientEmail.trim().toLowerCase(),
+      ) ?? null,
+    [employeesWithEmail, recipientEmail],
+  );
+
+  const filteredRecipients = useMemo(
+    () =>
+      employeesWithEmail.filter((employee) =>
+        matchesEmployeeQuery(employee, recipientSearch),
+      ),
+    [employeesWithEmail, recipientSearch],
+  );
+
+  useEffect(() => {
+    if (!recipientOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!recipientRef.current?.contains(event.target as Node)) {
+        setRecipientOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [recipientOpen]);
+
+  useEffect(() => {
+    if (recipientOpen) {
+      setRecipientSearch("");
+      requestAnimationFrame(() => recipientSearchRef.current?.focus());
+    }
+  }, [recipientOpen]);
+
+  function selectRecipient(employee: Employer) {
+    setRecipientEmail(employee.email.trim());
+    setRecipientOpen(false);
+  }
+
+  function persistDraft() {
+    onApply({ ...initial, hireDate, message });
+  }
+
+  function handleDismiss() {
+    persistDraft();
+    onClose();
+  }
+
   function handleBackdropClick(e: React.MouseEvent) {
-    if (e.target === e.currentTarget) onClose();
+    if (e.target === e.currentTarget) handleDismiss();
   }
 
   function updateTask(index: number, value: string) {
@@ -160,14 +246,15 @@ export function PrepareWorkplaceModal({
       .map((question) => `  ∙  ${question}`)
       .join("\n");
 
-    const body = [tableBlock, tasksBlock, questionsBlock]
+    const body = [message.trim(), tableBlock, tasksBlock, questionsBlock]
       .filter(Boolean)
       .join("\n\n");
 
     const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailto;
 
-    onApply({ ...initial, hireDate });
+    persistDraft();
+    onClose();
   }
 
   return createPortal(
@@ -185,7 +272,7 @@ export function PrepareWorkplaceModal({
               Данные сотрудника и вакансии
             </p>
           </div>
-          <CloseButton onClick={onClose} />
+          <CloseButton onClick={handleDismiss} />
         </div>
 
         <form
@@ -193,6 +280,24 @@ export function PrepareWorkplaceModal({
           className="flex min-h-0 flex-1 flex-col"
         >
           <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
+            <div className="mb-4 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+              <label
+                htmlFor="workplace-message"
+                className="block border-b border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300"
+              >
+                Сообщение
+              </label>
+              <textarea
+                id="workplace-message"
+                value={message}
+                onChange={(e) => onMessageChange(e.target.value)}
+                placeholder="Введите текст, который будет отправлен на почту"
+                rows={4}
+                autoFocus
+                className="w-full resize-y border-0 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
+              />
+            </div>
+
             <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
               <table className="w-full table-auto text-left">
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -208,7 +313,6 @@ export function PrepareWorkplaceModal({
                             value={hireDate}
                             onChange={(e) => setHireDate(e.target.value)}
                             className={inputClass}
-                            autoFocus
                           />
                         ) : (
                           <span className="whitespace-pre-wrap break-words">
@@ -314,23 +418,104 @@ export function PrepareWorkplaceModal({
               >
                 Кому:
               </label>
-              <input
-                id="workplace-recipient-email"
-                type="email"
-                value={recipientEmail}
-                onChange={(e) => setRecipientEmail(e.target.value)}
-                placeholder="name@example.com"
-                required
-                autoComplete="email"
-                className={emailInputClass}
-              />
+              <div ref={recipientRef} className="relative">
+                <button
+                  id="workplace-recipient-email"
+                  type="button"
+                  onClick={() => setRecipientOpen((open) => !open)}
+                  aria-haspopup="listbox"
+                  aria-expanded={recipientOpen}
+                  className={`${emailInputClass} flex items-center justify-between gap-2 text-left`}
+                >
+                  <span
+                    className={`block min-w-0 truncate ${
+                      selectedRecipient || recipientEmail
+                        ? "text-gray-900 dark:text-gray-100"
+                        : "text-gray-400 dark:text-gray-500"
+                    }`}
+                    title={
+                      selectedRecipient
+                        ? `${employeeLabel(selectedRecipient)} <${selectedRecipient.email}>`
+                        : recipientEmail || undefined
+                    }
+                  >
+                    {selectedRecipient
+                      ? `${employeeLabel(selectedRecipient)} <${selectedRecipient.email}>`
+                      : recipientEmail || "Выберите сотрудника"}
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className={`shrink-0 text-gray-400 transition-transform ${recipientOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {recipientOpen && (
+                  <div
+                    role="listbox"
+                    className="absolute inset-x-0 bottom-full z-50 mb-1 max-h-72 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                  >
+                    <div className="border-b border-gray-100 bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900">
+                      <input
+                        ref={recipientSearchRef}
+                        type="search"
+                        value={recipientSearch}
+                        onChange={(e) => setRecipientSearch(e.target.value)}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        placeholder="Поиск по ФИО или email"
+                        aria-label="Поиск сотрудника"
+                        className={emailInputClass}
+                      />
+                    </div>
+
+                    <div className="max-h-52 overflow-y-auto py-1">
+                      {employeesQuery.isLoading ? (
+                        <p className="px-3 py-2 text-sm text-gray-400 dark:text-gray-500">
+                          Загрузка…
+                        </p>
+                      ) : filteredRecipients.length === 0 ? (
+                        <p className="px-3 py-2 text-sm text-gray-400 dark:text-gray-500">
+                          Ничего не найдено
+                        </p>
+                      ) : (
+                        filteredRecipients.map((employee) => {
+                          const selected =
+                            employee.email.toLowerCase() ===
+                            recipientEmail.trim().toLowerCase();
+                          return (
+                            <button
+                              key={employee.id}
+                              type="button"
+                              role="option"
+                              aria-selected={selected}
+                              onClick={() => selectRecipient(employee)}
+                              className={`block w-full min-w-0 px-3 py-2 text-left text-sm leading-snug ${
+                                selected
+                                  ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+                                  : "text-gray-800 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+                              }`}
+                            >
+                              <span className="block truncate">
+                                {employeeLabel(employee)}
+                              </span>
+                              <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
+                                {employee.email}
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           <div className="flex shrink-0 items-center justify-end gap-2 border-t border-gray-100 px-6 py-4 dark:border-gray-800">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleDismiss}
               className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
             >
               Отмена

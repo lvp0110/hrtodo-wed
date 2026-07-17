@@ -28,6 +28,7 @@ const emptyDraft: EmployeeVacancyCreateFields = {
   position: "",
   isManager: false,
   comment: "",
+  message: "",
 };
 
 const STORAGE_KEY = "hrtodo:employee-add-draft";
@@ -53,7 +54,8 @@ function isDraftEmpty(draft: EmployeeVacancyCreateFields): boolean {
     draft.nodeId === 0 &&
     draft.position === "" &&
     !draft.isManager &&
-    draft.comment === ""
+    draft.comment === "" &&
+    draft.message === ""
   );
 }
 
@@ -144,6 +146,50 @@ export function clearEmployeeAddDraft() {
 }
 
 const compactInputClass = `${dictInputClass} min-w-0 px-2 py-1.5 text-xs`;
+const fieldErrorClass = "mt-1 text-xs text-red-500 dark:text-red-400";
+const invalidInputClass = "border-red-400 dark:border-red-500";
+
+type FieldKey =
+  | "surname"
+  | "first_name"
+  | "cityCode"
+  | "officeCode"
+  | "nodeId"
+  | "position";
+
+type FieldErrors = Partial<Record<FieldKey, string>>;
+
+function hasEmployeeDraftData(draft: EmployeeVacancyCreateFields): boolean {
+  return (
+    Boolean(draft.surname.trim()) ||
+    Boolean(draft.first_name.trim()) ||
+    Boolean(draft.second_name.trim()) ||
+    Boolean(draft.phone.trim()) ||
+    Boolean(draft.email.trim()) ||
+    Boolean(draft.gender) ||
+    Boolean(draft.hireDate)
+  );
+}
+
+function getRequiredFieldErrors(draft: EmployeeVacancyCreateFields): FieldErrors {
+  const errors: FieldErrors = {};
+
+  if (hasEmployeeDraftData(draft)) {
+    if (!draft.surname.trim()) errors.surname = "Укажите фамилию";
+    if (!draft.first_name.trim()) errors.first_name = "Укажите имя";
+  }
+  if (!draft.cityCode) errors.cityCode = "Выберите город";
+  if (draft.cityCode && !draft.officeCode) errors.officeCode = "Выберите офис";
+  if (!draft.nodeId) errors.nodeId = "Выберите отдел";
+  if (!draft.position.trim()) errors.position = "Укажите должность";
+
+  return errors;
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className={fieldErrorClass}>{message}</p>;
+}
 
 function PrepareWorkplaceButton({
   onClick,
@@ -184,6 +230,8 @@ function useEmployeeAddForm({
     getEmployeeAddStoreServerSnapshot,
   );
   const [localError, setLocalError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
 
   const officesQuery = useQuery({
     queryKey: ["offices", "city", draft.cityId] as const,
@@ -204,7 +252,13 @@ function useEmployeeAddForm({
     }
   }, [draft.cityCode, draft.officeCode, officesQuery.data]);
 
+  useEffect(() => {
+    if (!showFieldErrors) return;
+    setFieldErrors(getRequiredFieldErrors(draft));
+  }, [draft, showFieldErrors]);
+
   const displayError = localError ?? error;
+  const visibleFieldErrors = showFieldErrors ? fieldErrors : {};
 
   function setIsExpanded(value: boolean) {
     setEmployeeAddStore((prev) => ({ ...prev, isExpanded: value }));
@@ -213,6 +267,8 @@ function useEmployeeAddForm({
   function reset() {
     clearEmployeeAddDraft();
     setLocalError(null);
+    setFieldErrors({});
+    setShowFieldErrors(false);
   }
 
   function updateDraft<K extends keyof EmployeeVacancyCreateFields>(
@@ -259,34 +315,31 @@ function useEmployeeAddForm({
     setLocalError(null);
   }
 
+  function revealValidation(nextDraft = draft): FieldErrors {
+    const errors = getRequiredFieldErrors(nextDraft);
+    setShowFieldErrors(true);
+    setFieldErrors(errors);
+    const firstError = Object.values(errors)[0];
+    setLocalError(firstError ?? null);
+    return errors;
+  }
+
   function handleSubmit() {
-    const hasEmployeeDraft =
-      Boolean(draft.surname.trim()) ||
-      Boolean(draft.first_name.trim()) ||
-      Boolean(draft.second_name.trim()) ||
-      Boolean(draft.phone.trim()) ||
-      Boolean(draft.email.trim()) ||
-      Boolean(draft.gender) ||
-      Boolean(draft.hireDate);
-
-    if (hasEmployeeDraft && (!draft.surname.trim() || !draft.first_name.trim())) {
-      setLocalError("Если добавляете сотрудника, укажите фамилию и имя");
-      return;
-    }
-    if (!draft.cityCode) {
-      setLocalError("Выберите город");
-      return;
-    }
-    if (!draft.nodeId) {
-      setLocalError("Выберите отдел");
-      return;
-    }
-    if (!draft.position.trim()) {
-      setLocalError("Укажите должность");
-      return;
-    }
-
+    const errors = revealValidation();
+    if (Object.keys(errors).length > 0) return;
+    setLocalError(null);
     onSubmit(draft);
+  }
+
+  function handlePrepareWorkplace(): boolean {
+    if (isEmployeeVacancyFormComplete(draft)) {
+      setLocalError(null);
+      setFieldErrors({});
+      setShowFieldErrors(false);
+      return true;
+    }
+    revealValidation();
+    return false;
   }
 
   const officesDisabled =
@@ -299,6 +352,7 @@ function useEmployeeAddForm({
     setIsExpanded,
     draft,
     displayError,
+    fieldErrors: visibleFieldErrors,
     officesQuery,
     officesDisabled,
     prepareWorkplaceReady,
@@ -308,6 +362,7 @@ function useEmployeeAddForm({
     handleCityChange,
     handleOfficeChange,
     handleSubmit,
+    handlePrepareWorkplace,
     isPending,
   };
 }
@@ -315,26 +370,34 @@ function useEmployeeAddForm({
 function EmployeeNameFields({
   draft,
   updateDraft,
+  fieldErrors,
 }: {
   draft: EmployeeVacancyCreateFields;
   updateDraft: ReturnType<typeof useEmployeeAddForm>["updateDraft"];
+  fieldErrors?: FieldErrors;
 }) {
   return (
     <>
-      <input
-        type="text"
-        value={draft.surname}
-        onChange={(e) => updateDraft("surname", e.target.value)}
-        placeholder="Фамилия"
-        className={compactInputClass}
-      />
-      <input
-        type="text"
-        value={draft.first_name}
-        onChange={(e) => updateDraft("first_name", e.target.value)}
-        placeholder="Имя"
-        className={compactInputClass}
-      />
+      <div>
+        <input
+          type="text"
+          value={draft.surname}
+          onChange={(e) => updateDraft("surname", e.target.value)}
+          placeholder="Фамилия"
+          className={`${compactInputClass} ${fieldErrors?.surname ? invalidInputClass : ""}`}
+        />
+        <FieldError message={fieldErrors?.surname} />
+      </div>
+      <div>
+        <input
+          type="text"
+          value={draft.first_name}
+          onChange={(e) => updateDraft("first_name", e.target.value)}
+          placeholder="Имя"
+          className={`${compactInputClass} ${fieldErrors?.first_name ? invalidInputClass : ""}`}
+        />
+        <FieldError message={fieldErrors?.first_name} />
+      </div>
       <input
         type="text"
         value={draft.second_name}
@@ -463,14 +526,18 @@ export function EmployeeAddRow({
         <td className="px-4 py-3 align-top" rowSpan={2} />
         <td className="px-4 py-3 align-top" rowSpan={2}>
           <div className="flex min-w-[220px] flex-col gap-1.5">
-            <EmployeeNameFields draft={form.draft} updateDraft={form.updateDraft} />
+            <EmployeeNameFields
+              draft={form.draft}
+              updateDraft={form.updateDraft}
+              fieldErrors={form.fieldErrors}
+            />
           </div>
         </td>
         <td className="px-4 py-3 align-top">
           <select
             value={form.draft.cityCode}
             onChange={(e) => form.handleCityChange(e.target.value)}
-            className={`${compactInputClass} min-w-[120px]`}
+            className={`${compactInputClass} min-w-[120px] ${form.fieldErrors.cityCode ? invalidInputClass : ""}`}
           >
             <option value="">Город *</option>
             {cities.map((city) => (
@@ -479,20 +546,21 @@ export function EmployeeAddRow({
               </option>
             ))}
           </select>
+          <FieldError message={form.fieldErrors.cityCode} />
         </td>
         <td className="px-4 py-3 align-top">
           <select
             value={form.draft.officeCode}
             onChange={(e) => form.handleOfficeChange(e.target.value)}
             disabled={form.officesDisabled}
-            className={`${compactInputClass} min-w-[120px] disabled:opacity-60`}
+            className={`${compactInputClass} min-w-[120px] disabled:opacity-60 ${form.fieldErrors.officeCode ? invalidInputClass : ""}`}
           >
             <option value="">
               {!form.draft.cityCode
                 ? "Сначала город"
                 : form.officesQuery.isPending
                   ? "Загрузка…"
-                  : "Офис"}
+                  : "Офис *"}
             </option>
             {form.officesQuery.data?.map((office) => (
               <option key={office.id} value={office.code}>
@@ -500,6 +568,7 @@ export function EmployeeAddRow({
               </option>
             ))}
           </select>
+          <FieldError message={form.fieldErrors.officeCode} />
         </td>
         <td className="px-4 py-3 align-top">
           <DepartmentTreeSelect
@@ -509,7 +578,9 @@ export function EmployeeAddRow({
             onChange={(nodeId) => form.updateDraft("nodeId", nodeId)}
             placeholder="Отдел *"
             compact
+            className={form.fieldErrors.nodeId ? "rounded-lg ring-2 ring-red-400" : ""}
           />
+          <FieldError message={form.fieldErrors.nodeId} />
         </td>
         <td className="px-4 py-3 align-top">
           <div className="flex min-w-[140px] flex-col gap-1.5">
@@ -518,8 +589,9 @@ export function EmployeeAddRow({
               value={form.draft.position}
               onChange={(e) => form.updateDraft("position", e.target.value)}
               placeholder="Должность *"
-              className={`${compactInputClass} min-w-[140px]`}
+              className={`${compactInputClass} min-w-[140px] ${form.fieldErrors.position ? invalidInputClass : ""}`}
             />
+            <FieldError message={form.fieldErrors.position} />
             <label className="inline-flex items-center gap-2 px-1 text-xs text-gray-600 dark:text-gray-300">
               <input
                 type="checkbox"
@@ -550,8 +622,12 @@ export function EmployeeAddRow({
             isPending={form.isPending}
             onSubmit={form.handleSubmit}
             onCancel={form.reset}
-            onPrepareWorkplace={() => setIsPrepareModalOpen(true)}
             prepareWorkplaceReady={form.prepareWorkplaceReady}
+            onPrepareWorkplace={() => {
+              if (form.handlePrepareWorkplace()) {
+                setIsPrepareModalOpen(true);
+              }
+            }}
           />
         </td>
       </tr>
@@ -561,10 +637,8 @@ export function EmployeeAddRow({
           cities={cities}
           orgNodes={orgNodes}
           onClose={() => setIsPrepareModalOpen(false)}
-          onApply={(data) => {
-            form.applyDraft(data);
-            setIsPrepareModalOpen(false);
-          }}
+          onApply={(data) => form.applyDraft(data)}
+          onMessageChange={(message) => form.updateDraft("message", message)}
         />
       )}
     </>
@@ -593,40 +667,50 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
     <div className="space-y-3 bg-blue-50/40 p-4 dark:bg-blue-950/20">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <EmployeeNameFields draft={form.draft} updateDraft={form.updateDraft} />
+          <EmployeeNameFields
+            draft={form.draft}
+            updateDraft={form.updateDraft}
+            fieldErrors={form.fieldErrors}
+          />
         </div>
         <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
-          <select
-            value={form.draft.cityCode}
-            onChange={(e) => form.handleCityChange(e.target.value)}
-            className={compactInputClass}
-          >
-            <option value="">Город *</option>
-            {cities.map((city) => (
-              <option key={city.code} value={city.code}>
-                {city.name}
+          <div>
+            <select
+              value={form.draft.cityCode}
+              onChange={(e) => form.handleCityChange(e.target.value)}
+              className={`${compactInputClass} ${form.fieldErrors.cityCode ? invalidInputClass : ""}`}
+            >
+              <option value="">Город *</option>
+              {cities.map((city) => (
+                <option key={city.code} value={city.code}>
+                  {city.name}
+                </option>
+              ))}
+            </select>
+            <FieldError message={form.fieldErrors.cityCode} />
+          </div>
+          <div>
+            <select
+              value={form.draft.officeCode}
+              onChange={(e) => form.handleOfficeChange(e.target.value)}
+              disabled={form.officesDisabled}
+              className={`${compactInputClass} disabled:opacity-60 ${form.fieldErrors.officeCode ? invalidInputClass : ""}`}
+            >
+              <option value="">
+                {!form.draft.cityCode
+                  ? "Сначала город"
+                  : form.officesQuery.isPending
+                    ? "Загрузка…"
+                    : "Офис *"}
               </option>
-            ))}
-          </select>
-          <select
-            value={form.draft.officeCode}
-            onChange={(e) => form.handleOfficeChange(e.target.value)}
-            disabled={form.officesDisabled}
-            className={`${compactInputClass} disabled:opacity-60`}
-          >
-            <option value="">
-              {!form.draft.cityCode
-                ? "Сначала город"
-                : form.officesQuery.isPending
-                  ? "Загрузка…"
-                  : "Офис"}
-            </option>
-            {form.officesQuery.data?.map((office) => (
-              <option key={office.id} value={office.code}>
-                {office.name}
-              </option>
-            ))}
-          </select>
+              {form.officesQuery.data?.map((office) => (
+                <option key={office.id} value={office.code}>
+                  {office.name}
+                </option>
+              ))}
+            </select>
+            <FieldError message={form.fieldErrors.officeCode} />
+          </div>
           <div className="sm:col-span-2">
             <DepartmentTreeSelect
               variant="node"
@@ -635,15 +719,20 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
               onChange={(nodeId) => form.updateDraft("nodeId", nodeId)}
               placeholder="Отдел *"
               compact
+              className={form.fieldErrors.nodeId ? "rounded-lg ring-2 ring-red-400" : ""}
             />
+            <FieldError message={form.fieldErrors.nodeId} />
           </div>
-          <input
-            type="text"
-            value={form.draft.position}
-            onChange={(e) => form.updateDraft("position", e.target.value)}
-            placeholder="Должность *"
-            className={compactInputClass}
-          />
+          <div>
+            <input
+              type="text"
+              value={form.draft.position}
+              onChange={(e) => form.updateDraft("position", e.target.value)}
+              placeholder="Должность *"
+              className={`${compactInputClass} ${form.fieldErrors.position ? invalidInputClass : ""}`}
+            />
+            <FieldError message={form.fieldErrors.position} />
+          </div>
           <label className="inline-flex items-center gap-2 px-1 text-xs text-gray-600 dark:text-gray-300">
             <input
               type="checkbox"
@@ -667,8 +756,12 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
         isPending={form.isPending}
         onSubmit={form.handleSubmit}
         onCancel={form.reset}
-        onPrepareWorkplace={() => setIsPrepareModalOpen(true)}
         prepareWorkplaceReady={form.prepareWorkplaceReady}
+        onPrepareWorkplace={() => {
+          if (form.handlePrepareWorkplace()) {
+            setIsPrepareModalOpen(true);
+          }
+        }}
       />
       {isPrepareModalOpen && (
         <PrepareWorkplaceModal
@@ -676,10 +769,8 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
           cities={cities}
           orgNodes={orgNodes}
           onClose={() => setIsPrepareModalOpen(false)}
-          onApply={(data) => {
-            form.applyDraft(data);
-            setIsPrepareModalOpen(false);
-          }}
+          onApply={(data) => form.applyDraft(data)}
+          onMessageChange={(message) => form.updateDraft("message", message)}
         />
       )}
     </div>

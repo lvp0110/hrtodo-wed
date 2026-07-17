@@ -19,6 +19,7 @@ export type EmployeeVacancyCreateFields = EmployeeEditFields & {
   position: string;
   isManager: boolean;
   comment: string;
+  message: string;
 };
 
 export function isEmployeeVacancyFormComplete(
@@ -30,6 +31,7 @@ export function isEmployeeVacancyFormComplete(
     draft.gender !== "" &&
     draft.hireDate !== "" &&
     draft.cityCode !== "" &&
+    draft.officeCode !== "" &&
     draft.nodeId !== 0 &&
     draft.position.trim() !== ""
   );
