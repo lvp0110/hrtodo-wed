@@ -26,6 +26,30 @@ function matchesEmployeeQuery(employee: Employer, query: string): boolean {
   );
 }
 
+const MESSAGE_TEMPLATE_RE =
+  /^Добрый день,? (.+?)! Просьба подготовить рабочее место для нового сотрудника\.(?:\n\n([\s\S]*))?$/;
+
+function greetingName(employee: Employer): string {
+  return employee.first_name?.trim() || employeeLabel(employee);
+}
+
+function buildGreeting(name: string): string {
+  return `Добрый день, ${name || "..."}! Просьба подготовить рабочее место для нового сотрудника.`;
+}
+
+function parseExtraMessage(message: string): string {
+  const trimmed = message.trim();
+  if (!trimmed) return "";
+  const match = trimmed.match(MESSAGE_TEMPLATE_RE);
+  if (match) return (match[2] ?? "").trimStart();
+  return message;
+}
+
+function composeMessage(greeting: string, extra: string): string {
+  const extraTrimmed = extra.trim();
+  return extraTrimmed ? `${greeting}\n\n${extraTrimmed}` : greeting;
+}
+
 const inputClass =
   "w-full max-w-xs px-2 py-1.5 text-sm rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent border-gray-200 dark:border-gray-700";
 
@@ -75,6 +99,9 @@ export function PrepareWorkplaceModal({
 }: PrepareWorkplaceModalProps) {
   const [hireDate, setHireDate] = useState(initial.hireDate);
   const [recipientEmail, setRecipientEmail] = useState("");
+  const [extraMessage, setExtraMessage] = useState(() =>
+    parseExtraMessage(initial.message ?? ""),
+  );
   const [tasks, setTasks] = useState(DEFAULT_TASKS);
   const [questions, setQuestions] = useState(DEFAULT_QUESTIONS);
   const [listsOpen, setListsOpen] = useState(false);
@@ -82,8 +109,7 @@ export function PrepareWorkplaceModal({
   const [recipientSearch, setRecipientSearch] = useState("");
   const recipientRef = useRef<HTMLDivElement>(null);
   const recipientSearchRef = useRef<HTMLInputElement>(null);
-
-  const message = initial.message ?? "";
+  const onMessageChangeRef = useRef(onMessageChange);
 
   const employeesQuery = useQuery(dictQueries.employees);
 
@@ -111,6 +137,19 @@ export function PrepareWorkplaceModal({
     [employeesWithEmail, recipientEmail],
   );
 
+  const greeting = useMemo(
+    () =>
+      buildGreeting(
+        selectedRecipient ? greetingName(selectedRecipient) : "...",
+      ),
+    [selectedRecipient],
+  );
+
+  const message = useMemo(
+    () => composeMessage(greeting, extraMessage),
+    [greeting, extraMessage],
+  );
+
   const filteredRecipients = useMemo(
     () =>
       employeesWithEmail.filter((employee) =>
@@ -118,6 +157,14 @@ export function PrepareWorkplaceModal({
       ),
     [employeesWithEmail, recipientSearch],
   );
+
+  useEffect(() => {
+    onMessageChangeRef.current = onMessageChange;
+  }, [onMessageChange]);
+
+  useEffect(() => {
+    onMessageChangeRef.current(message);
+  }, [message]);
 
   useEffect(() => {
     if (!recipientOpen) return;
@@ -287,12 +334,15 @@ export function PrepareWorkplaceModal({
               >
                 Сообщение
               </label>
+              <p className="border-b border-gray-100 px-3 py-2 text-sm text-gray-900 dark:border-gray-800 dark:text-gray-100">
+                {greeting}
+              </p>
               <textarea
                 id="workplace-message"
-                value={message}
-                onChange={(e) => onMessageChange(e.target.value)}
-                placeholder="Введите текст, который будет отправлен на почту"
-                rows={4}
+                value={extraMessage}
+                onChange={(e) => setExtraMessage(e.target.value)}
+                placeholder="Добавьте текст при необходимости"
+                rows={3}
                 autoFocus
                 className="w-full resize-y border-0 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
               />

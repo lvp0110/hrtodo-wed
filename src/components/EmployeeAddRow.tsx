@@ -38,6 +38,17 @@ type EmployeeAddFormStore = {
   isExpanded: boolean;
 };
 
+function isDefaultWorkplaceMessage(message: string): boolean {
+  const trimmed = message.trim();
+  return (
+    trimmed === "" ||
+    trimmed ===
+      "Добрый день, ...! Просьба подготовить рабочее место для нового сотрудника." ||
+    trimmed ===
+      "Добрый день ...! Просьба подготовить рабочее место для нового сотрудника."
+  );
+}
+
 function isDraftEmpty(draft: EmployeeVacancyCreateFields): boolean {
   return (
     draft.surname === "" &&
@@ -55,7 +66,7 @@ function isDraftEmpty(draft: EmployeeVacancyCreateFields): boolean {
     draft.position === "" &&
     !draft.isManager &&
     draft.comment === "" &&
-    draft.message === ""
+    isDefaultWorkplaceMessage(draft.message)
   );
 }
 
