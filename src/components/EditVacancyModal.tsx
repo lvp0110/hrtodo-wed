@@ -5,6 +5,7 @@ import { CloseButton } from "#/components/CloseButton";
 import { DepartmentTreeSelect } from "#/components/DepartmentTreeSelect";
 import { EmployeeSelect } from "#/components/EmployeeSelect";
 import { dictQueries, officesApi, orgNodesApi } from "#/services/api";
+import { findManagerForVacancy } from "#/lib/orgTree";
 import { findEmployeeVacancyConflict } from "#/lib/vacancyValidation";
 import type {
   EditVacancyFormFields,
@@ -157,6 +158,11 @@ function EditVacancyForm({
 
   const cityCode = watch("cityCode");
   const nodeId = watch("nodeId");
+  const isManager = watch("isManager");
+  const manager = useMemo(
+    () => findManagerForVacancy(orgNodes, nodeId, data.id, isManager),
+    [orgNodes, nodeId, data.id, isManager],
+  );
   const selectedCityId = useMemo(
     () => cities.find((city) => city.code === cityCode)?.id ?? null,
     [cities, cityCode],
@@ -310,6 +316,24 @@ function EditVacancyForm({
           value={watch("userId")}
           onChange={(userId) => setValue("userId", userId, { shouldValidate: true })}
         />
+      </div>
+
+      <div>
+        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Руководитель
+        </div>
+        {manager ? (
+          <div className="text-sm text-gray-900 dark:text-gray-100">
+            <div>{manager.name}</div>
+            {manager.position && (
+              <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                {manager.position}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-sm text-gray-400 dark:text-gray-500">Не указан</div>
+        )}
       </div>
 
       <div>
