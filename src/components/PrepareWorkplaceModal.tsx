@@ -244,7 +244,16 @@ export function PrepareWorkplaceModal({
     { key: "surname", label: "Фамилия", value: initial.surname || "—" },
     { key: "first_name", label: "Имя", value: initial.first_name || "—" },
     { key: "second_name", label: "Отчество", value: initial.second_name || "—" },
-    { key: "phone", label: "Телефон", value: initial.phone || "—" },
+    {
+      key: "personal_number",
+      label: "Личный телефон",
+      value: initial.personal_number || "—",
+    },
+    {
+      key: "work_number",
+      label: "Рабочий телефон",
+      value: initial.work_number || "—",
+    },
     { key: "email", label: "Эл. почта", value: initial.email || "—" },
     { key: "gender", label: "Пол", value: genderLabel },
     {

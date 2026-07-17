@@ -4,7 +4,8 @@ export type EmployeeEditFields = {
   surname: string;
   first_name: string;
   second_name: string;
-  phone: string;
+  personal_number: string;
+  work_number: string;
   email: string;
   gender: string;
   hireDate: string;
@@ -51,7 +52,8 @@ export function toEmployeeCreateReq(
     surname: fields.surname.trim(),
     first_name: fields.first_name.trim(),
     second_name: fields.second_name.trim(),
-    phone: fields.phone.trim() || undefined,
+    personal_number: fields.personal_number.trim() || undefined,
+    work_number: fields.work_number.trim() || undefined,
     email: fields.email.trim(),
     gender: fields.gender || undefined,
     hire_date: normalizeHireDateForApi(fields.hireDate),
@@ -70,7 +72,8 @@ export function toEmployeeUpdateReq(
     surname: fields.surname.trim(),
     first_name: fields.first_name.trim(),
     second_name: fields.second_name.trim(),
-    phone: fields.phone.trim() || undefined,
+    personal_number: fields.personal_number.trim() || undefined,
+    work_number: fields.work_number.trim() || undefined,
     email: fields.email.trim(),
     gender: fields.gender || undefined,
     hire_date: hireDateForApi,

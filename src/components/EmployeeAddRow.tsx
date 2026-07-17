@@ -16,7 +16,8 @@ const emptyDraft: EmployeeVacancyCreateFields = {
   surname: "",
   first_name: "",
   second_name: "",
-  phone: "",
+  personal_number: "",
+  work_number: "",
   email: "",
   gender: "",
   hireDate: "",
@@ -54,7 +55,8 @@ function isDraftEmpty(draft: EmployeeVacancyCreateFields): boolean {
     draft.surname === "" &&
     draft.first_name === "" &&
     draft.second_name === "" &&
-    draft.phone === "" &&
+    draft.personal_number === "" &&
+    draft.work_number === "" &&
     draft.email === "" &&
     draft.gender === "" &&
     draft.hireDate === "" &&
@@ -175,7 +177,8 @@ function hasEmployeeDraftData(draft: EmployeeVacancyCreateFields): boolean {
     Boolean(draft.surname.trim()) ||
     Boolean(draft.first_name.trim()) ||
     Boolean(draft.second_name.trim()) ||
-    Boolean(draft.phone.trim()) ||
+    Boolean(draft.personal_number.trim()) ||
+    Boolean(draft.work_number.trim()) ||
     Boolean(draft.email.trim()) ||
     Boolean(draft.gender) ||
     Boolean(draft.hireDate)
@@ -418,9 +421,17 @@ function EmployeeNameFields({
       />
       <input
         type="tel"
-        value={draft.phone}
-        onChange={(e) => updateDraft("phone", e.target.value)}
-        placeholder="Телефон"
+        value={draft.personal_number}
+        onChange={(e) => updateDraft("personal_number", e.target.value)}
+        placeholder="Личный телефон"
+        className={compactInputClass}
+        autoComplete="tel"
+      />
+      <input
+        type="tel"
+        value={draft.work_number}
+        onChange={(e) => updateDraft("work_number", e.target.value)}
+        placeholder="Рабочий телефон"
         className={compactInputClass}
         autoComplete="tel"
       />

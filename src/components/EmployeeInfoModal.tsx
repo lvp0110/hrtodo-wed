@@ -43,7 +43,8 @@ export function EmployeeInfoModal({
       surname: employee.surname,
       first_name: employee.first_name,
       second_name: employee.second_name,
-      phone: employee.phone ?? "",
+      personal_number: employee.personal_number ?? "",
+      work_number: employee.work_number ?? "",
       email: employee.email ?? "",
       gender: normalizeGender(employee.gender),
       hireDate: toDateInputValue(employee.hire_date),
@@ -105,12 +106,24 @@ export function EmployeeInfoModal({
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Телефон
+              Личный телефон
             </label>
             <input
               type="tel"
               autoComplete="tel"
-              {...register("phone")}
+              {...register("personal_number")}
+              className={`${inputClass} border-gray-200 dark:border-gray-700`}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Рабочий телефон
+            </label>
+            <input
+              type="tel"
+              autoComplete="tel"
+              {...register("work_number")}
               className={`${inputClass} border-gray-200 dark:border-gray-700`}
             />
           </div>

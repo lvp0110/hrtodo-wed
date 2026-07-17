@@ -46,6 +46,8 @@ export interface Employer {
   surname: string;
   email: string;
   phone?: string;
+  personal_number?: string;
+  work_number?: string;
   hire_date?: string;
   gender?: string;
   city?: Entity | null;
@@ -60,6 +62,8 @@ export interface EmployeeCreateReq {
   surname: string;
   email?: string;
   phone?: string;
+  personal_number?: string;
+  work_number?: string;
   hire_date?: string;
   gender?: string;
 }
@@ -70,6 +74,8 @@ export interface EmployeeUpdateReq {
   surname: string;
   email: string;
   phone?: string;
+  personal_number?: string;
+  work_number?: string;
   hire_date?: string;
   gender?: string;
   city_id?: number | null;
