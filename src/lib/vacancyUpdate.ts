@@ -7,7 +7,8 @@ export function toVacancyUpdateReq(
   return {
     node_id: data.nodeId,
     user_id: data.userId,
-    office_code: data.officeCode,
+    city_code: data.cityCode || undefined,
+    office_code: data.officeCode || undefined,
     position_code: data.position,
     position_name: data.position,
     is_manager: data.isManager,

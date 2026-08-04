@@ -529,11 +529,11 @@ export function EmployeeAddRow({
   if (!form.isExpanded) {
     return (
       <tr
-        className="cursor-pointer text-gray-400 transition-colors hover:bg-gray-50 hover:text-blue-600 dark:text-gray-500 dark:hover:bg-gray-800/40 dark:hover:text-blue-400"
+        className="cursor-pointer bg-white text-sm font-normal normal-case tracking-normal text-gray-400 transition-colors hover:bg-gray-50 hover:text-blue-600 dark:bg-gray-900 dark:text-gray-500 dark:hover:bg-gray-800/40 dark:hover:text-blue-400"
         onClick={() => form.setIsExpanded(true)}
       >
-        <td colSpan={columnsCount} className="px-4 py-3">
-          <span className="inline-flex items-center gap-2 text-sm">
+        <td colSpan={columnsCount} className="bg-white px-4 py-3 dark:bg-gray-900">
+          <span className="inline-flex items-center gap-2">
             <Plus size={14} />
             Добавить сотрудника и вакансию
           </span>
@@ -544,9 +544,9 @@ export function EmployeeAddRow({
 
   return (
     <>
-      <tr className="bg-blue-50/40 dark:bg-blue-950/20">
-        <td className="px-4 py-3 align-top" rowSpan={2} />
-        <td className="px-4 py-3 align-top" rowSpan={2}>
+      <tr className="bg-blue-50 text-sm font-normal normal-case tracking-normal text-gray-700 dark:bg-blue-950/40 dark:text-gray-200">
+        <td className="bg-blue-50 px-4 py-3 align-top dark:bg-blue-950/40" rowSpan={2} />
+        <td className="bg-blue-50 px-4 py-3 align-top dark:bg-blue-950/40" rowSpan={2}>
           <div className="flex min-w-[220px] flex-col gap-1.5">
             <EmployeeNameFields
               draft={form.draft}
@@ -555,7 +555,7 @@ export function EmployeeAddRow({
             />
           </div>
         </td>
-        <td className="px-4 py-3 align-top">
+        <td className="bg-blue-50 px-4 py-3 align-top dark:bg-blue-950/40">
           <select
             value={form.draft.cityCode}
             onChange={(e) => form.handleCityChange(e.target.value)}
@@ -570,7 +570,7 @@ export function EmployeeAddRow({
           </select>
           <FieldError message={form.fieldErrors.cityCode} />
         </td>
-        <td className="px-4 py-3 align-top">
+        <td className="bg-blue-50 px-4 py-3 align-top dark:bg-blue-950/40">
           <select
             value={form.draft.officeCode}
             onChange={(e) => form.handleOfficeChange(e.target.value)}
@@ -592,7 +592,7 @@ export function EmployeeAddRow({
           </select>
           <FieldError message={form.fieldErrors.officeCode} />
         </td>
-        <td className="px-4 py-3 align-top">
+        <td className="bg-blue-50 px-4 py-3 align-top dark:bg-blue-950/40">
           <DepartmentTreeSelect
             variant="node"
             tree={orgNodes}
@@ -604,7 +604,7 @@ export function EmployeeAddRow({
           />
           <FieldError message={form.fieldErrors.nodeId} />
         </td>
-        <td className="px-4 py-3 align-top">
+        <td className="bg-blue-50 px-4 py-3 align-top dark:bg-blue-950/40">
           <div className="flex min-w-[140px] flex-col gap-1.5">
             <input
               type="text"
@@ -626,8 +626,8 @@ export function EmployeeAddRow({
           </div>
         </td>
       </tr>
-      <tr className="bg-blue-50/40 dark:bg-blue-950/20">
-        <td colSpan={4} className="px-4 pb-3 pt-0 align-top">
+      <tr className="bg-blue-50 text-sm font-normal normal-case tracking-normal text-gray-700 dark:bg-blue-950/40 dark:text-gray-200">
+        <td colSpan={4} className="bg-blue-50 px-4 pb-3 pt-0 align-top dark:bg-blue-950/40">
           <textarea
             value={form.draft.comment}
             onChange={(e) => form.updateDraft("comment", e.target.value)}
@@ -637,8 +637,8 @@ export function EmployeeAddRow({
           />
         </td>
       </tr>
-      <tr className="bg-blue-50/40 dark:bg-blue-950/20">
-        <td colSpan={columnsCount} className="px-4 pb-3 pt-0">
+      <tr className="bg-blue-50 text-sm font-normal normal-case tracking-normal text-gray-700 dark:bg-blue-950/40 dark:text-gray-200">
+        <td colSpan={columnsCount} className="bg-blue-50 px-4 pb-3 pt-0 dark:bg-blue-950/40">
           <EmployeeAddActions
             displayError={form.displayError}
             isPending={form.isPending}
@@ -677,7 +677,7 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
       <button
         type="button"
         onClick={() => form.setIsExpanded(true)}
-        className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-gray-400 transition-colors hover:bg-gray-50 hover:text-blue-600 dark:text-gray-500 dark:hover:bg-gray-800/40 dark:hover:text-blue-400"
+        className="flex w-full items-center gap-2 bg-white px-4 py-3 text-left text-sm text-gray-400 transition-colors hover:bg-gray-50 hover:text-blue-600 dark:bg-gray-900 dark:text-gray-500 dark:hover:bg-gray-800/40 dark:hover:text-blue-400"
       >
         <Plus size={14} />
         Добавить сотрудника и вакансию
@@ -686,7 +686,7 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
   }
 
   return (
-    <div className="space-y-3 bg-blue-50/40 p-4 dark:bg-blue-950/20">
+    <div className="space-y-3 bg-blue-50 p-4 dark:bg-blue-950/40">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <EmployeeNameFields

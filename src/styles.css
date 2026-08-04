@@ -130,6 +130,17 @@ a {
     transform 180ms ease;
 }
 
+.employees-dict-table table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.employees-dict-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
 @media (min-width: 1024px) and (max-width: 1069px) {
   .employees-page {
     padding-left: 1rem;

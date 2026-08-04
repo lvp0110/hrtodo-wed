@@ -10,6 +10,7 @@ import type {
   EmployeeReportItem,
   EmployeeUpdateReq,
   Employer,
+  ExportRequest,
   LoginRequest,
   NodeCreateReq,
   NodeUpdateReq,
@@ -177,6 +178,64 @@ export const employeesApi = {
   /** Удалить сотрудника — DELETE /employees/{id} */
   delete: (id: number): Promise<void> =>
     request(`/employees/${id}`, { method: "DELETE" }),
+};
+
+function filenameFromContentDisposition(header: string | null): string | null {
+  if (!header) return null;
+  const utf8 = header.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+  if (utf8?.[1]) {
+    try {
+      return decodeURIComponent(utf8[1].trim().replace(/^"|"$/g, ""));
+    } catch {
+      /* ignore */
+    }
+  }
+  const plain = header.match(/filename\s*=\s*("?)([^";]+)\1/i);
+  return plain?.[2]?.trim() || null;
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+export const exportApi = {
+  /** Выгрузка сотрудников в Excel — POST /export/excel */
+  excel: async (body: ExportRequest = {}): Promise<void> => {
+    const headers: Record<string, string> = {
+      Accept:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Type": "application/json",
+    };
+    const csrf = readCookie("csrf_token");
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+
+    const res = await fetch(`${BASE_URL}/export/excel`, {
+      method: "POST",
+      headers,
+      credentials: "include",
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw Object.assign(new Error(err.error ?? res.statusText), {
+        code: res.status,
+      });
+    }
+
+    const blob = await res.blob();
+    const filename =
+      filenameFromContentDisposition(res.headers.get("Content-Disposition")) ??
+      `сотрудники-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    downloadBlob(blob, filename);
+  },
 };
 
 export const employeeQueries = {

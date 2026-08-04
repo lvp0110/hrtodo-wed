@@ -191,10 +191,25 @@ export interface VacancyReq {
 export interface VacancyUpdateReq {
   node_id: number;
   user_id: number | null;
+  city_code?: string;
   office_code?: string;
   position_code: string;
   position_name: string;
   is_manager: boolean;
   position_description: string;
   job_offer_link: string;
+}
+
+/** Фильтры для POST /export/excel */
+export interface ExportRequest {
+  full_name?: string;
+  country_code?: string;
+  city_code?: string;
+  office_code?: string;
+  department_id?: number;
+  position_name?: string;
+  gender?: string;
+  hire_year?: number;
+  hire_month?: number;
+  hire_day?: number;
 }

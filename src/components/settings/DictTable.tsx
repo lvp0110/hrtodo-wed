@@ -97,52 +97,58 @@ export function DictTable<T>({
 
   return (
     <div
-      className={`overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 ${wrapperClassName ?? ""}`}
+      className={`overflow-auto rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 ${wrapperClassName ?? ""}`}
     >
       {showMobileCards && (
-        <div className="divide-y divide-gray-100 dark:divide-gray-800 lg:hidden">
-          {isLoading && (
-            <div className="px-4 py-8 text-center text-sm text-gray-400">
-              Загрузка…
+        <div className="lg:hidden">
+          {!isLoading && !isError && topRowMobile && (
+            <div className="sticky top-0 z-10 border-b border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
+              {topRowMobile}
             </div>
           )}
 
-          {!isLoading && isError && (
-            <div className="px-4 py-8 text-center text-sm text-red-500">
-              {errorMessage ?? "Не удалось загрузить данные"}
-            </div>
-          )}
-
-          {!isLoading && !isError && topRowMobile}
-
-          {!isLoading && !isError && rows.length === 0 && (
-            <div className="px-4 py-8 text-center text-sm text-gray-400">
-              {emptyMessage}
-            </div>
-          )}
-
-          {!isLoading &&
-            !isError &&
-            rows.map((row) => (
-              <div key={rowKey(row)}>
-                {renderMobileCard!(row, (
-                  <RowActions row={row} onEdit={onEdit} onDelete={onDelete} />
-                ))}
+          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+            {isLoading && (
+              <div className="px-4 py-8 text-center text-sm text-gray-400">
+                Загрузка…
               </div>
-            ))}
+            )}
+
+            {!isLoading && isError && (
+              <div className="px-4 py-8 text-center text-sm text-red-500">
+                {errorMessage ?? "Не удалось загрузить данные"}
+              </div>
+            )}
+
+            {!isLoading && !isError && rows.length === 0 && (
+              <div className="px-4 py-8 text-center text-sm text-gray-400">
+                {emptyMessage}
+              </div>
+            )}
+
+            {!isLoading &&
+              !isError &&
+              rows.map((row) => (
+                <div key={rowKey(row)}>
+                  {renderMobileCard!(row, (
+                    <RowActions row={row} onEdit={onEdit} onDelete={onDelete} />
+                  ))}
+                </div>
+              ))}
+          </div>
         </div>
       )}
 
       <table
-        className={`w-full table-auto text-left text-sm ${showMobileCards ? "hidden lg:table" : ""}`}
+        className={`w-full border-separate border-spacing-0 table-auto text-left text-sm ${showMobileCards ? "hidden lg:table" : ""}`}
       >
-        <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-800 dark:bg-gray-900/60 dark:text-gray-400">
+        <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
           <tr>
             {columns.map((c) => (
               <th
                 key={c.key}
                 onClick={c.onHeaderClick}
-                className={`px-4 py-3 font-medium ${c.headerClassName ?? ""}${
+                className={`bg-gray-50 px-4 py-3 font-medium dark:bg-gray-900 ${c.headerClassName ?? ""}${
                   c.onHeaderClick ? " cursor-pointer select-none" : ""
                 }`}
               >
@@ -151,11 +157,12 @@ export function DictTable<T>({
             ))}
             {showActions && (
               <th
-                className="w-12 px-4 py-3"
+                className="w-12 bg-gray-50 px-4 py-3 dark:bg-gray-900"
                 aria-label="Действия"
               />
             )}
           </tr>
+          {!isLoading && !isError && topRow}
         </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
           {isLoading && (
@@ -190,8 +197,6 @@ export function DictTable<T>({
               </td>
             </tr>
           )}
-
-          {!isLoading && !isError && topRow}
 
           {!isLoading &&
             !isError &&

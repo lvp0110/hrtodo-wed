@@ -1,11 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { FileSpreadsheet, Search, Star } from "lucide-react";
 import {
   dictQueries,
   employeeQueries,
   employeesApi,
+  exportApi,
   officesApi,
   orgNodesApi,
   vacanciesApi,
@@ -24,7 +30,15 @@ import { EmployeesRowCard } from "#/components/EmployeesRowCard";
 import { EditVacancyModal } from "#/components/EditVacancyModal";
 import { DictTable } from "#/components/settings/DictTable";
 import { dictInputClass } from "#/components/settings/DictFormModal";
-import type { EmployeeReportItem, Employer, OrgNode } from "#/types/api";
+import type {
+  City,
+  Country,
+  EmployeeReportItem,
+  Employer,
+  ExportRequest,
+  Office,
+  OrgNode,
+} from "#/types/api";
 import type { VacancyModalData } from "#/types/orgChart";
 import { DepartmentTreeSelect } from "#/components/DepartmentTreeSelect";
 import { normalizeGender } from "#/lib/employeeDisplay";
@@ -34,7 +48,15 @@ import {
   type EmployeeVacancyCreateFields,
 } from "#/lib/employeeUpdate";
 import { toVacancyUpdateReq } from "#/lib/vacancyUpdate";
-import { formatVacancyError } from "#/lib/vacancyValidation";
+import {
+  findExistingPositionSlot,
+  formatVacancyError,
+  NODE_POSITION_SLOT_EXISTS_MESSAGE,
+} from "#/lib/vacancyValidation";
+import { findOrgNodeByName } from "#/lib/orgTree";
+
+/** Город по коду офиса — в дереве вакансий бэк отдаёт только office, без city. */
+type CityByOfficeCode = Map<string, { name: string; code: string }>;
 
 export const Route = createFileRoute("/employees")({
   component: EmployeesPage,
@@ -122,6 +144,7 @@ type EmployeesTableRow =
 function collectVacanciesForEmployee(
   nodes: OrgNode[],
   employeeId: number,
+  employeeCity?: { name: string; code: string },
 ): VacancyModalData[] {
   const result: VacancyModalData[] = [];
 
@@ -133,8 +156,8 @@ function collectVacanciesForEmployee(
         nodeId: vacancy.node_id,
         position: vacancy.position?.name ?? vacancy.position?.code ?? "",
         positionCode: vacancy.position?.code ?? vacancy.position?.name ?? "",
-        city: vacancy.city?.name ?? "",
-        cityCode: vacancy.city?.code ?? "",
+        city: vacancy.city?.name || employeeCity?.name || "",
+        cityCode: vacancy.city?.code || employeeCity?.code || "",
         office: vacancy.office?.name ?? "",
         officeCode: vacancy.office?.code ?? "",
         deptName: node.name,
@@ -435,17 +458,24 @@ function mergeVacancyMaps(
   return merged;
 }
 
-function collectVacantRowsFromTree(nodes: OrgNode[]): EmployeesTableRow[] {
+function collectVacantRowsFromTree(
+  nodes: OrgNode[],
+  cityByOfficeCode: CityByOfficeCode,
+): EmployeesTableRow[] {
   const rows: EmployeesTableRow[] = [];
 
   function walk(node: OrgNode) {
     for (const vacancy of node.vacancies ?? []) {
       if (vacancy.employer?.id) continue;
       const position = vacancy.position?.name ?? vacancy.position?.code ?? "";
-      const city = vacancy.city?.name ?? "";
-      const cityCode = vacancy.city?.code ?? "";
       const office = vacancy.office?.name ?? "";
       const officeCode = vacancy.office?.code ?? "";
+      const cityFromOffice = officeCode
+        ? cityByOfficeCode.get(officeCode)
+        : undefined;
+      // В API дерева у вакансии нет city — только office → город берём из справочника.
+      const city = vacancy.city?.name || cityFromOffice?.name || "";
+      const cityCode = vacancy.city?.code || cityFromOffice?.code || "";
 
       rows.push({
         kind: "vacancy",
@@ -533,6 +563,56 @@ function matchesFilters(
   return true;
 }
 
+function optionalInt(value: string): number | undefined {
+  if (!value.trim()) return undefined;
+  const n = Number.parseInt(value, 10);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function buildExportRequest(
+  filters: EmployeeFilters,
+  countries: Country[],
+  cities: City[],
+  offices: Office[],
+  tree: OrgNode[],
+): ExportRequest {
+  const body: ExportRequest = {};
+
+  if (filters.name.trim()) body.full_name = filters.name.trim();
+
+  if (filters.country) {
+    const country = countries.find((c) => c.name === filters.country);
+    if (country?.code) body.country_code = country.code;
+  }
+
+  if (filters.city) {
+    const city = cities.find((c) => c.name === filters.city);
+    if (city?.code) body.city_code = city.code;
+  }
+
+  if (filters.office) {
+    const office = offices.find((o) => o.name === filters.office);
+    if (office?.code) body.office_code = office.code;
+  }
+
+  if (filters.department) {
+    const node = findOrgNodeByName(tree, filters.department);
+    if (node) body.department_id = node.id;
+  }
+
+  if (filters.position.trim()) body.position_name = filters.position.trim();
+  if (filters.gender) body.gender = filters.gender;
+
+  const hireYear = optionalInt(filters.hireYear);
+  const hireMonth = optionalInt(filters.hireMonth);
+  const hireDay = optionalInt(filters.hireDay);
+  if (hireYear !== undefined) body.hire_year = hireYear;
+  if (hireMonth !== undefined) body.hire_month = hireMonth;
+  if (hireDay !== undefined) body.hire_day = hireDay;
+
+  return body;
+}
+
 function EmployeesPage() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<EmployeeFilters>(emptyFilters);
@@ -556,6 +636,32 @@ function EmployeesPage() {
     queryKey: ["orgTree"],
     queryFn: () => orgNodesApi.getTreeVacancies().then((res) => res.data ?? []),
   });
+
+  const cities = citiesQuery.data ?? [];
+  const officesByCityQueries = useQueries({
+    queries: cities.map((city) => ({
+      queryKey: ["offices", "city", city.id] as const,
+      queryFn: () => officesApi.getByCity(city.id).then((res) => res.data ?? []),
+      staleTime: 60_000,
+    })),
+  });
+  const officesDataUpdatedAt = officesByCityQueries
+    .map((query) => query.dataUpdatedAt)
+    .join(",");
+
+  const cityByOfficeCode = useMemo(() => {
+    const map: CityByOfficeCode = new Map();
+    officesByCityQueries.forEach((query, index) => {
+      const city = cities[index];
+      if (!city || !query.data) return;
+      for (const office of query.data) {
+        map.set(office.code, { name: city.name, code: city.code });
+      }
+    });
+    return map;
+    // officesDataUpdatedAt отражает загрузку офисов по городам
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cities, officesDataUpdatedAt]);
 
   const orgByEmployeeId = useMemo(
     () =>
@@ -581,8 +687,8 @@ function EmployeesPage() {
   );
 
   const vacantRows = useMemo(
-    () => collectVacantRowsFromTree(treeQuery.data ?? []),
-    [treeQuery.data],
+    () => collectVacantRowsFromTree(treeQuery.data ?? [], cityByOfficeCode),
+    [treeQuery.data, cityByOfficeCode],
   );
 
   const updateVacancyMutation = useMutation({
@@ -630,6 +736,7 @@ function EmployeesPage() {
         await vacanciesApi.update(vacancy.id, {
           node_id: vacancy.nodeId,
           user_id: null,
+          city_code: vacancy.cityCode || undefined,
           office_code: vacancy.officeCode || undefined,
           position_code: vacancy.positionCode || vacancy.position,
           position_name: vacancy.position,
@@ -669,6 +776,7 @@ function EmployeesPage() {
       fields: AssignEmployeeFormFields;
     }) => {
       let employeeId: number;
+      let createdEmployeeId: number | null = null;
 
       if (fields.mode === "existing") {
         if (!fields.existingUserId) {
@@ -678,6 +786,7 @@ function EmployeesPage() {
       } else {
         const employeeRes = await employeesApi.create(toEmployeeCreateReq(fields));
         employeeId = employeeRes.data.id;
+        createdEmployeeId = employeeId;
 
         const cityId =
           citiesQuery.data?.find((city) => city.code === org.cityCode)?.id ?? null;
@@ -690,16 +799,28 @@ function EmployeesPage() {
         }
       }
 
-      await vacanciesApi.update(vacancy.id, {
-        node_id: vacancy.nodeId,
-        user_id: employeeId,
-        office_code: vacancy.officeCode,
-        position_code: vacancy.position,
-        position_name: vacancy.position,
-        is_manager: vacancy.isManager,
-        position_description: vacancy.description,
-        job_offer_link: vacancy.jobOffer,
-      });
+      try {
+        await vacanciesApi.update(vacancy.id, {
+          node_id: vacancy.nodeId,
+          user_id: employeeId,
+          city_code: vacancy.cityCode || org.cityCode || undefined,
+          office_code: vacancy.officeCode || org.officeCode || undefined,
+          position_code: vacancy.position,
+          position_name: vacancy.position,
+          is_manager: vacancy.isManager,
+          position_description: vacancy.description,
+          job_offer_link: vacancy.jobOffer,
+        });
+      } catch (error) {
+        if (createdEmployeeId !== null) {
+          try {
+            await employeesApi.delete(createdEmployeeId);
+          } catch {
+            // Оставляем исходную ошибку назначения.
+          }
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orgTree"] });
@@ -712,6 +833,17 @@ function EmployeesPage() {
 
   const createEmployeeVacancyMutation = useMutation({
     mutationFn: async (data: EmployeeVacancyCreateFields) => {
+      // Проверка до POST /employees — иначе при node_position_slots_pkey
+      // снова появляются сотрудники без должности.
+      const existingSlot = findExistingPositionSlot(
+        treeQuery.data ?? [],
+        data.nodeId,
+        data.position,
+      );
+      if (existingSlot) {
+        throw new Error(NODE_POSITION_SLOT_EXISTS_MESSAGE);
+      }
+
       const shouldCreateEmployee =
         Boolean(data.surname.trim()) || Boolean(data.first_name.trim());
       let employeeId: number | null = null;
@@ -723,38 +855,50 @@ function EmployeesPage() {
 
       const positionDescription = data.comment.trim();
 
-      const vacancyRes = await vacanciesApi.create({
-        node_id: data.nodeId,
-        position_code: data.position,
-        position_name: data.position,
-        user_id: employeeId,
-        city_code: data.cityCode,
-        office_code: data.officeCode || undefined,
-        is_manager: data.isManager,
-        position_description: positionDescription,
-        job_offer_link: "",
-      });
-
-      // Ensure the newly created vacancy is explicitly assigned to the new employee.
-      if (employeeId) {
-        await vacanciesApi.update(vacancyRes.data.id, {
+      try {
+        const vacancyRes = await vacanciesApi.create({
           node_id: data.nodeId,
-          user_id: employeeId,
-          office_code: data.officeCode || undefined,
           position_code: data.position,
           position_name: data.position,
+          user_id: employeeId,
+          city_code: data.cityCode,
+          office_code: data.officeCode || undefined,
           is_manager: data.isManager,
           position_description: positionDescription,
           job_offer_link: "",
         });
-      }
 
-      if (employeeId && (data.cityId || data.officeId)) {
-        await employeesApi.update(employeeId, {
-          ...toEmployeeCreateReq(data),
-          city_id: data.cityId,
-          office_id: data.officeId,
-        });
+        if (employeeId) {
+          await vacanciesApi.update(vacancyRes.data.id, {
+            node_id: data.nodeId,
+            user_id: employeeId,
+            city_code: data.cityCode || undefined,
+            office_code: data.officeCode || undefined,
+            position_code: data.position,
+            position_name: data.position,
+            is_manager: data.isManager,
+            position_description: positionDescription,
+            job_offer_link: "",
+          });
+        }
+
+        if (employeeId && (data.cityId || data.officeId)) {
+          await employeesApi.update(employeeId, {
+            ...toEmployeeCreateReq(data),
+            city_id: data.cityId,
+            office_id: data.officeId,
+          });
+        }
+      } catch (error) {
+        // Сотрудник уже создан, а вакансия нет — иначе в отчёте остаются «без должности».
+        if (employeeId !== null) {
+          try {
+            await employeesApi.delete(employeeId);
+          } catch {
+            // Оставляем исходную ошибку создания вакансии.
+          }
+        }
+        throw error;
       }
     },
     onSuccess: () => {
@@ -951,9 +1095,22 @@ function EmployeesPage() {
     setManagerFilterId(null);
   };
 
+  const exportMutation = useMutation({
+    mutationFn: () =>
+      exportApi.excel(
+        buildExportRequest(
+          filters,
+          countriesQuery.data ?? [],
+          citiesQuery.data ?? [],
+          officesQuery.data ?? [],
+          treeQuery.data ?? [],
+        ),
+      ),
+  });
+
   return (
-    <div className="employees-page absolute inset-0 overflow-auto bg-gray-50 px-4 py-6 min-[1070px]:px-8 dark:bg-gray-950">
-      <div className="mb-6 flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:gap-3">
+    <div className="employees-page absolute inset-0 flex flex-col overflow-hidden bg-gray-50 px-4 py-6 min-[1070px]:px-8 dark:bg-gray-950">
+      <div className="mb-6 flex shrink-0 flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:gap-3">
         <label className="max-md:w-full min-w-[160px] flex-1">
           <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
             ФИО
@@ -1179,11 +1336,13 @@ function EmployeesPage() {
 
           <button
             type="button"
-            onClick={() => {
-              // TODO: выгрузка filteredRows в Excel через API
-            }}
-            disabled={filteredRows.length === 0}
-            title="Выгрузить в Excel"
+            onClick={() => exportMutation.mutate()}
+            disabled={exportMutation.isPending}
+            title={
+              exportMutation.isError
+                ? exportMutation.error.message
+                : "Выгрузить в Excel"
+            }
             aria-label="Выгрузить в Excel"
             className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-emerald-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-emerald-400 dark:hover:bg-gray-700"
           >
@@ -1252,9 +1411,10 @@ function EmployeesPage() {
         </div>
       </div>
 
+      <div className="min-h-0 flex-1 overflow-hidden">
       <DictTable<EmployeesTableRow>
         rowHoverVariant="border"
-        wrapperClassName="employees-dict-table"
+        wrapperClassName="employees-dict-table h-full"
         renderMobileCard={(row, actions) => {
           const nameColumn = row.kind === "employee"
             ? fullName(row.employee) || <span className="text-gray-400">—</span>
@@ -1440,7 +1600,7 @@ function EmployeesPage() {
           {
             key: "city",
             header: "Город",
-            headerClassName: "w-px",
+            headerClassName: "w-px whitespace-nowrap",
             className: "w-px whitespace-nowrap",
             onClick: (r) => {
               const city = r.org?.city;
@@ -1460,7 +1620,7 @@ function EmployeesPage() {
           {
             key: "office",
             header: "Офис",
-            headerClassName: "w-px",
+            headerClassName: "w-px whitespace-nowrap",
             className: "w-px whitespace-nowrap",
             onClick: (r) => {
               const org = r.org;
@@ -1535,6 +1695,10 @@ function EmployeesPage() {
             const vacancies = collectVacanciesForEmployee(
               treeQuery.data ?? [],
               row.employee.id,
+              {
+                name: row.org?.city || row.employee.city?.name || "",
+                code: row.org?.cityCode || row.employee.city?.code || "",
+              },
             );
             // row.vacancy может быть из отчёта, если дерева ещё нет
             if (
@@ -1586,6 +1750,7 @@ function EmployeesPage() {
           />
         }
       />
+      </div>
 
       {selectedEmployee && (
         <EmployeeInfoModal
