@@ -33,8 +33,26 @@ export const Route = createFileRoute("/structure")({
 /** Сколько уровней дерева раскрыто по умолчанию. */
 const DEFAULT_EXPANDED_LEVELS = 3;
 
+function upsertVacancy(tree: OrgNode[], vacancy: Vacancy): OrgNode[] {
+  return tree.map((node) => {
+    if (node.id === vacancy.node_id) {
+      const existing = node.vacancies ?? [];
+      const idx = existing.findIndex((v) => v.id === vacancy.id);
+      const vacancies =
+        idx >= 0
+          ? existing.map((v, i) => (i === idx ? vacancy : v))
+          : [...existing, vacancy];
+      return { ...node, vacancies };
+    }
+    if (node.children?.length) {
+      return { ...node, children: upsertVacancy(node.children, vacancy) };
+    }
+    return node;
+  });
+}
+
 function employerName(v: Vacancy): string {
-  if (!v.employer.id) return "Вакантно";
+  if (!v.employer?.id) return "Вакантно";
   const { first_name, second_name, surname } = v.employer;
   return [surname, first_name, second_name].filter(Boolean).join(" ");
 }
@@ -119,7 +137,7 @@ function VacancyRow({
   depth: number;
   ctx: TreeContext;
 }) {
-  const filled = !!vacancy.employer.id;
+  const filled = !!vacancy.employer?.id;
   return (
     <div
       className="group flex items-center gap-2 rounded-md py-1.5 pr-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-800/50"
@@ -129,7 +147,7 @@ function VacancyRow({
         <Star size={12} className="shrink-0 fill-amber-400 text-amber-400" />
       )}
       <span className="truncate text-gray-700 dark:text-gray-300">
-        {vacancy.position.name}
+        {vacancy.position?.name ?? vacancy.position?.code ?? "—"}
       </span>
       <span className="text-gray-300 dark:text-gray-600">·</span>
       <span
@@ -137,10 +155,14 @@ function VacancyRow({
       >
         {employerName(vacancy)}
       </span>
-      <span className="text-gray-300 dark:text-gray-600">·</span>
-      <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
-        {vacancy.city.name}
-      </span>
+      {vacancy.city?.name && (
+        <>
+          <span className="text-gray-300 dark:text-gray-600">·</span>
+          <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
+            {vacancy.city.name}
+          </span>
+        </>
+      )}
       <button
         type="button"
         title="Удалить вакансию"
@@ -167,14 +189,18 @@ function EmptyVacancyRow({
       style={{ paddingLeft: depth * 20 + 28 }}
     >
       <span className="truncate text-gray-700 dark:text-gray-300">
-        {vacancy.position.name}
+        {vacancy.position?.name ?? vacancy.position?.code ?? "—"}
       </span>
       <span className="text-gray-300 dark:text-gray-600">·</span>
       <span className="truncate text-xs text-amber-500">Вакантно</span>
-      <span className="text-gray-300 dark:text-gray-600">·</span>
-      <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
-        {vacancy.city.name}
-      </span>
+      {vacancy.city?.name && (
+        <>
+          <span className="text-gray-300 dark:text-gray-600">·</span>
+          <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
+            {vacancy.city.name}
+          </span>
+        </>
+      )}
     </div>
   );
 }
@@ -235,7 +261,7 @@ function TreeNode({
           size={14}
           className="shrink-0 text-gray-300 dark:text-gray-600"
         />
-        <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+        <span className="text-[length:var(--tsrd-font-size)] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
           {node.type}
         </span>
         <span className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -367,7 +393,12 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
 
   const createVacancyMutation = useMutation({
     mutationFn: (body: VacancyReq) => vacanciesApi.create(body),
-    onSuccess: (_data, body) => {
+    onSuccess: ({ data: vacancy }, body) => {
+      if (vacancy) {
+        queryClient.setQueryData<OrgNode[]>(["orgTree"], (old) =>
+          old ? upsertVacancy(old, vacancy) : old,
+        );
+      }
       setExpanded((prev) => new Set(prev).add(body.node_id));
       setAddVacancy(null);
       invalidate();
@@ -409,7 +440,11 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
   };
 
   const onDeleteVacancy = (v: Vacancy) => {
-    if (window.confirm(`Удалить вакансию «${v.position.name}»?`)) {
+    if (
+      window.confirm(
+        `Удалить вакансию «${v.position?.name ?? v.position?.code ?? "—"}»?`,
+      )
+    ) {
       deleteVacancyMutation.mutate(v.id);
     }
   };
@@ -512,6 +547,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
               node_id: Number(addVacancy.deptId),
               position_code: data.position,
               position_name: data.position,
+              user_id: null,
               city_code: data.cityCode,
               is_manager: data.isManager,
               position_description: data.description,

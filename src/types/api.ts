@@ -10,6 +10,13 @@ export interface City {
   country_id: number;
 }
 
+export interface Office {
+  id: number;
+  code: string;
+  name: string;
+  city_id: number;
+}
+
 export interface Country {
   id: number;
   code: string;
@@ -38,6 +45,65 @@ export interface Employer {
   second_name: string;
   surname: string;
   email: string;
+  phone?: string;
+  personal_number?: string;
+  work_number?: string;
+  hire_date?: string;
+  gender?: string;
+  city?: Entity | null;
+  city_id?: number | null;
+  office?: (Entity & { id?: number }) | null;
+  office_id?: number | null;
+}
+
+export interface EmployeeCreateReq {
+  first_name: string;
+  second_name: string;
+  surname: string;
+  email?: string;
+  phone?: string;
+  personal_number?: string;
+  work_number?: string;
+  hire_date?: string;
+  gender?: string;
+}
+
+export interface EmployeeUpdateReq {
+  first_name: string;
+  second_name: string;
+  surname: string;
+  email: string;
+  phone?: string;
+  personal_number?: string;
+  work_number?: string;
+  hire_date?: string;
+  gender?: string;
+  city_id?: number | null;
+  office_id?: number | null;
+}
+
+export interface EmployeeReportPosition {
+  id: number;
+  code: string;
+  name: string;
+  position_description: string;
+  job_offer_link: string;
+  node_id: number;
+  node: Entity;
+  node_type: Entity;
+  city_id: number;
+  city: Entity;
+  country_id: number;
+  country: Entity;
+  is_manager: boolean;
+  manager_id: number;
+  office_id?: number | null;
+  office?: (Entity & { id?: number }) | null;
+}
+
+export interface EmployeeReportItem {
+  employee: Employer;
+  positions: EmployeeReportPosition[];
 }
 
 export interface OrgNodeType {
@@ -47,15 +113,17 @@ export interface OrgNodeType {
 }
 
 export interface EmptyVacancy {
-  position: Entity;
-  city: Entity;
+  position?: Entity | null;
+  city?: Entity | null;
+  office?: Entity | null;
 }
 
 export interface Vacancy {
   id: number;
   node_id: number;
-  position: Entity;
-  city: Entity;
+  position?: Entity | null;
+  city?: Entity | null;
+  office?: Entity | null;
   employer: Employer;
   is_manager: boolean;
   position_description: string;
@@ -71,14 +139,6 @@ export interface OrgNode {
   children: OrgNode[];
   vacancies: Vacancy[];
   empty_vacancy: EmptyVacancy[];
-}
-
-export interface OrgNodeRow {
-  id: number;
-  parent_id: number | null;
-  code: string;
-  name: string;
-  type_code: string;
 }
 
 export interface ApiResponse<T> {
@@ -105,15 +165,7 @@ export interface UserFullInfo {
   created_at: string;
 }
 
-export interface ErrorResponse {
-  code: number;
-  error: string;
-}
-
 export type OrgNodesResponse = ApiResponse<OrgNode[]>;
-export type OrgNodeRowResponse = ApiResponse<OrgNodeRow>;
-export type VacancyResponse = ApiResponse<Vacancy>;
-export type OrgNodeResponse = ApiResponse<OrgNode>;
 
 export interface NodeCreateReq {
   code: string;
@@ -128,7 +180,9 @@ export interface VacancyReq {
   node_id: number;
   position_code: string;
   position_name: string;
-  city_code: string;
+  user_id?: number | null;
+  office_code?: string;
+  city_code?: string;
   is_manager: boolean;
   position_description: string;
   job_offer_link: string;
@@ -137,10 +191,25 @@ export interface VacancyReq {
 export interface VacancyUpdateReq {
   node_id: number;
   user_id: number | null;
-  city_code: string;
+  city_code?: string;
+  office_code?: string;
   position_code: string;
   position_name: string;
   is_manager: boolean;
   position_description: string;
   job_offer_link: string;
+}
+
+/** Фильтры для POST /export/excel */
+export interface ExportRequest {
+  full_name?: string;
+  country_code?: string;
+  city_code?: string;
+  office_code?: string;
+  department_id?: number;
+  position_name?: string;
+  gender?: string;
+  hire_year?: number;
+  hire_month?: number;
+  hire_day?: number;
 }

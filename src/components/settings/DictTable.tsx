@@ -3,56 +3,166 @@ import { Pencil, Trash2 } from "lucide-react";
 
 export interface DictColumn<T> {
   key: string;
-  header: string;
+  header: ReactNode;
   render: (row: T) => ReactNode;
   className?: string;
   headerClassName?: string;
+  onClick?: (row: T) => void;
+  onHeaderClick?: () => void;
 }
 
 interface DictTableProps<T> {
   columns: DictColumn<T>[];
   rows: T[];
   rowKey: (row: T) => string | number;
+  onRowClick?: (row: T) => void;
   onEdit?: (row: T) => void;
   onDelete?: (row: T) => void;
+  rowHoverVariant?: "background" | "border";
   isLoading?: boolean;
   isError?: boolean;
   errorMessage?: string | null;
   emptyMessage?: string;
+  topRow?: ReactNode;
+  topRowMobile?: ReactNode;
+  footerRow?: ReactNode;
+  wrapperClassName?: string;
+  renderMobileCard?: (row: T, actions: ReactNode) => ReactNode;
+}
+
+const rowHoverClasses = {
+  background:
+    "hover:bg-gray-50 dark:hover:bg-gray-800/40",
+  border:
+    "hover:ring-1 hover:ring-inset hover:ring-gray-300 dark:hover:ring-gray-600",
+} as const;
+
+function RowActions<T>({
+  row,
+  onEdit,
+  onDelete,
+}: {
+  row: T;
+  onEdit?: (row: T) => void;
+  onDelete?: (row: T) => void;
+}) {
+  if (!onEdit && !onDelete) return null;
+
+  return (
+    <div className="inline-flex shrink-0 items-center gap-1">
+      {onEdit && (
+        <button
+          type="button"
+          onClick={() => onEdit(row)}
+          aria-label="Редактировать"
+          className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+        >
+          <Pencil size={15} />
+        </button>
+      )}
+      {onDelete && (
+        <button
+          type="button"
+          onClick={() => onDelete(row)}
+          aria-label="Удалить"
+          className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+        >
+          <Trash2 size={15} />
+        </button>
+      )}
+    </div>
+  );
 }
 
 export function DictTable<T>({
   columns,
   rows,
   rowKey,
+  onRowClick,
   onEdit,
   onDelete,
+  rowHoverVariant = "background",
   isLoading = false,
   isError = false,
   errorMessage,
   emptyMessage = "Записей пока нет",
+  topRow,
+  topRowMobile,
+  footerRow,
+  wrapperClassName,
+  renderMobileCard,
 }: DictTableProps<T>) {
   const showActions = Boolean(onEdit || onDelete);
+  const showMobileCards = Boolean(renderMobileCard);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-      <table className="w-full text-left text-sm">
-        <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-800 dark:bg-gray-900/60 dark:text-gray-400">
+    <div
+      className={`overflow-auto rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 ${wrapperClassName ?? ""}`}
+    >
+      {showMobileCards && (
+        <div className="lg:hidden">
+          {!isLoading && !isError && topRowMobile && (
+            <div className="sticky top-0 z-10 border-b border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
+              {topRowMobile}
+            </div>
+          )}
+
+          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+            {isLoading && (
+              <div className="px-4 py-8 text-center text-sm text-gray-400">
+                Загрузка…
+              </div>
+            )}
+
+            {!isLoading && isError && (
+              <div className="px-4 py-8 text-center text-sm text-red-500">
+                {errorMessage ?? "Не удалось загрузить данные"}
+              </div>
+            )}
+
+            {!isLoading && !isError && rows.length === 0 && (
+              <div className="px-4 py-8 text-center text-sm text-gray-400">
+                {emptyMessage}
+              </div>
+            )}
+
+            {!isLoading &&
+              !isError &&
+              rows.map((row) => (
+                <div key={rowKey(row)}>
+                  {renderMobileCard!(row, (
+                    <RowActions row={row} onEdit={onEdit} onDelete={onDelete} />
+                  ))}
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      <table
+        className={`w-full border-separate border-spacing-0 table-auto text-left text-sm ${showMobileCards ? "hidden lg:table" : ""}`}
+      >
+        <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
           <tr>
             {columns.map((c) => (
               <th
                 key={c.key}
-                className={`px-4 py-3 font-medium ${c.headerClassName ?? ""}`}
+                onClick={c.onHeaderClick}
+                className={`bg-gray-50 px-4 py-3 font-medium dark:bg-gray-900 ${c.headerClassName ?? ""}${
+                  c.onHeaderClick ? " cursor-pointer select-none" : ""
+                }`}
               >
                 {c.header}
               </th>
             ))}
             {showActions && (
-              <th className="w-40 px-4 py-3 font-medium text-right">
-                Действия
-              </th>
+              <th
+                className="w-12 bg-gray-50 px-4 py-3 dark:bg-gray-900"
+                aria-label="Действия"
+              />
             )}
           </tr>
+          {!isLoading && !isError && topRow}
         </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
           {isLoading && (
@@ -93,44 +203,40 @@ export function DictTable<T>({
             rows.map((row) => (
               <tr
                 key={rowKey(row)}
-                className="text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800/40"
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                className={`text-gray-700 dark:text-gray-200 transition-[background-color,box-shadow] ${rowHoverClasses[rowHoverVariant]}${
+                  onRowClick ? " cursor-pointer" : ""
+                }`}
               >
                 {columns.map((c) => (
                   <td
                     key={c.key}
-                    className={`px-4 py-3 align-middle ${c.className ?? ""}`}
+                    onClick={
+                      c.onClick
+                        ? (e) => {
+                            e.stopPropagation();
+                            c.onClick!(row);
+                          }
+                        : undefined
+                    }
+                    className={`px-4 py-3 align-middle${c.onClick ? " cursor-pointer" : ""} ${c.className ?? ""}`}
                   >
                     {c.render(row)}
                   </td>
                 ))}
                 {showActions && (
                   <td className="px-4 py-3 text-right">
-                    <div className="inline-flex items-center gap-1">
-                      {onEdit && (
-                        <button
-                          type="button"
-                          onClick={() => onEdit(row)}
-                          aria-label="Редактировать"
-                          className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-100"
-                        >
-                          <Pencil size={15} />
-                        </button>
-                      )}
-                      {onDelete && (
-                        <button
-                          type="button"
-                          onClick={() => onDelete(row)}
-                          aria-label="Удалить"
-                          className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      )}
-                    </div>
+                    <RowActions
+                      row={row}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                    />
                   </td>
                 )}
               </tr>
             ))}
+
+          {!isLoading && !isError && footerRow}
         </tbody>
       </table>
     </div>

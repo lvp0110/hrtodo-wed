@@ -4,13 +4,16 @@ import type {
   City,
   CityReq,
   Country,
+  Office,
   CountryReq,
+  EmployeeCreateReq,
+  EmployeeReportItem,
+  EmployeeUpdateReq,
   Employer,
+  ExportRequest,
   LoginRequest,
   NodeCreateReq,
   NodeUpdateReq,
-  OrgNode,
-  OrgNodeRow,
   OrgNodeType,
   OrgNodeTypeReq,
   OrgNodesResponse,
@@ -88,8 +91,29 @@ export const authApi = {
   login: (body: LoginRequest): Promise<ApiResponse<UserFullInfo>> =>
     request("/login", { method: "POST", body }),
 
-  /** Проверка активной сессии — используется для условного рендера в __root. */
-  session: (): Promise<ApiResponse<UserFullInfo>> => request("/auth/session"),
+  /**
+   * Проверка активной сессии — используется для условного рендера в __root.
+   * Бэк отвечает 404 без auth-cookie; это не ошибка, а отсутствие сессии.
+   */
+  session: async (): Promise<UserFullInfo | null> => {
+    const res = await fetch(`${BASE_URL}/auth/session`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      credentials: "include",
+    });
+
+    if (res.status === 404) return null;
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw Object.assign(new Error(err.error ?? res.statusText), {
+        code: res.status,
+      });
+    }
+
+    const body = (await res.json()) as ApiResponse<UserFullInfo>;
+    return body.data;
+  },
 
   /** Выход: бэк сбрасывает обе cookies. */
   logout: (): Promise<ApiResponse<string>> =>
@@ -99,7 +123,7 @@ export const authApi = {
 export const authQueries = {
   session: queryOptions({
     queryKey: ["auth", "session"] as const,
-    queryFn: () => authApi.session().then((res) => res.data),
+    queryFn: () => authApi.session(),
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 10,
     retry: false,
@@ -107,20 +131,9 @@ export const authQueries = {
 };
 
 export const orgNodesApi = {
-  /** Получить всё организационное дерево */
-  getTree: (): Promise<OrgNodesResponse> => request("/orgnodes"),
-
-  /** Получить дерево относительно узла */
-  getSubTree: (id: number): Promise<OrgNodesResponse> =>
-    request(`/orgnodes/${id}`),
-
   /** Получить дерево с вакансиями */
   getTreeVacancies: (): Promise<OrgNodesResponse> =>
     request("/orgnodes/tree/vacancies"),
-
-  /** Получить узел по ID (без дочерних) */
-  getNode: (id: number): Promise<ApiResponse<OrgNodeRow>> =>
-    request(`/orgnodes/node/${id}`),
 
   /** Создать организационный узел */
   createNode: (body: NodeCreateReq): Promise<ApiResponse<null>> =>
@@ -136,10 +149,6 @@ export const orgNodesApi = {
 };
 
 export const vacanciesApi = {
-  /** Получить вакансию по ID */
-  get: (id: number): Promise<ApiResponse<Vacancy>> =>
-    request(`/vacancies/${id}`),
-
   /** Создать вакансию */
   create: (body: VacancyReq): Promise<ApiResponse<Vacancy>> =>
     request("/vacancies", { method: "POST", body }),
@@ -151,14 +160,91 @@ export const vacanciesApi = {
   /** Удалить вакансию */
   delete: (id: number): Promise<void> =>
     request(`/vacancies/${id}`, { method: "DELETE" }),
+};
 
-  /** Получить отдел со списком пустых вакансий */
-  getEmpty: (nodeId: number): Promise<ApiResponse<OrgNode>> =>
-    request(`/vacancies/${nodeId}/vacancies/empty`),
+export const employeesApi = {
+  /** Список сотрудников с должностями — GET /employees/report */
+  getReport: (): Promise<ApiResponse<EmployeeReportItem[]>> =>
+    request("/employees/report"),
 
-  /** Получить отдел со списком занятых вакансий */
-  getFilled: (nodeId: number): Promise<ApiResponse<OrgNode>> =>
-    request(`/vacancies/${nodeId}/vacancies/filled`),
+  /** Создать сотрудника — POST /employees */
+  create: (body: EmployeeCreateReq): Promise<ApiResponse<Employer>> =>
+    request("/employees", { method: "POST", body }),
+
+  /** Обновить сотрудника — PUT /employees/{id} */
+  update: (id: number, body: EmployeeUpdateReq): Promise<ApiResponse<Employer>> =>
+    request(`/employees/${id}`, { method: "PUT", body }),
+
+  /** Удалить сотрудника — DELETE /employees/{id} */
+  delete: (id: number): Promise<void> =>
+    request(`/employees/${id}`, { method: "DELETE" }),
+};
+
+function filenameFromContentDisposition(header: string | null): string | null {
+  if (!header) return null;
+  const utf8 = header.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+  if (utf8?.[1]) {
+    try {
+      return decodeURIComponent(utf8[1].trim().replace(/^"|"$/g, ""));
+    } catch {
+      /* ignore */
+    }
+  }
+  const plain = header.match(/filename\s*=\s*("?)([^";]+)\1/i);
+  return plain?.[2]?.trim() || null;
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+export const exportApi = {
+  /** Выгрузка сотрудников в Excel — POST /export/excel */
+  excel: async (body: ExportRequest = {}): Promise<void> => {
+    const headers: Record<string, string> = {
+      Accept:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Type": "application/json",
+    };
+    const csrf = readCookie("csrf_token");
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+
+    const res = await fetch(`${BASE_URL}/export/excel`, {
+      method: "POST",
+      headers,
+      credentials: "include",
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw Object.assign(new Error(err.error ?? res.statusText), {
+        code: res.status,
+      });
+    }
+
+    const blob = await res.blob();
+    const filename =
+      filenameFromContentDisposition(res.headers.get("Content-Disposition")) ??
+      `сотрудники-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    downloadBlob(blob, filename);
+  },
+};
+
+export const employeeQueries = {
+  report: queryOptions({
+    queryKey: ["employees", "report"] as const,
+    queryFn: () => employeesApi.getReport().then((res) => res.data ?? []),
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
+  }),
 };
 
 export const dictApi = {
@@ -179,10 +265,13 @@ export const dictApi = {
     request("/dict/orgnode/type"),
 };
 
-export const citiesApi = {
-  /** Получить город по ID */
-  get: (id: number): Promise<ApiResponse<City>> => request(`/cities/${id}`),
+export const officesApi = {
+  /** Получить офисы по ID города — GET /offices/city/{cityId} */
+  getByCity: (cityId: number): Promise<ApiResponse<Office[]>> =>
+    request(`/offices/city/${cityId}`),
+};
 
+export const citiesApi = {
   /** Создать город */
   create: (body: CityReq): Promise<ApiResponse<City>> =>
     request("/cities", { method: "POST", body }),
@@ -197,9 +286,6 @@ export const citiesApi = {
 };
 
 export const countriesApi = {
-  /** Получить страну по ID */
-  get: (id: number): Promise<ApiResponse<Country>> => request(`/country/${id}`),
-
   /** Создать страну */
   create: (body: CountryReq): Promise<ApiResponse<Country>> =>
     request("/country", { method: "POST", body }),
@@ -214,10 +300,6 @@ export const countriesApi = {
 };
 
 export const orgNodeTypesApi = {
-  /** Получить тип узла по ID */
-  get: (id: number): Promise<ApiResponse<OrgNodeType>> =>
-    request(`/orgnodetypes/${id}`),
-
   /** Создать тип узла */
   create: (body: OrgNodeTypeReq): Promise<ApiResponse<OrgNodeType>> =>
     request("/orgnodetypes", { method: "POST", body }),

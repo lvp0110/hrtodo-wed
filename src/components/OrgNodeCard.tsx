@@ -3,7 +3,7 @@ import type { Vacancy, EmptyVacancy } from "#/types/api";
 import type { AddVacancyState, VacancyModalData } from "#/types/orgChart";
 
 function employerName(v: Vacancy): string {
-  if (!v.employer.id) return "Вакантно";
+  if (!v.employer?.id) return "Вакантно";
   const { first_name, second_name, surname } = v.employer;
   return [surname, first_name, second_name].filter(Boolean).join(" ");
 }
@@ -66,13 +66,15 @@ export function OrgNodeCard({ id, data }: NodeProps) {
                 openVacancy(e, {
                   id: v.id,
                   nodeId: v.node_id,
-                  position: v.position.name,
-                  positionCode: v.position.code,
-                  city: v.city.name,
-                  cityCode: v.city.code,
+                  position: v.position?.name ?? v.position?.code ?? "",
+                  positionCode: v.position?.code ?? v.position?.name ?? "",
+                  city: v.city?.name ?? "",
+                  cityCode: v.city?.code ?? "",
+                  office: v.office?.name,
+                  officeCode: v.office?.code,
                   deptName: label,
                   isManager: v.is_manager,
-                  employer: v.employer.id
+                  employer: v.employer?.id
                     ? {
                         id: v.employer.id,
                         name: employerName(v),
@@ -97,18 +99,24 @@ export function OrgNodeCard({ id, data }: NodeProps) {
                     <path d="M12 2l2.6 7.6H22l-6.2 4.5 2.4 7.5L12 16.9 5.8 21.6l2.4-7.5L2 9.6h7.4z" />
                   </svg>
                 )}
-                <span className="truncate">{v.position.name}</span>
+                <span className="truncate">
+                  {v.position?.name ?? v.position?.code ?? "—"}
+                </span>
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span
-                  className={`text-xs truncate ${v.employer.id ? "text-gray-600 dark:text-gray-400" : "text-amber-500"}`}
+                  className={`text-xs truncate ${v.employer?.id ? "text-gray-600 dark:text-gray-400" : "text-amber-500"}`}
                 >
                   {employerName(v)}
                 </span>
-                <span className="text-gray-300 dark:text-gray-600 text-xs">·</span>
-                <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
-                  {v.city.name}
-                </span>
+                {v.city?.name && (
+                  <>
+                    <span className="text-gray-300 dark:text-gray-600 text-xs">·</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
+                      {v.city.name}
+                    </span>
+                  </>
+                )}
               </div>
             </li>
           ))}
@@ -121,10 +129,12 @@ export function OrgNodeCard({ id, data }: NodeProps) {
                 openVacancy(e, {
                   id: 0,
                   nodeId: 0,
-                  position: v.position.name,
-                  positionCode: v.position.code,
-                  city: v.city.name,
-                  cityCode: v.city.code,
+                  position: v.position?.name ?? v.position?.code ?? "",
+                  positionCode: v.position?.code ?? v.position?.name ?? "",
+                  city: v.city?.name ?? "",
+                  cityCode: v.city?.code ?? "",
+                  office: v.office?.name,
+                  officeCode: v.office?.code,
                   deptName: label,
                   isManager: false,
                   employer: null,
@@ -134,14 +144,18 @@ export function OrgNodeCard({ id, data }: NodeProps) {
               }
             >
               <div className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">
-                {v.position.name}
+                {v.position?.name ?? v.position?.code ?? "—"}
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="text-xs text-amber-500">Вакантно</span>
-                <span className="text-gray-300 dark:text-gray-600 text-xs">·</span>
-                <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
-                  {v.city.name}
-                </span>
+                {v.city?.name && (
+                  <>
+                    <span className="text-gray-300 dark:text-gray-600 text-xs">·</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
+                      {v.city.name}
+                    </span>
+                  </>
+                )}
               </div>
             </li>
           ))}
