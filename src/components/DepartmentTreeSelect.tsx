@@ -278,14 +278,14 @@ export function DepartmentTreeSelect(props: DepartmentTreeSelectProps) {
       {isOpen && (
         <div
           role="listbox"
-          className="absolute inset-x-0 top-full z-50 mt-1 h-auto w-full overflow-x-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+          className="absolute inset-x-0 top-full z-50 mt-1 flex max-h-72 w-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
         >
           <button
             type="button"
             role="option"
             aria-selected={rootSelected}
             onClick={selectRoot}
-            className={`block w-full min-w-0 text-left leading-snug break-words ${panelRowClass} ${
+            className={`block w-full min-w-0 shrink-0 text-left leading-snug break-words ${panelRowClass} ${
               rootSelected
                 ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
                 : "text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -294,7 +294,7 @@ export function DepartmentTreeSelect(props: DepartmentTreeSelectProps) {
             {rootLabel}
           </button>
 
-          <div className="border-b border-gray-100 bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900">
+          <div className="shrink-0 border-b border-gray-100 bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900">
             <input
               ref={searchInputRef}
               type="search"
@@ -308,27 +308,29 @@ export function DepartmentTreeSelect(props: DepartmentTreeSelectProps) {
             />
           </div>
 
-          {filteredDepartments.length === 0 ? (
-            <p
-              className={`${panelRowClass} text-gray-400 dark:text-gray-500`}
-            >
-              Ничего не найдено
-            </p>
-          ) : (
-            filteredDepartments.map((node) => (
-              <TreeRow
-                key={node.id}
-                node={node}
-                depth={0}
-                variant={variant}
-                value={variant === "filter" ? props.value : props.value}
-                expandedIds={effectiveExpandedIds}
-                onToggle={toggleExpanded}
-                onSelect={selectNode}
-                compact={compact}
-              />
-            ))
-          )}
+          <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+            {filteredDepartments.length === 0 ? (
+              <p
+                className={`${panelRowClass} text-gray-400 dark:text-gray-500`}
+              >
+                Ничего не найдено
+              </p>
+            ) : (
+              filteredDepartments.map((node) => (
+                <TreeRow
+                  key={node.id}
+                  node={node}
+                  depth={0}
+                  variant={variant}
+                  value={variant === "filter" ? props.value : props.value}
+                  expandedIds={effectiveExpandedIds}
+                  onToggle={toggleExpanded}
+                  onSelect={selectNode}
+                  compact={compact}
+                />
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>
