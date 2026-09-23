@@ -194,17 +194,27 @@ export function OrgChart() {
             setDeptModal(null);
           }}
           isPending={
-            deptModal.mode === "create"
-              ? createNodeMutation.isPending
-              : updateNodeMutation.isPending
+            createNodeMutation.isPending || updateNodeMutation.isPending
           }
           error={
-            (deptModal.mode === "create"
-              ? createNodeMutation.error?.message
-              : updateNodeMutation.error?.message) ?? null
+            createNodeMutation.error?.message ??
+            updateNodeMutation.error?.message ??
+            null
           }
           onSubmit={(data) => {
-            if (deptModal.mode === "create") {
+            if (deptModal.mode === "create" && data.moveNodeId) {
+              createNodeMutation.reset();
+              updateNodeMutation.mutate({
+                id: data.moveNodeId,
+                body: {
+                  code: data.code,
+                  name: data.name,
+                  type_code: data.type,
+                  parent_id: Number(deptModal.parentId),
+                },
+              });
+            } else if (deptModal.mode === "create") {
+              updateNodeMutation.reset();
               createNodeMutation.mutate({
                 code: data.code,
                 name: data.name,

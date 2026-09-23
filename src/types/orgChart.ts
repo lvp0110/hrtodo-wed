@@ -14,7 +14,13 @@ export type VacancyModalData = {
   description: string;
 };
 
-export type DeptFields = { name: string; type: string; code: string };
+export type DeptFields = {
+  name: string;
+  type: string;
+  code: string;
+  /** Узел из списка: перенести его к новому родителю, а не создавать копию. */
+  moveNodeId?: number;
+};
 
 export type DeptModalState =
   | { mode: "create"; parentId: string; parentLabel: string }
