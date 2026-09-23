@@ -60,6 +60,23 @@ export function findManagerForVacancy(
   return null;
 }
 
+/** Плоский список всех узлов дерева, включая вложенные. */
+export function flattenOrgNodes(
+  nodes: OrgNode[] | null | undefined,
+): OrgNode[] {
+  const acc: OrgNode[] = [];
+
+  const walk = (list: OrgNode[] | null | undefined) => {
+    for (const node of list ?? []) {
+      acc.push(node);
+      walk(node.children);
+    }
+  };
+
+  walk(nodes);
+  return acc;
+}
+
 export function findOrgNode(
   nodes: OrgNode[],
   predicate: (node: OrgNode) => boolean,
@@ -107,6 +124,38 @@ export function findOrgNodeByName(
   name: string,
 ): OrgNode | null {
   return findOrgNode(nodes, (node) => node.name === name);
+}
+
+/**
+ * Почему узел нельзя перенести под newParentId.
+ * null — перенос допустим.
+ */
+export function relocateBlockReason(
+  nodes: OrgNode[],
+  nodeId: number,
+  newParentId: number,
+): string | null {
+  if (nodeId === newParentId) {
+    return "Нельзя перенести подразделение само в себя";
+  }
+
+  const parentAncestors = ancestorIdsForNode(nodes, newParentId) ?? [];
+  if (parentAncestors.includes(nodeId)) {
+    return "Нельзя перенести внутрь своей ветки";
+  }
+
+  const nodeAncestors = ancestorIdsForNode(nodes, nodeId);
+  if (!nodeAncestors) return null;
+
+  const currentParent =
+    nodeAncestors.length > 0
+      ? nodeAncestors[nodeAncestors.length - 1]
+      : null;
+  if (currentParent === newParentId) {
+    return "Уже в этом подразделении";
+  }
+
+  return null;
 }
 
 /** ID предков узла — чтобы раскрыть путь к выбранному отделу. */

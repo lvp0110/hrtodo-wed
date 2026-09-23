@@ -356,10 +356,13 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
       }),
     onSuccess: (_data, vars) => {
       setExpanded((prev) => new Set(prev).add(vars.parentId));
+      setDeptModal(null);
       invalidate();
     },
-    onError: (err) =>
-      window.alert(err instanceof Error ? err.message : "Не удалось перенести"),
+    onError: (err) => {
+      if (deptModal) return;
+      window.alert(err instanceof Error ? err.message : "Не удалось перенести");
+    },
   });
 
   const deleteNodeMutation = useMutation({
@@ -466,12 +469,15 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
     onDrop,
     onDeleteNode,
     onDeleteVacancy,
-    onAddDept: (node) =>
+    onAddDept: (node) => {
+      moveMutation.reset();
+      createNodeMutation.reset();
       setDeptModal({
         mode: "create",
         parentId: String(node.id),
         parentLabel: node.name,
-      }),
+      });
+    },
     onAddVacancy: (node) =>
       setAddVacancy({ deptId: String(node.id), deptName: node.name }),
   };
@@ -518,18 +524,36 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
           state={deptModal}
           onClose={() => {
             createNodeMutation.reset();
+            moveMutation.reset();
             setDeptModal(null);
           }}
-          isPending={createNodeMutation.isPending}
-          error={createNodeMutation.error?.message ?? null}
-          onSubmit={(data: DeptFields) =>
+          isPending={
+            createNodeMutation.isPending || moveMutation.isPending
+          }
+          error={
+            createNodeMutation.error?.message ??
+            moveMutation.error?.message ??
+            null
+          }
+          onSubmit={(data: DeptFields) => {
+            if (data.moveNodeId) {
+              const node = findNodeById(tree, data.moveNodeId);
+              if (!node) return;
+              createNodeMutation.reset();
+              moveMutation.mutate({
+                node,
+                parentId: Number(deptModal.parentId),
+              });
+              return;
+            }
+            moveMutation.reset();
             createNodeMutation.mutate({
               code: data.code,
               name: data.name,
               type_code: data.type,
               parent_id: Number(deptModal.parentId),
-            })
-          }
+            });
+          }}
         />
       )}
 
