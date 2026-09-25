@@ -5,9 +5,8 @@ import type { LoginRequest } from "#/types/api";
 
 /**
  * Форма входа. Рендерится условно в __root, отдельной страницы /login нет.
- * Бэк выдаёт HttpOnly access_token и csrf_token cookies, поэтому ничего
- * вручную в localStorage сохранять не нужно — достаточно инвалидации
- * authQueries.session, чтобы __root перерисовался с авторизованным состоянием.
+ * Бэк ставит HttpOnly access/refresh cookies. В кеш кладём только user,
+ * сроки жизни сессии сохраняет authRefresh и само обновляет её до истечения.
  */
 export function LoginForm() {
   const queryClient = useQueryClient();
@@ -25,7 +24,7 @@ export function LoginForm() {
     mutationFn: (body: LoginRequest) => authApi.login(body),
     onSuccess: (res) => {
       // Кладём пользователя в кеш сразу, чтобы избежать лишнего GET /auth/session.
-      queryClient.setQueryData(authQueries.session.queryKey, res.data);
+      queryClient.setQueryData(authQueries.session.queryKey, res.data.user);
     },
   });
 

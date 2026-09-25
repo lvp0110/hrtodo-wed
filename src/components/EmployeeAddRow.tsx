@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore, type ClipboardEvent } from "react";
 import { Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { dictInputClass } from "#/components/settings/DictFormModal";
@@ -205,6 +205,20 @@ function FieldError({ message }: { message?: string }) {
   return <p className={fieldErrorClass}>{message}</p>;
 }
 
+function splitPastedFullName(text: string): {
+  surname: string;
+  first_name: string;
+  second_name: string;
+} | null {
+  const parts = text.trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return null;
+  return {
+    surname: parts[0] ?? "",
+    first_name: parts[1] ?? "",
+    second_name: parts.slice(2).join(" "),
+  };
+}
+
 function PrepareWorkplaceButton({
   onClick,
   disabled,
@@ -296,6 +310,18 @@ function useEmployeeAddForm({
     setLocalError(null);
   }
 
+  function updateNameParts(parts: {
+    surname: string;
+    first_name: string;
+    second_name: string;
+  }) {
+    setEmployeeAddStore((prev) => ({
+      ...prev,
+      draft: { ...prev.draft, ...parts },
+    }));
+    setLocalError(null);
+  }
+
   function applyDraft(data: EmployeeVacancyCreateFields) {
     setEmployeeAddStore((prev) => ({ ...prev, draft: data }));
     setLocalError(null);
@@ -372,6 +398,7 @@ function useEmployeeAddForm({
     prepareWorkplaceReady,
     reset,
     updateDraft,
+    updateNameParts,
     applyDraft,
     handleCityChange,
     handleOfficeChange,
@@ -384,12 +411,21 @@ function useEmployeeAddForm({
 function EmployeeNameFields({
   draft,
   updateDraft,
+  updateNameParts,
   fieldErrors,
 }: {
   draft: EmployeeVacancyCreateFields;
   updateDraft: ReturnType<typeof useEmployeeAddForm>["updateDraft"];
+  updateNameParts: ReturnType<typeof useEmployeeAddForm>["updateNameParts"];
   fieldErrors?: FieldErrors;
 }) {
+  function handleNamePaste(event: ClipboardEvent<HTMLInputElement>) {
+    const parts = splitPastedFullName(event.clipboardData.getData("text"));
+    if (!parts) return;
+    event.preventDefault();
+    updateNameParts(parts);
+  }
+
   return (
     <>
       <div>
@@ -397,6 +433,7 @@ function EmployeeNameFields({
           type="text"
           value={draft.surname}
           onChange={(e) => updateDraft("surname", e.target.value)}
+          onPaste={handleNamePaste}
           placeholder="Фамилия"
           className={`${compactInputClass} ${fieldErrors?.surname ? invalidInputClass : ""}`}
         />
@@ -407,6 +444,7 @@ function EmployeeNameFields({
           type="text"
           value={draft.first_name}
           onChange={(e) => updateDraft("first_name", e.target.value)}
+          onPaste={handleNamePaste}
           placeholder="Имя"
           className={`${compactInputClass} ${fieldErrors?.first_name ? invalidInputClass : ""}`}
         />
@@ -416,6 +454,7 @@ function EmployeeNameFields({
         type="text"
         value={draft.second_name}
         onChange={(e) => updateDraft("second_name", e.target.value)}
+        onPaste={handleNamePaste}
         placeholder="Отчество"
         className={compactInputClass}
       />
@@ -551,6 +590,7 @@ export function EmployeeAddRow({
             <EmployeeNameFields
               draft={form.draft}
               updateDraft={form.updateDraft}
+              updateNameParts={form.updateNameParts}
               fieldErrors={form.fieldErrors}
             />
           </div>
@@ -692,6 +732,7 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
           <EmployeeNameFields
             draft={form.draft}
             updateDraft={form.updateDraft}
+            updateNameParts={form.updateNameParts}
             fieldErrors={form.fieldErrors}
           />
         </div>
