@@ -151,6 +151,19 @@ export interface LoginRequest {
   password: string;
 }
 
+/** Ответ POST /auth/login: токены только в HttpOnly cookies. */
+export interface AuthSession {
+  user: UserFullInfo;
+  expires_at: string;
+  refresh_expires_at: string;
+}
+
+/** Ответ POST /auth/refresh: новые сроки жизни access и refresh cookies. */
+export interface RefreshSession {
+  expires_at: string;
+  refresh_expires_at: string;
+}
+
 export interface UserFullInfo {
   user_id: string;
   first_name: string;

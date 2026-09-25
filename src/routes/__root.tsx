@@ -17,6 +17,15 @@ function RootShell() {
 
   const isAuthed = sessionQuery.isSuccess && !!sessionQuery.data;
 
+  // После выхода или протухшей сессии убираем данные прошлого пользователя.
+  useEffect(() => {
+    if (sessionQuery.isPending || isAuthed) return;
+
+    queryClient.removeQueries({
+      predicate: (query) => query.queryKey[0] !== "auth",
+    });
+  }, [sessionQuery.isPending, isAuthed, queryClient]);
+
   // Прогреваем справочники сразу после успешной авторизации, чтобы модалки
   // открывались с уже готовыми данными. До авторизации запросы вернули бы 401.
   useEffect(() => {

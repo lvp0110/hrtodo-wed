@@ -1,4 +1,10 @@
 import { queryOptions } from "@tanstack/react-query";
+import {
+  clearAuthExpiry,
+  expireClientSession,
+  refreshSession,
+  rememberAuthExpiry,
+} from "#/services/authRefresh";
 import type {
   ApiResponse,
   City,
@@ -11,6 +17,7 @@ import type {
   EmployeeUpdateReq,
   Employer,
   ExportRequest,
+  AuthSession,
   LoginRequest,
   NodeCreateReq,
   NodeUpdateReq,
@@ -46,14 +53,29 @@ function readCookie(name: string): string | null {
   return null;
 }
 
-async function request<T>(
-  path: string,
-  init: { method?: Method; body?: unknown } = {},
-): Promise<T> {
-  const { method = "GET", body } = init;
+/** Login и сам refresh не должны запускать повторный refresh. */
+const SKIP_REFRESH = new Set(["/auth/login", "/auth/refresh", "/login"]);
+
+type FetchInit = {
+  method?: Method;
+  body?: unknown;
+  headers?: Record<string, string>;
+  retried?: boolean;
+};
+
+async function errorFromResponse(res: Response): Promise<Error> {
+  const err = await res.json().catch(() => ({ error: res.statusText }));
+  return Object.assign(new Error(err.error ?? res.statusText), {
+    code: res.status,
+  });
+}
+
+async function fetchApi(path: string, init: FetchInit = {}): Promise<Response> {
+  const { method = "GET", body, headers: extraHeaders, retried = false } = init;
 
   const headers: Record<string, string> = {
     Accept: "application/json",
+    ...extraHeaders,
   };
 
   if (body !== undefined) {
@@ -69,17 +91,28 @@ async function request<T>(
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
     headers,
-    // Куки access_token / csrf_token приходят с бэка и должны отправляться обратно.
+    // access_token / refresh_token / csrf_token приходят с бэка и уходят обратно.
     credentials: "include",
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw Object.assign(new Error(err.error ?? res.statusText), {
-      code: res.status,
-    });
+  // Первый 401 — refresh и один повтор. Второй 401 или провал refresh — выход.
+  if (res.status === 401 && !retried && !SKIP_REFRESH.has(path)) {
+    await refreshSession({ force: true });
+    return fetchApi(path, { ...init, retried: true });
   }
+
+  if (res.status === 401 && retried && !SKIP_REFRESH.has(path)) {
+    expireClientSession();
+  }
+
+  return res;
+}
+
+async function request<T>(path: string, init: FetchInit = {}): Promise<T> {
+  const res = await fetchApi(path, init);
+
+  if (!res.ok) throw await errorFromResponse(res);
 
   if (res.status === 204) return undefined as T;
 
@@ -87,37 +120,46 @@ async function request<T>(
 }
 
 export const authApi = {
-  /** Вход: бэк ставит HttpOnly access_token и csrf_token. */
-  login: (body: LoginRequest): Promise<ApiResponse<UserFullInfo>> =>
-    request("/login", { method: "POST", body }),
+  /** Вход: бэк ставит HttpOnly access/refresh cookies и csrf_token. */
+  login: async (body: LoginRequest): Promise<ApiResponse<AuthSession>> => {
+    const res = await request<ApiResponse<AuthSession>>("/auth/login", {
+      method: "POST",
+      body,
+    });
+    rememberAuthExpiry(res.data.expires_at, res.data.refresh_expires_at);
+    return res;
+  },
 
   /**
    * Проверка активной сессии — используется для условного рендера в __root.
-   * Бэк отвечает 404 без auth-cookie; это не ошибка, а отсутствие сессии.
+   * 401 на протухшем access token сначала обновляет сессию через /auth/refresh.
+   * 404 оставлен для старого бэка без auth-cookie.
    */
   session: async (): Promise<UserFullInfo | null> => {
-    const res = await fetch(`${BASE_URL}/auth/session`, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      credentials: "include",
-    });
+    try {
+      const res = await fetchApi("/auth/session");
 
-    if (res.status === 404) return null;
+      if (res.status === 401 || res.status === 404) return null;
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      throw Object.assign(new Error(err.error ?? res.statusText), {
-        code: res.status,
-      });
+      if (!res.ok) throw await errorFromResponse(res);
+
+      const body = (await res.json()) as ApiResponse<UserFullInfo>;
+      return body.data;
+    } catch (error) {
+      const code = (error as { code?: number }).code;
+      if (code === 401 || code === 403) return null;
+      throw error;
     }
-
-    const body = (await res.json()) as ApiResponse<UserFullInfo>;
-    return body.data;
   },
 
-  /** Выход: бэк сбрасывает обе cookies. */
-  logout: (): Promise<ApiResponse<string>> =>
-    request("/auth/logout", { method: "POST" }),
+  /** Выход: бэк отзывает сессию и сбрасывает access, refresh и csrf cookies. */
+  logout: async (): Promise<ApiResponse<string>> => {
+    const res = await request<ApiResponse<string>>("/auth/logout", {
+      method: "POST",
+    });
+    clearAuthExpiry();
+    return res;
+  },
 };
 
 export const authQueries = {
@@ -208,27 +250,16 @@ function downloadBlob(blob: Blob, filename: string): void {
 export const exportApi = {
   /** Выгрузка сотрудников в Excel — POST /export/excel */
   excel: async (body: ExportRequest = {}): Promise<void> => {
-    const headers: Record<string, string> = {
-      Accept:
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Type": "application/json",
-    };
-    const csrf = readCookie("csrf_token");
-    if (csrf) headers["X-CSRF-Token"] = csrf;
-
-    const res = await fetch(`${BASE_URL}/export/excel`, {
+    const res = await fetchApi("/export/excel", {
       method: "POST",
-      headers,
-      credentials: "include",
-      body: JSON.stringify(body),
+      body,
+      headers: {
+        Accept:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      },
     });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      throw Object.assign(new Error(err.error ?? res.statusText), {
-        code: res.status,
-      });
-    }
+    if (!res.ok) throw await errorFromResponse(res);
 
     const blob = await res.blob();
     const filename =
