@@ -3,22 +3,37 @@ import type { ApiResponse, RefreshSession } from "#/types/api";
 const BASE_URL = "/api";
 const EXPIRY_KEY = "hrtodo.auth_expiry";
 const LOCK_KEY = "hrtodo.auth_refresh_lock";
-/** Обновляем access token чуть раньше истечения, чтобы запросы не ловили 401. */
-const LEEWAY_MS = 45_000;
+/**
+ * access_token на бэке живёт 15 минут, и этот срок из фронта не увеличить.
+ * Обновляем сессию за 2 минуты до конца: фоновая вкладка в Chrome тикает
+ * не чаще раза в минуту, запаса в 45 секунд не хватало — cookie уже удалялась,
+ * запоздалый refresh сталкивался со шквалом 401 и сжигал одноразовый токен.
+ */
+const LEEWAY_MS = 2 * 60_000;
+const HEARTBEAT_MS = 15_000;
+const ROTATION_RETRY_MS = 400;
 const LOCK_TTL_MS = 10_000;
 const MAX_TIMER_MS = 2_147_483_647;
 
 let refreshInFlight: Promise<RefreshSession> | null = null;
 let refreshTimer: number | null = null;
 let sessionExpired = false;
+/** Явный выход. Опоздавший refresh после него сессию не возвращает. */
+let explicitLogout = false;
 /** Увеличивается при выходе, чтобы опоздавший refresh не вернул сроки сессии. */
 let sessionEpoch = 0;
 
 const expiredListeners = new Set<() => void>();
+const restoredListeners = new Set<() => void>();
 
 export function subscribeAuthExpired(listener: () => void): () => void {
   expiredListeners.add(listener);
   return () => expiredListeners.delete(listener);
+}
+
+export function subscribeAuthRestored(listener: () => void): () => void {
+  restoredListeners.add(listener);
+  return () => restoredListeners.delete(listener);
 }
 
 function readCookie(name: string): string | null {
@@ -88,6 +103,7 @@ function freshStored(): RefreshSession | null {
 }
 
 export function rememberAuthExpiry(expiresAt: string, refreshExpiresAt: string): void {
+  explicitLogout = false;
   sessionExpired = false;
   const payload: RefreshSession = {
     expires_at: expiresAt,
@@ -97,8 +113,7 @@ export function rememberAuthExpiry(expiresAt: string, refreshExpiresAt: string):
   scheduleRefresh(expiresAt);
 }
 
-export function clearAuthExpiry(): void {
-  sessionEpoch += 1;
+function dropStoredExpiry(): void {
   if (refreshTimer != null) {
     window.clearTimeout(refreshTimer);
     refreshTimer = null;
@@ -107,12 +122,24 @@ export function clearAuthExpiry(): void {
   localStorage.removeItem(LOCK_KEY);
 }
 
+export function clearAuthExpiry(): void {
+  explicitLogout = true;
+  sessionExpired = true;
+  sessionEpoch += 1;
+  dropStoredExpiry();
+}
+
 /** Сбросить локальные сроки и перевести приложение на экран входа. */
 export function expireClientSession(): void {
-  clearAuthExpiry();
+  if (explicitLogout) return;
+  dropStoredExpiry();
   if (sessionExpired) return;
   sessionExpired = true;
   for (const listener of expiredListeners) listener();
+}
+
+function notifyRestored(): void {
+  for (const listener of restoredListeners) listener();
 }
 
 function authError(status: number, message: string): Error {
@@ -160,42 +187,65 @@ function expiryWasRenewed(previousExpiresAt: string | null): RefreshSession | nu
   return stored;
 }
 
-async function requestRefresh(
-  previousExpiresAt: string | null,
-): Promise<RefreshSession> {
-  const epoch = sessionEpoch;
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+async function postRefresh(): Promise<Response> {
   const headers: Record<string, string> = { Accept: "application/json" };
   const csrf = readCookie("csrf_token");
   if (csrf) headers["X-CSRF-Token"] = csrf;
 
-  const res = await fetch(`${BASE_URL}/auth/refresh`, {
+  return fetch(`${BASE_URL}/auth/refresh`, {
     method: "POST",
     headers,
     credentials: "include",
   });
+}
 
-  if (epoch !== sessionEpoch) {
+async function requestRefresh(
+  previousExpiresAt: string | null,
+  allowRetry: boolean,
+): Promise<RefreshSession> {
+  const epoch = sessionEpoch;
+  const res = await postRefresh();
+
+  if (explicitLogout || epoch !== sessionEpoch) {
     throw authError(401, "Сессия завершена");
   }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     const message = String(err.error ?? res.statusText);
-    // Параллельный refresh уже сжёг этот токен и записал новый срок.
-    const renewed = expiryWasRenewed(previousExpiresAt);
-    if (renewed && String(message).includes("refresh session not found")) {
-      scheduleRefresh(renewed.expires_at);
-      return renewed;
+    const rotatedAway = message.includes("refresh session not found");
+
+    if (rotatedAway) {
+      // Победивший refresh мог ещё не записать срок или не успеть обновить cookie.
+      if (allowRetry) await delay(ROTATION_RETRY_MS);
+      if (explicitLogout || epoch !== sessionEpoch) {
+        throw authError(401, "Сессия завершена");
+      }
+      const renewed = expiryWasRenewed(previousExpiresAt);
+      if (renewed) {
+        scheduleRefresh(renewed.expires_at);
+        return renewed;
+      }
+      if (allowRetry) return requestRefresh(previousExpiresAt, false);
     }
+
     if (res.status === 401 || res.status === 403) expireClientSession();
     throw authError(res.status, message);
   }
 
   const body = (await res.json()) as ApiResponse<RefreshSession>;
-  if (epoch !== sessionEpoch) {
+  if (explicitLogout || epoch !== sessionEpoch) {
     throw authError(401, "Сессия завершена");
   }
+  const wasExpired = sessionExpired;
   rememberAuthExpiry(body.data.expires_at, body.data.refresh_expires_at);
+  if (wasExpired) notifyRestored();
   return body.data;
 }
 
@@ -204,7 +254,8 @@ function runSingleRefresh(
 ): Promise<RefreshSession> {
   const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
   if (locks?.request) {
-    return locks.request("hrtodo-auth-refresh", task);
+    // Типы DOM не разворачивают Promise из callback, сам LockManager — разворачивает.
+    return locks.request("hrtodo-auth-refresh", task).then((session) => session);
   }
   return task();
 }
@@ -242,7 +293,7 @@ async function performRefresh(force: boolean): Promise<RefreshSession> {
     }
 
     try {
-      return await requestRefresh(seenExpiresAt);
+      return await requestRefresh(seenExpiresAt, true);
     } finally {
       if (locked) releaseLock();
     }
@@ -269,8 +320,28 @@ export function refreshSession(options?: { force?: boolean }): Promise<RefreshSe
   return refreshInFlight;
 }
 
+/** Если срок уже близко или прошёл — один refresh. Иначе держим точный таймер. */
+function ensureFreshSession(): void {
+  if (sessionExpired || explicitLogout) return;
+
+  const stored = readStored();
+  if (!stored) return;
+
+  const wait = msUntilRefresh(stored.expires_at);
+  if (wait == null) return;
+
+  if (wait <= 0) {
+    void refreshSession().catch(() => {
+      // 401 уже переводит на вход. Сетевой сбой повторит следующий пульс.
+    });
+    return;
+  }
+
+  if (refreshTimer == null) scheduleRefresh(stored.expires_at);
+}
+
 function onStorage(event: StorageEvent): void {
-  if (event.key !== EXPIRY_KEY) return;
+  if (event.key !== EXPIRY_KEY || explicitLogout) return;
 
   if (!event.newValue) {
     expireClientSession();
@@ -279,15 +350,35 @@ function onStorage(event: StorageEvent): void {
 
   try {
     const parsed = JSON.parse(event.newValue) as RefreshSession;
+    const wasExpired = sessionExpired;
     sessionExpired = false;
     scheduleRefresh(parsed.expires_at);
+    if (wasExpired) notifyRestored();
   } catch {
     /* чужая вкладка записала неJSON — игнорируем */
   }
 }
 
 if (typeof window !== "undefined") {
-  const stored = readStored();
-  if (stored) scheduleRefresh(stored.expires_at);
+  const onVisible = () => {
+    if (document.visibilityState === "visible") ensureFreshSession();
+  };
+
+  ensureFreshSession();
+  const heartbeat = window.setInterval(ensureFreshSession, HEARTBEAT_MS);
+  document.addEventListener("visibilitychange", onVisible);
+  window.addEventListener("focus", ensureFreshSession);
+  window.addEventListener("pageshow", ensureFreshSession);
   window.addEventListener("storage", onStorage);
+
+  if (import.meta.hot) {
+    import.meta.hot.dispose(() => {
+      window.clearInterval(heartbeat);
+      if (refreshTimer != null) window.clearTimeout(refreshTimer);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", ensureFreshSession);
+      window.removeEventListener("pageshow", ensureFreshSession);
+      window.removeEventListener("storage", onStorage);
+    });
+  }
 }

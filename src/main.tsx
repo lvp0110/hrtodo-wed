@@ -4,7 +4,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { getRouter } from "./router";
 import { authQueries } from "#/services/api";
-import { subscribeAuthExpired } from "#/services/authRefresh";
+import { subscribeAuthExpired, subscribeAuthRestored } from "#/services/authRefresh";
 import "./styles.css";
 
 const queryClient = new QueryClient({
@@ -23,6 +23,11 @@ const queryClient = new QueryClient({
 // Refresh не удался или повторный запрос снова 401 — показываем вход.
 subscribeAuthExpired(() => {
   queryClient.setQueryData(authQueries.session.queryKey, null);
+});
+
+// Параллельный refresh уже выписал новую cookie — возвращаем сессию без повторного логина.
+subscribeAuthRestored(() => {
+  void queryClient.invalidateQueries({ queryKey: authQueries.session.queryKey });
 });
 
 // Прогрев справочников выполняется в __root.tsx после успешной авторизации —
