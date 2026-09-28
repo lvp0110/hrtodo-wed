@@ -8,7 +8,7 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "#/components/AppShell";
 import { LoginForm } from "#/components/LoginForm";
-import { authQueries, dictQueries, employeeQueries, orgNodesApi } from "#/services/api";
+import { authQueries, dictQueries, employeeReportQuery, orgNodesApi } from "#/services/api";
 
 function RootShell() {
   const queryClient = useQueryClient();
@@ -34,7 +34,8 @@ function RootShell() {
     queryClient.prefetchQuery(dictQueries.cities);
     queryClient.prefetchQuery(dictQueries.countries);
     queryClient.prefetchQuery(dictQueries.employees);
-    queryClient.prefetchQuery(employeeQueries.report);
+    queryClient.prefetchQuery(employeeReportQuery("active"));
+    queryClient.prefetchQuery(employeeReportQuery("archived"));
     queryClient.prefetchQuery(dictQueries.nodeTypes);
     queryClient.prefetchQuery({
       queryKey: ["orgTree"],

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Archive, Pencil, Trash2 } from "lucide-react";
 
 export interface DictColumn<T> {
   key: string;
@@ -18,6 +18,11 @@ interface DictTableProps<T> {
   onRowClick?: (row: T) => void;
   onEdit?: (row: T) => void;
   onDelete?: (row: T) => void;
+  /** Если задан, кнопка удаления показывается только для строк, где предикат истинен. */
+  showDelete?: (row: T) => boolean;
+  onArchive?: (row: T) => void;
+  /** Если задан, кнопка архива показывается только для строк, где предикат истинен. */
+  showArchive?: (row: T) => boolean;
   rowHoverVariant?: "background" | "border";
   isLoading?: boolean;
   isError?: boolean;
@@ -41,12 +46,21 @@ function RowActions<T>({
   row,
   onEdit,
   onDelete,
+  showDelete,
+  onArchive,
+  showArchive,
 }: {
   row: T;
   onEdit?: (row: T) => void;
   onDelete?: (row: T) => void;
+  showDelete?: (row: T) => boolean;
+  onArchive?: (row: T) => void;
+  showArchive?: (row: T) => boolean;
 }) {
-  if (!onEdit && !onDelete) return null;
+  const deleteVisible = Boolean(onDelete) && (showDelete ? showDelete(row) : true);
+  const archiveVisible = Boolean(onArchive) && (showArchive ? showArchive(row) : true);
+
+  if (!onEdit && !deleteVisible && !archiveVisible) return null;
 
   return (
     <div className="inline-flex shrink-0 items-center gap-1">
@@ -60,10 +74,21 @@ function RowActions<T>({
           <Pencil size={15} />
         </button>
       )}
-      {onDelete && (
+      {archiveVisible && (
         <button
           type="button"
-          onClick={() => onDelete(row)}
+          onClick={() => onArchive?.(row)}
+          aria-label="Архивировать"
+          title="Архивировать"
+          className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+        >
+          <Archive size={15} />
+        </button>
+      )}
+      {deleteVisible && (
+        <button
+          type="button"
+          onClick={() => onDelete?.(row)}
           aria-label="Удалить"
           className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
         >
@@ -81,6 +106,9 @@ export function DictTable<T>({
   onRowClick,
   onEdit,
   onDelete,
+  showDelete,
+  onArchive,
+  showArchive,
   rowHoverVariant = "background",
   isLoading = false,
   isError = false,
@@ -92,7 +120,7 @@ export function DictTable<T>({
   wrapperClassName,
   renderMobileCard,
 }: DictTableProps<T>) {
-  const showActions = Boolean(onEdit || onDelete);
+  const showActions = Boolean(onEdit || onDelete || onArchive);
   const showMobileCards = Boolean(renderMobileCard);
 
   return (
@@ -131,7 +159,14 @@ export function DictTable<T>({
               rows.map((row) => (
                 <div key={rowKey(row)}>
                   {renderMobileCard!(row, (
-                    <RowActions row={row} onEdit={onEdit} onDelete={onDelete} />
+                    <RowActions
+                      row={row}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                      showDelete={showDelete}
+                      onArchive={onArchive}
+                      showArchive={showArchive}
+                    />
                   ))}
                 </div>
               ))}
@@ -230,6 +265,9 @@ export function DictTable<T>({
                       row={row}
                       onEdit={onEdit}
                       onDelete={onDelete}
+                      showDelete={showDelete}
+                      onArchive={onArchive}
+                      showArchive={showArchive}
                     />
                   </td>
                 )}

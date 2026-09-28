@@ -14,6 +14,7 @@ import type {
   CountryReq,
   EmployeeCreateReq,
   EmployeeReportItem,
+  EmployeeStatus,
   EmployeeUpdateReq,
   Employer,
   ExportRequest,
@@ -205,17 +206,29 @@ export const vacanciesApi = {
 };
 
 export const employeesApi = {
-  /** Список сотрудников с должностями — GET /employees/report */
-  getReport: (): Promise<ApiResponse<EmployeeReportItem[]>> =>
-    request("/employees/report"),
+  /**
+   * Список сотрудников с должностями — GET /employees/report.
+   * Без status — все, status=active|archived — фильтр на бэке.
+   */
+  getReport: (
+    status?: EmployeeStatus,
+  ): Promise<ApiResponse<EmployeeReportItem[]>> =>
+    request(status ? `/employees/report?status=${status}` : "/employees/report"),
 
   /** Создать сотрудника — POST /employees */
   create: (body: EmployeeCreateReq): Promise<ApiResponse<Employer>> =>
     request("/employees", { method: "POST", body }),
 
-  /** Обновить сотрудника — PUT /employees/{id} */
+  /** Обновить сотрудника — PUT /employees/{id}. Поле status не передаётся. */
   update: (id: number, body: EmployeeUpdateReq): Promise<ApiResponse<Employer>> =>
     request(`/employees/${id}`, { method: "PUT", body }),
+
+  /**
+   * Архивировать — POST /employees/{id}/archive, ответ 204.
+   * Бэк ставит status=archived и снимает сотрудника со всех позиций.
+   */
+  archive: (id: number): Promise<void> =>
+    request(`/employees/${id}/archive`, { method: "POST" }),
 
   /** Удалить сотрудника — DELETE /employees/{id} */
   delete: (id: number): Promise<void> =>
@@ -269,13 +282,18 @@ export const exportApi = {
   },
 };
 
-export const employeeQueries = {
-  report: queryOptions({
-    queryKey: ["employees", "report"] as const,
-    queryFn: () => employeesApi.getReport().then((res) => res.data ?? []),
+export function employeeReportQuery(status?: EmployeeStatus) {
+  return queryOptions({
+    queryKey: ["employees", "report", status ?? "all"] as const,
+    queryFn: () => employeesApi.getReport(status).then((res) => res.data ?? []),
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 10,
-  }),
+  });
+}
+
+export const employeeQueries = {
+  /** Отчёт без фильтра status — все сотрудники. */
+  report: employeeReportQuery(),
 };
 
 export const dictApi = {
@@ -288,7 +306,7 @@ export const dictApi = {
   /** Справочник стран */
   getCountries: (): Promise<ApiResponse<Country[]>> => request("/dict/countries"),
 
-  /** Справочник сотрудников */
+  /** Справочник сотрудников — только active, архивных бэк не отдаёт. */
   getEmployees: (): Promise<ApiResponse<Employer[]>> => request("/dict/employees"),
 
   /** Справочник типов организационных узлов */

@@ -60,6 +60,7 @@ export function toEmployeeCreateReq(
   };
 }
 
+/** status намеренно не входит в тело: архив меняется только через POST /archive. */
 export function toEmployeeUpdateReq(
   employee: Employer,
   fields: EmployeeEditFields,

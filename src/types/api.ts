@@ -39,6 +39,9 @@ export interface OrgNodeTypeReq {
   name: string;
 }
 
+/** active попадает в /dict/employees и может быть назначен; archived снят с позиций. */
+export type EmployeeStatus = "active" | "archived";
+
 export interface Employer {
   id: number;
   first_name: string;
@@ -54,6 +57,7 @@ export interface Employer {
   city_id?: number | null;
   office?: (Entity & { id?: number }) | null;
   office_id?: number | null;
+  status?: EmployeeStatus;
 }
 
 export interface EmployeeCreateReq {
@@ -68,6 +72,10 @@ export interface EmployeeCreateReq {
   gender?: string;
 }
 
+/**
+ * Обычное редактирование не меняет status.
+ * Архив — только POST /employees/{id}/archive.
+ */
 export interface EmployeeUpdateReq {
   first_name: string;
   second_name: string;
