@@ -44,6 +44,25 @@ export const Route = createFileRoute("/structure")({
 /** Сколько уровней дерева раскрыто по умолчанию. */
 const DEFAULT_EXPANDED_LEVELS = 3;
 
+/** Размер названия узла уменьшается с уровнем подчинения. */
+const NODE_TITLE_CLASS = [
+  "text-[22px] font-normal leading-7",
+  "text-[17px] font-normal leading-6",
+  "text-[15px] font-normal leading-5",
+  "text-[13px] font-normal leading-5",
+  "text-xs font-normal leading-5",
+] as const;
+
+function nodeTitleClass(depth: number): string {
+  const index = Math.min(Math.max(depth, 0), NODE_TITLE_CLASS.length - 1);
+  return NODE_TITLE_CLASS[index];
+}
+
+/** Внутренний отступ строки и ширина галочки. Вложенный блок начинается у галочки родителя. */
+const NODE_ROW_PAD = 4;
+const NODE_CHEVRON = 16;
+const NODE_INDENT = NODE_ROW_PAD + NODE_CHEVRON;
+
 function upsertVacancy(tree: OrgNode[], vacancy: Vacancy): OrgNode[] {
   return tree.map((node) => {
     if (node.id === vacancy.node_id) {
@@ -76,8 +95,12 @@ function replaceNodeType(
   });
 }
 
+function isOpenVacancy(vacancy: Vacancy): boolean {
+  return !vacancy.employer?.id;
+}
+
 function employerName(v: Vacancy): string {
-  if (!v.employer?.id) return "Вакантно";
+  if (isOpenVacancy(v)) return "Вакантно";
   const { first_name, second_name, surname } = v.employer;
   return [surname, first_name, second_name].filter(Boolean).join(" ");
 }
@@ -137,6 +160,34 @@ function emptyVacancyTextMatches(vacancy: EmptyVacancy, query: string): boolean 
     textIncludes(vacancy.city?.name, query) ||
     (query.length >= 4 && textIncludes("Вакантно", query))
   );
+}
+
+function nodeHasOpenVacancy(node: OrgNode): boolean {
+  return (
+    (node.vacancies ?? []).some(isOpenVacancy) ||
+    (node.empty_vacancy?.length ?? 0) > 0
+  );
+}
+
+/** Оставляет отделы с вакансиями и их родителей, чтобы ветка осталась на месте. */
+function filterDepartmentsWithVacancies(nodes: OrgNode[]): {
+  nodes: OrgNode[];
+  expandIds: Set<number>;
+} {
+  const expandIds = new Set<number>();
+
+  const walk = (list: OrgNode[]): OrgNode[] => {
+    const result: OrgNode[] = [];
+    for (const node of list) {
+      const children = walk(node.children ?? []);
+      if (!nodeHasOpenVacancy(node) && children.length === 0) continue;
+      expandIds.add(node.id);
+      result.push({ ...node, children });
+    }
+    return result;
+  };
+
+  return { nodes: walk(nodes), expandIds };
 }
 
 /** Оставляет ветки с совпадением и id узлов, которые нужно раскрыть, чтобы совпадения были видны. */
@@ -238,6 +289,7 @@ interface TreeContext {
   onToggleTypeMenu: (id: number) => void;
   onCloseTypeMenu: () => void;
   onChangeType: (node: OrgNode, typeCode: string) => void;
+  showVacancies: boolean;
 }
 
 function VacancyRow({
@@ -476,14 +528,14 @@ function TreeNode({
           e.stopPropagation();
           if (canAccept) ctx.onDrop(node.id);
         }}
-        className={`group flex select-none items-center gap-2 rounded-md border border-solid border-[#7198bb] py-2 pr-3 transition-colors ${
+        className={`group flex select-none items-center gap-2 rounded-md border border-solid border-[#7198bb] py-2 pr-3 pl-1 transition-colors ${
           canAccept ? "cursor-copy" : "cursor-pointer"
         } ${isDragging ? "opacity-40" : ""} ${
           isDropTarget
             ? "bg-blue-50 ring-2 ring-blue-400 dark:bg-blue-500/10"
             : "hover:bg-gray-100 dark:hover:bg-gray-800"
         }`}
-        style={{ paddingLeft: depth * 20 + 4 }}
+        style={{ marginLeft: depth * NODE_INDENT }}
       >
         <span
           data-node-toggle
@@ -498,7 +550,9 @@ function TreeNode({
           />
         </span>
         <NodeTypeControl node={node} ctx={ctx} />
-        <span className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+        <span
+          className={`truncate text-gray-900 dark:text-gray-100 ${nodeTitleClass(depth)}`}
+        >
           {node.name}
         </span>
         <div className="ml-auto flex shrink-0 items-center gap-1">
@@ -524,19 +578,22 @@ function TreeNode({
 
       {isOpen && (
         <div>
+          {(node.vacancies ?? [])
+            .filter((vacancy) => ctx.showVacancies || !isOpenVacancy(vacancy))
+            .map((v, i) => (
+              <VacancyRow
+                key={`v-${v.id}-${i}`}
+                vacancy={v}
+                depth={depth + 1}
+                ctx={ctx}
+              />
+            ))}
+          {ctx.showVacancies &&
+            (node.empty_vacancy ?? []).map((v, i) => (
+              <EmptyVacancyRow key={`e-${i}`} vacancy={v} depth={depth + 1} />
+            ))}
           {(node.children ?? []).map((child) => (
             <TreeNode key={child.id} node={child} depth={depth + 1} ctx={ctx} />
-          ))}
-          {(node.vacancies ?? []).map((v, i) => (
-            <VacancyRow
-              key={`v-${v.id}-${i}`}
-              vacancy={v}
-              depth={depth + 1}
-              ctx={ctx}
-            />
-          ))}
-          {(node.empty_vacancy ?? []).map((v, i) => (
-            <EmptyVacancyRow key={`e-${i}`} vacancy={v} depth={depth + 1} />
           ))}
           <div
             className="flex items-center gap-4"
@@ -628,6 +685,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
     return acc;
   });
   const [searchQuery, setSearchQuery] = useState("");
+  const [vacancyFilter, setVacancyFilter] = useState(false);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dropTargetId, setDropTargetId] = useState<number | null>(null);
   const pickRef = useRef<{ id: number; x: number; y: number } | null>(null);
@@ -644,17 +702,21 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
     return acc;
   }, [tree]);
 
-  const filteredTree = useMemo(
-    () => filterStructureTree(tree, searchQuery),
-    [tree, searchQuery],
-  );
+  const filteredTree = useMemo(() => {
+    const base = vacancyFilter ? filterDepartmentsWithVacancies(tree) : null;
+    const searched = filterStructureTree(base?.nodes ?? tree, searchQuery);
+    if (!base) return searched;
+    const expandIds = new Set(base.expandIds);
+    for (const id of searched.expandIds) expandIds.add(id);
+    return { nodes: searched.nodes, expandIds };
+  }, [tree, searchQuery, vacancyFilter]);
 
   const effectiveExpanded = useMemo(() => {
-    if (!searchQuery.trim()) return expanded;
+    if (!searchQuery.trim() && !vacancyFilter) return expanded;
     const next = new Set(expanded);
     for (const id of filteredTree.expandIds) next.add(id);
     return next;
-  }, [expanded, filteredTree.expandIds, searchQuery]);
+  }, [expanded, filteredTree.expandIds, searchQuery, vacancyFilter]);
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["orgTree"] });
@@ -892,6 +954,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
       }
       changeTypeMutation.mutate({ node, typeCode });
     },
+    showVacancies: vacancyFilter,
   };
 
   const heldNode =
@@ -907,6 +970,18 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
           наведению на строку.
         </p>
         <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            aria-pressed={vacancyFilter}
+            onClick={() => setVacancyFilter((on) => !on)}
+            className={`rounded-md border px-3 py-1.5 text-sm text-amber-500 transition-colors ${
+              vacancyFilter
+                ? "border-amber-500 bg-amber-500/10"
+                : "border-amber-500/40 hover:bg-amber-500/10"
+            }`}
+          >
+            Вакансии
+          </button>
           <button
             type="button"
             onClick={() => setExpanded(new Set(allIds))}
@@ -943,7 +1018,9 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
         <div className="max-w-3xl min-w-0 flex-1 rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900">
           {filteredTree.nodes.length === 0 ? (
             <p className="px-3 py-2 text-sm text-gray-400 dark:text-gray-500">
-              Ничего не найдено
+              {vacancyFilter && !searchQuery.trim()
+                ? "Нет отделов с вакансиями"
+                : "Ничего не найдено"}
             </p>
           ) : (
             filteredTree.nodes.map((node) => (
