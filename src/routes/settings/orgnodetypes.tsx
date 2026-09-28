@@ -4,7 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { Plus } from "lucide-react";
 import { dictQueries, orgNodeTypesApi } from "#/services/api";
+import { ApiErrorModal } from "#/components/ApiErrorModal";
 import { DictTable } from "#/components/settings/DictTable";
+import { formatApiError } from "#/lib/apiError";
 import {
   DictFormModal,
   Field,
@@ -85,7 +87,7 @@ function OrgNodeTypesPage() {
         }}
         isLoading={nodeTypesQuery.isPending}
         isError={nodeTypesQuery.isError}
-        errorMessage={nodeTypesQuery.error?.message}
+        errorMessage={formatApiError(nodeTypesQuery.error)}
       />
 
       {form && (
@@ -96,11 +98,9 @@ function OrgNodeTypesPage() {
               ? createMutation.isPending
               : updateMutation.isPending
           }
-          error={
-            (form.mode === "create"
-              ? createMutation.error?.message
-              : updateMutation.error?.message) ?? null
-          }
+          error={formatApiError(
+            form.mode === "create" ? createMutation.error : updateMutation.error,
+          )}
           onClose={() => {
             createMutation.reset();
             updateMutation.reset();
@@ -113,6 +113,13 @@ function OrgNodeTypesPage() {
               updateMutation.mutate({ id: form.nodeType.id, body: data });
             }
           }}
+        />
+      )}
+
+      {deleteMutation.isError && (
+        <ApiErrorModal
+          error={deleteMutation.error}
+          onClose={() => deleteMutation.reset()}
         />
       )}
     </>

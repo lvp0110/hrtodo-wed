@@ -1,5 +1,10 @@
 import type { OrgNode } from "#/types/api";
 
+export {
+  NODE_POSITION_SLOT_EXISTS_MESSAGE,
+  formatVacancyError,
+} from "#/lib/apiError";
+
 type VacancyConflict = {
   vacancyId: number;
   deptName: string;
@@ -84,71 +89,3 @@ export function findExistingPositionSlot(
   return walk(nodes);
 }
 
-export const NODE_POSITION_SLOT_EXISTS_MESSAGE =
-  "В одном отделе уже есть слот на эту должность (в т.ч. строка «Вакантно»). Бэкенд не позволяет второй слот с той же должностью в том же отделе — город и офис не делают слот уникальным. Удалите старую вакансию, выберите другой отдел/должность или измените город/офис у существующей.";
-
-const KNOWN_UNIQUE_CONSTRAINTS: Record<string, string> = {
-  ux_node_position_employee_notnull:
-    "Этот сотрудник уже назначен на такую же должность в выбранном отделе. Освободите другую вакансию или выберите другого сотрудника.",
-  node_position_slots_pkey: NODE_POSITION_SLOT_EXISTS_MESSAGE,
-};
-
-/** Имя constraint из типичного текста pq/Postgres: ... constraint "name" ... */
-function extractUniqueConstraintName(message: string): string | null {
-  const quoted = message.match(
-    /unique constraint ["'`]([^"'`]+)["'`]/i,
-  );
-  if (quoted?.[1]) return quoted[1];
-
-  const bare = message.match(/\b(ux_[a-z0-9_]+)\b/i);
-  return bare?.[1] ?? null;
-}
-
-type VacancyErrorInput =
-  | string
-  | { message?: string | null; code?: number }
-  | null
-  | undefined;
-
-function isArchivedAssignmentConflict(message: string, code?: number): boolean {
-  if (/archiv|архив|not active/i.test(message)) return true;
-  if (code !== 409) return false;
-
-  const normalized = message.trim().toLowerCase();
-  return (
-    normalized === "" ||
-    normalized === "conflict" ||
-    normalized === "409 conflict"
-  );
-}
-
-export function formatVacancyError(error: VacancyErrorInput): string | null {
-  if (!error) return null;
-
-  const message = typeof error === "string" ? error : (error.message ?? "");
-  const code = typeof error === "object" ? error.code : undefined;
-  if (!message && code == null) return null;
-
-  if (message.includes("missing auth cookie")) {
-    return "Сессия истекла или вы не авторизованы. Обновите страницу и войдите снова.";
-  }
-
-  if (
-    message.includes("assigned to") &&
-    message.toLowerCase().includes("vacancy")
-  ) {
-    return "Нельзя удалить сотрудника, пока он назначен на вакансию. Сначала освободите вакансию.";
-  }
-
-  const constraint = extractUniqueConstraintName(message);
-  if (constraint && KNOWN_UNIQUE_CONSTRAINTS[constraint]) {
-    return KNOWN_UNIQUE_CONSTRAINTS[constraint];
-  }
-
-  if (isArchivedAssignmentConflict(message, code)) {
-    return "Архивного сотрудника нельзя назначить на позицию.";
-  }
-
-  // Прочие unique / сырые ошибки бэка — без подмены, чтобы была видна точная причина.
-  return message || null;
-}

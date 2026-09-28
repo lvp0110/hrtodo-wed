@@ -16,6 +16,7 @@ import {
   orgNodesApi,
   vacanciesApi,
 } from "#/services/api";
+import { ApiErrorModal } from "#/components/ApiErrorModal";
 import {
   AssignEmployeeModal,
   type AssignEmployeeFormFields,
@@ -53,6 +54,7 @@ import {
   formatVacancyError,
   NODE_POSITION_SLOT_EXISTS_MESSAGE,
 } from "#/lib/vacancyValidation";
+import { formatApiError } from "#/lib/apiError";
 import { findOrgNodeByName } from "#/lib/orgTree";
 
 /** Город по коду офиса — в дереве вакансий бэк отдаёт только office, без city. */
@@ -1302,11 +1304,7 @@ function EmployeesPage() {
             type="button"
             onClick={() => exportMutation.mutate()}
             disabled={exportMutation.isPending}
-            title={
-              exportMutation.isError
-                ? exportMutation.error.message
-                : "Выгрузить в Excel"
-            }
+            title="Выгрузить в Excel"
             aria-label="Выгрузить в Excel"
             className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-emerald-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-emerald-400 dark:hover:bg-gray-700"
           >
@@ -1414,10 +1412,21 @@ function EmployeesPage() {
         </div>
       </div>
 
-      {archiveEmployeeMutation.isError && (
-        <p className="mb-3 shrink-0 text-sm text-red-500 dark:text-red-400">
-          {archiveEmployeeMutation.error.message}
-        </p>
+      {(archiveEmployeeMutation.isError ||
+        deleteVacancyMutation.isError ||
+        exportMutation.isError) && (
+        <ApiErrorModal
+          error={
+            archiveEmployeeMutation.error ??
+            deleteVacancyMutation.error ??
+            exportMutation.error
+          }
+          onClose={() => {
+            archiveEmployeeMutation.reset();
+            deleteVacancyMutation.reset();
+            exportMutation.reset();
+          }}
+        />
       )}
 
       <div className="min-h-0 flex-1 overflow-hidden">
@@ -1696,7 +1705,7 @@ function EmployeesPage() {
         rowKey={(r) => r.id}
         isLoading={reportQuery.isPending}
         isError={reportQuery.isError}
-        errorMessage={reportQuery.error?.message}
+        errorMessage={formatApiError(reportQuery.error)}
         emptyMessage={hasFilters ? "Ничего не найдено" : "Записей пока нет"}
         showDelete={(row) => row.kind === "vacancy"}
         onDelete={(row) => {
@@ -1756,7 +1765,7 @@ function EmployeesPage() {
             setSelectedEmployee(null);
           }}
           isPending={updateEmployeeMutation.isPending}
-          error={updateEmployeeMutation.error?.message ?? null}
+          error={formatApiError(updateEmployeeMutation.error)}
           onSubmit={(fields) => {
             updateEmployeeMutation.mutate({
               id: selectedEmployee.id,

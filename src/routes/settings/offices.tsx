@@ -4,7 +4,9 @@ import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/rea
 import { useForm } from "react-hook-form";
 import { Plus } from "lucide-react";
 import { dictQueries, officesApi } from "#/services/api";
+import { ApiErrorModal } from "#/components/ApiErrorModal";
 import { DictTable } from "#/components/settings/DictTable";
+import { formatApiError } from "#/lib/apiError";
 import {
   DictFormModal,
   Field,
@@ -82,9 +84,10 @@ function OfficesPage() {
       </div>
 
       {deleteMutation.isError && (
-        <p className="mb-3 text-sm text-red-500 dark:text-red-400">
-          {deleteMutation.error.message}
-        </p>
+        <ApiErrorModal
+          error={deleteMutation.error}
+          onClose={() => deleteMutation.reset()}
+        />
       )}
 
       <DictTable<Office>
@@ -111,9 +114,9 @@ function OfficesPage() {
         }}
         isLoading={citiesQuery.isPending || officesPending}
         isError={citiesQuery.isError || Boolean(officesError)}
-        errorMessage={
-          citiesQuery.error?.message ?? officesError?.error?.message
-        }
+        errorMessage={formatApiError(
+          citiesQuery.error ?? officesError?.error,
+        )}
       />
 
       {form && (
@@ -126,11 +129,9 @@ function OfficesPage() {
               ? createMutation.isPending
               : updateMutation.isPending
           }
-          error={
-            (form.mode === "create"
-              ? createMutation.error?.message
-              : updateMutation.error?.message) ?? null
-          }
+          error={formatApiError(
+            form.mode === "create" ? createMutation.error : updateMutation.error,
+          )}
           onClose={() => {
             createMutation.reset();
             updateMutation.reset();

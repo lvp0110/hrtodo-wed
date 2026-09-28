@@ -4,7 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { Plus } from "lucide-react";
 import { countriesApi, dictQueries } from "#/services/api";
+import { ApiErrorModal } from "#/components/ApiErrorModal";
 import { DictTable } from "#/components/settings/DictTable";
+import { formatApiError } from "#/lib/apiError";
 import {
   DictFormModal,
   Field,
@@ -90,7 +92,7 @@ function CountriesPage() {
         }}
         isLoading={countriesQuery.isPending}
         isError={countriesQuery.isError}
-        errorMessage={countriesQuery.error?.message}
+        errorMessage={formatApiError(countriesQuery.error)}
       />
 
       {form && (
@@ -101,11 +103,9 @@ function CountriesPage() {
               ? createMutation.isPending
               : updateMutation.isPending
           }
-          error={
-            (form.mode === "create"
-              ? createMutation.error?.message
-              : updateMutation.error?.message) ?? null
-          }
+          error={formatApiError(
+            form.mode === "create" ? createMutation.error : updateMutation.error,
+          )}
           onClose={() => {
             createMutation.reset();
             updateMutation.reset();
@@ -118,6 +118,13 @@ function CountriesPage() {
               updateMutation.mutate({ id: form.country.id, body: data });
             }
           }}
+        />
+      )}
+
+      {deleteMutation.isError && (
+        <ApiErrorModal
+          error={deleteMutation.error}
+          onClose={() => deleteMutation.reset()}
         />
       )}
     </>

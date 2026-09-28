@@ -4,7 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { Plus } from "lucide-react";
 import { citiesApi, dictQueries } from "#/services/api";
+import { ApiErrorModal } from "#/components/ApiErrorModal";
 import { DictTable } from "#/components/settings/DictTable";
+import { formatApiError } from "#/lib/apiError";
 import {
   DictFormModal,
   Field,
@@ -89,7 +91,7 @@ function CitiesPage() {
         }}
         isLoading={citiesQuery.isPending}
         isError={citiesQuery.isError}
-        errorMessage={citiesQuery.error?.message}
+        errorMessage={formatApiError(citiesQuery.error)}
       />
 
       {form && (
@@ -102,11 +104,9 @@ function CitiesPage() {
               ? createMutation.isPending
               : updateMutation.isPending
           }
-          error={
-            (form.mode === "create"
-              ? createMutation.error?.message
-              : updateMutation.error?.message) ?? null
-          }
+          error={formatApiError(
+            form.mode === "create" ? createMutation.error : updateMutation.error,
+          )}
           onClose={() => {
             createMutation.reset();
             updateMutation.reset();
@@ -119,6 +119,13 @@ function CitiesPage() {
               updateMutation.mutate({ id: form.city.id, body: data });
             }
           }}
+        />
+      )}
+
+      {deleteMutation.isError && (
+        <ApiErrorModal
+          error={deleteMutation.error}
+          onClose={() => deleteMutation.reset()}
         />
       )}
     </>

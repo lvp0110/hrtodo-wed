@@ -5,6 +5,7 @@ import "@xyflow/react/dist/style.css";
 
 import { orgNodesApi, vacanciesApi } from "#/services/api";
 import { buildLayout } from "#/lib/orgTreeLayout";
+import { formatApiError } from "#/lib/apiError";
 import { formatVacancyError } from "#/lib/vacancyValidation";
 import { toVacancyUpdateReq } from "#/lib/vacancyUpdate";
 import { OrgNodeCard } from "#/components/OrgNodeCard";
@@ -149,7 +150,7 @@ export function OrgChart() {
   if (isError) {
     return (
       <div className="flex h-full items-center justify-center text-red-500">
-        Ошибка: {error.message}
+        Ошибка: {formatApiError(error)}
       </div>
     );
   }
@@ -196,11 +197,9 @@ export function OrgChart() {
           isPending={
             createNodeMutation.isPending || updateNodeMutation.isPending
           }
-          error={
-            createNodeMutation.error?.message ??
-            updateNodeMutation.error?.message ??
-            null
-          }
+          error={formatApiError(
+            createNodeMutation.error ?? updateNodeMutation.error,
+          )}
           onSubmit={(data) => {
             if (deptModal.mode === "create" && data.moveNodeId) {
               createNodeMutation.reset();
@@ -254,7 +253,7 @@ export function OrgChart() {
             setAddVacancyModal(null);
           }}
           isPending={createVacancyMutation.isPending}
-          error={createVacancyMutation.error?.message ?? null}
+          error={formatApiError(createVacancyMutation.error)}
           onSubmit={(data) => {
             createVacancyMutation.mutate({
               node_id: Number(addVacancyModal.deptId),

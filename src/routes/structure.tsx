@@ -19,9 +19,11 @@ import {
 } from "lucide-react";
 import { selectableOrgNodeTypes } from "#/lib/orgNodeTypes";
 import { dictQueries, orgNodesApi, vacanciesApi } from "#/services/api";
+import { ApiErrorModal } from "#/components/ApiErrorModal";
 import { CreateVacancyModal } from "#/components/CreateVacancyModal";
 import { DeptModal } from "#/components/DeptModal";
 import { dictInputClass } from "#/components/settings/DictFormModal";
+import { formatApiError } from "#/lib/apiError";
 import type {
   AddVacancyState,
   DeptFields,
@@ -736,28 +738,16 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
       setDeptModal(null);
       invalidate();
     },
-    onError: (err) => {
-      if (deptModal) return;
-      window.alert(err instanceof Error ? err.message : "Не удалось перенести");
-    },
   });
 
   const deleteNodeMutation = useMutation({
     mutationFn: (id: number) => orgNodesApi.deleteNode(id),
     onSuccess: invalidate,
-    onError: (err) =>
-      window.alert(
-        err instanceof Error ? err.message : "Не удалось удалить узел",
-      ),
   });
 
   const deleteVacancyMutation = useMutation({
     mutationFn: (id: number) => vacanciesApi.delete(id),
     onSuccess: invalidate,
-    onError: (err) =>
-      window.alert(
-        err instanceof Error ? err.message : "Не удалось удалить вакансию",
-      ),
   });
 
   const createNodeMutation = useMutation({
@@ -786,8 +776,6 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
       );
       invalidate();
     },
-    onError: (err) =>
-      window.alert(err instanceof Error ? err.message : "Не удалось сменить тип"),
   });
 
   const createVacancyMutation = useMutation({
@@ -1056,11 +1044,9 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
           isPending={
             createNodeMutation.isPending || moveMutation.isPending
           }
-          error={
-            createNodeMutation.error?.message ??
-            moveMutation.error?.message ??
-            null
-          }
+          error={formatApiError(
+            createNodeMutation.error ?? moveMutation.error,
+          )}
           onSubmit={(data: DeptFields) => {
             if (data.moveNodeId) {
               const node = findNodeById(tree, data.moveNodeId);
@@ -1091,7 +1077,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
             setAddVacancy(null);
           }}
           isPending={createVacancyMutation.isPending}
-          error={createVacancyMutation.error?.message ?? null}
+          error={formatApiError(createVacancyMutation.error)}
           onSubmit={(data: VacancyFormFields) =>
             createVacancyMutation.mutate({
               node_id: Number(addVacancy.deptId),
@@ -1104,6 +1090,26 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
               job_offer_link: data.jobOffer,
             })
           }
+        />
+      )}
+
+      {(deleteNodeMutation.isError ||
+        deleteVacancyMutation.isError ||
+        changeTypeMutation.isError ||
+        (moveMutation.isError && !deptModal)) && (
+        <ApiErrorModal
+          error={
+            deleteNodeMutation.error ??
+            deleteVacancyMutation.error ??
+            changeTypeMutation.error ??
+            moveMutation.error
+          }
+          onClose={() => {
+            deleteNodeMutation.reset();
+            deleteVacancyMutation.reset();
+            changeTypeMutation.reset();
+            moveMutation.reset();
+          }}
         />
       )}
     </>
@@ -1128,7 +1134,7 @@ function StructurePage() {
         <p className="text-sm text-gray-500 dark:text-gray-400">Загрузка…</p>
       ) : treeQuery.isError ? (
         <p className="text-sm text-red-500">
-          {treeQuery.error?.message ?? "Не удалось загрузить структуру"}
+          {formatApiError(treeQuery.error) ?? "Не удалось загрузить структуру"}
         </p>
       ) : tree.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">
