@@ -58,9 +58,16 @@ export function EmployeeInfoModal({
     >
       <div className="mx-4 w-full max-w-md overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900">
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-            Редактирование сотрудника
-          </h2>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+              Редактирование сотрудника
+            </h2>
+            {employee.status === "archived" && (
+              <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                Архивный. Статус не меняется при сохранении.
+              </p>
+            )}
+          </div>
           <CloseButton onClick={onClose} />
         </div>
 

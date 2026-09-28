@@ -118,13 +118,18 @@ function EditVacancyForm({
 }: EditVacancyFormProps) {
   const [localError, setLocalError] = useState<string | null>(null);
   const employeeOptions = useMemo(() => {
-    if (!data.employer?.id) return employees;
-    const alreadyExists = employees.some((employee) => employee.id === data.employer?.id);
-    if (alreadyExists) return employees;
+    const activeEmployees = employees.filter(
+      (employee) => employee.status !== "archived",
+    );
+    if (!data.employer?.id) return activeEmployees;
+    const alreadyExists = activeEmployees.some(
+      (employee) => employee.id === data.employer?.id,
+    );
+    if (alreadyExists) return activeEmployees;
 
     const [surname = "", first_name = "", second_name = ""] = data.employer.name.split(" ");
     return [
-      ...employees,
+      ...activeEmployees,
       {
         id: data.employer.id,
         surname,

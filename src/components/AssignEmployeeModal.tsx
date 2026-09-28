@@ -116,7 +116,9 @@ export function AssignEmployeeModal({
   const dictsLoading = employees.isPending || orgTree.isPending;
   const dictsError = employees.isError || orgTree.isError;
   const displayError = localError ?? error;
-  const employeeList = employees.data ?? [];
+  const employeeList = (employees.data ?? []).filter(
+    (employee) => employee.status !== "archived",
+  );
 
   return (
     <div

@@ -278,7 +278,7 @@ export function OrgChart() {
             setEditVacancyModal(null);
           }}
           isPending={updateVacancyMutation.isPending}
-          error={formatVacancyError(updateVacancyMutation.error?.message)}
+          error={formatVacancyError(updateVacancyMutation.error)}
           onSubmit={(data) => {
             updateVacancyMutation.mutate({
               id: editVacancyModal.id,

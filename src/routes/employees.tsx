@@ -9,7 +9,7 @@ import { useMemo, useState } from "react";
 import { FileSpreadsheet, Search, Star } from "lucide-react";
 import {
   dictQueries,
-  employeeQueries,
+  employeeReportQuery,
   employeesApi,
   exportApi,
   officesApi,
@@ -94,6 +94,20 @@ function fullName(e: Employer) {
   return [e.surname, e.first_name, e.second_name].filter(Boolean).join(" ");
 }
 
+function employeeNameContent(employee: Employer) {
+  const name = fullName(employee);
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      {name || <span className="text-gray-400">—</span>}
+      {employee.status === "archived" && (
+        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+          Архив
+        </span>
+      )}
+    </span>
+  );
+}
+
 function normalizeHireDateForCompare(value: string | null | undefined): string {
   if (!value?.trim()) return "";
   const parsed = new Date(value);
@@ -139,44 +153,6 @@ type EmployeesTableRow =
       org: EmployeeVacancyInfo;
       vacancy: VacancyModalData;
     };
-
-/** Все вакансии сотрудника в дереве — перед DELETE нужно снять назначение. */
-function collectVacanciesForEmployee(
-  nodes: OrgNode[],
-  employeeId: number,
-  employeeCity?: { name: string; code: string },
-): VacancyModalData[] {
-  const result: VacancyModalData[] = [];
-
-  function walk(node: OrgNode) {
-    for (const vacancy of node.vacancies) {
-      if (vacancy.employer.id !== employeeId) continue;
-      result.push({
-        id: vacancy.id,
-        nodeId: vacancy.node_id,
-        position: vacancy.position?.name ?? vacancy.position?.code ?? "",
-        positionCode: vacancy.position?.code ?? vacancy.position?.name ?? "",
-        city: vacancy.city?.name || employeeCity?.name || "",
-        cityCode: vacancy.city?.code || employeeCity?.code || "",
-        office: vacancy.office?.name ?? "",
-        officeCode: vacancy.office?.code ?? "",
-        deptName: node.name,
-        isManager: vacancy.is_manager,
-        employer: {
-          id: vacancy.employer.id,
-          name: fullName(vacancy.employer),
-          email: vacancy.employer.email,
-        },
-        jobOffer: vacancy.job_offer_link ?? "",
-        description: vacancy.position_description ?? "",
-      });
-    }
-    for (const child of node.children) walk(child);
-  }
-
-  for (const node of nodes) walk(node);
-  return result;
-}
 
 function collectEmployeeIdsInNodeAndDescendants(node: OrgNode): Set<number> {
   const ids = new Set<number>();
@@ -616,6 +592,7 @@ function buildExportRequest(
 function EmployeesPage() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<EmployeeFilters>(emptyFilters);
+  const [archiveView, setArchiveView] = useState(false);
   const [rowKindFilter, setRowKindFilter] = useState<RowKindFilter>("all");
   const [managersOnlyFilter, setManagersOnlyFilter] = useState(false);
   const [managerFilterId, setManagerFilterId] = useState<number | null>(null);
@@ -629,7 +606,9 @@ function EmployeesPage() {
     null,
   );
   const [addRowKey, setAddRowKey] = useState(0);
-  const reportQuery = useQuery(employeeQueries.report);
+  const activeReportQuery = useQuery(employeeReportQuery("active"));
+  const archivedReportQuery = useQuery(employeeReportQuery("archived"));
+  const reportQuery = archiveView ? archivedReportQuery : activeReportQuery;
   const citiesQuery = useQuery(dictQueries.cities);
   const countriesQuery = useQuery(dictQueries.countries);
   const treeQuery = useQuery({
@@ -723,30 +702,8 @@ function EmployeesPage() {
     },
   });
 
-  const deleteEmployeeMutation = useMutation({
-    mutationFn: async ({
-      employeeId,
-      vacancies,
-    }: {
-      employeeId: number;
-      vacancies: VacancyModalData[];
-    }) => {
-      // Бэк не удаляет сотрудника, пока он назначен на вакансию (404).
-      for (const vacancy of vacancies) {
-        await vacanciesApi.update(vacancy.id, {
-          node_id: vacancy.nodeId,
-          user_id: null,
-          city_code: vacancy.cityCode || undefined,
-          office_code: vacancy.officeCode || undefined,
-          position_code: vacancy.positionCode || vacancy.position,
-          position_name: vacancy.position,
-          is_manager: vacancy.isManager,
-          position_description: vacancy.description,
-          job_offer_link: vacancy.jobOffer,
-        });
-      }
-      await employeesApi.delete(employeeId);
-    },
+  const archiveEmployeeMutation = useMutation({
+    mutationFn: (employeeId: number) => employeesApi.archive(employeeId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
       queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
@@ -980,19 +937,24 @@ function EmployeesPage() {
     );
   }, [filterOptions.cities, filters.country, cityCountryByName]);
 
-  const tableRows = useMemo<EmployeesTableRow[]>(
-    () => [
-      ...employees.map((employee) => ({
-        kind: "employee" as const,
-        id: employee.id,
-        employee,
-        org: orgByEmployeeId.get(employee.id),
-        vacancy: vacancyByEmployeeId.get(employee.id),
-      })),
-      ...vacantRows,
-    ],
-    [employees, orgByEmployeeId, vacancyByEmployeeId, vacantRows],
-  );
+  const tableRows = useMemo<EmployeesTableRow[]>(() => {
+    const employeeRows = employees.map((employee) => ({
+      kind: "employee" as const,
+      id: employee.id,
+      employee,
+      org: orgByEmployeeId.get(employee.id),
+      vacancy: vacancyByEmployeeId.get(employee.id),
+    }));
+    // В архиве только архивные сотрудники: их позиции уже освобождены.
+    if (archiveView) return employeeRows;
+    return [...employeeRows, ...vacantRows];
+  }, [
+    employees,
+    orgByEmployeeId,
+    vacancyByEmployeeId,
+    vacantRows,
+    archiveView,
+  ]);
 
   const filteredRows = useMemo(() => {
     const hasTextFilters = Object.values(filters).some((value) => value.trim());
@@ -1070,11 +1032,12 @@ function EmployeesPage() {
     cityCountryByName,
   ]);
 
-  const hasFilters =
+  const hasClientFilters =
     rowKindFilter !== "all" ||
     managersOnlyFilter ||
     managerFilterId !== null ||
     Object.values(filters).some((value) => value.trim());
+  const hasFilters = hasClientFilters || archiveView;
 
   const employeeCounts = useMemo(() => {
     const total = tableRows.filter((row) => row.kind === "employee").length;
@@ -1090,6 +1053,7 @@ function EmployeesPage() {
 
   const resetAllFilters = () => {
     setFilters({ ...emptyFilters });
+    setArchiveView(false);
     setRowKindFilter("all");
     setManagersOnlyFilter(false);
     setManagerFilterId(null);
@@ -1355,24 +1319,27 @@ function EmployeesPage() {
             </span>
             <button
               type="button"
-              onClick={() =>
-                setRowKindFilter((prev) => (prev === "employee" ? "all" : "employee"))
-              }
+              onClick={() => {
+                setArchiveView(false);
+                setRowKindFilter((prev) => (prev === "employee" ? "all" : "employee"));
+              }}
               className={`inline-flex min-w-[72px] items-center justify-center rounded-lg border px-3 py-2 text-sm transition-colors ${
-                rowKindFilter === "employee"
+                !archiveView && rowKindFilter === "employee"
                   ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-300"
                   : "border-gray-200 bg-white text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
               }`}
             >
-              {reportQuery.isPending ? (
+              {activeReportQuery.isPending ? (
                 <span className="text-gray-400">…</span>
-              ) : hasFilters ? (
+              ) : !archiveView && hasClientFilters ? (
                 <span className="inline-flex items-center gap-1.5">
                   {employeeCounts.filtered}
                   <span className="text-gray-400">
                     из {employeeCounts.total}
                   </span>
                 </span>
+              ) : archiveView ? (
+                activeReportQuery.data?.length ?? 0
               ) : (
                 employeeCounts.total
               )}
@@ -1385,31 +1352,73 @@ function EmployeesPage() {
             </span>
             <button
               type="button"
-              onClick={() =>
-                setRowKindFilter((prev) => (prev === "vacancy" ? "all" : "vacancy"))
-              }
+              onClick={() => {
+                setArchiveView(false);
+                setRowKindFilter((prev) => (prev === "vacancy" ? "all" : "vacancy"));
+              }}
               className={`inline-flex min-w-[72px] items-center justify-center rounded-lg border px-3 py-2 text-sm transition-colors ${
-                rowKindFilter === "vacancy"
+                !archiveView && rowKindFilter === "vacancy"
                   ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-300"
                   : "border-gray-200 bg-white text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
               }`}
             >
-              {reportQuery.isPending ? (
+              {activeReportQuery.isPending ? (
                 <span className="text-gray-400">…</span>
-              ) : hasFilters ? (
+              ) : !archiveView && hasClientFilters ? (
                 <span className="inline-flex items-center gap-1.5">
                   {vacancyCounts.filtered}
                   <span className="text-gray-400">
                     из {vacancyCounts.total}
                   </span>
                 </span>
+              ) : archiveView ? (
+                vacantRows.length
               ) : (
                 vacancyCounts.total
               )}
             </button>
           </div>
+
+          <div className="shrink-0">
+            <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+              Архив
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setRowKindFilter("all");
+                setManagersOnlyFilter(false);
+                setManagerFilterId(null);
+                setArchiveView((prev) => !prev);
+              }}
+              className={`inline-flex min-w-[72px] items-center justify-center rounded-lg border px-3 py-2 text-sm transition-colors ${
+                archiveView
+                  ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-300"
+                  : "border-gray-200 bg-white text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+              }`}
+            >
+              {archivedReportQuery.isPending ? (
+                <span className="text-gray-400">…</span>
+              ) : archiveView && hasClientFilters ? (
+                <span className="inline-flex items-center gap-1.5">
+                  {employeeCounts.filtered}
+                  <span className="text-gray-400">
+                    из {archivedReportQuery.data?.length ?? employeeCounts.total}
+                  </span>
+                </span>
+              ) : (
+                archivedReportQuery.data?.length ?? 0
+              )}
+            </button>
+          </div>
         </div>
       </div>
+
+      {archiveEmployeeMutation.isError && (
+        <p className="mb-3 shrink-0 text-sm text-red-500 dark:text-red-400">
+          {archiveEmployeeMutation.error.message}
+        </p>
+      )}
 
       <div className="min-h-0 flex-1 overflow-hidden">
       <DictTable<EmployeesTableRow>
@@ -1417,7 +1426,7 @@ function EmployeesPage() {
         wrapperClassName="employees-dict-table h-full"
         renderMobileCard={(row, actions) => {
           const nameColumn = row.kind === "employee"
-            ? fullName(row.employee) || <span className="text-gray-400">—</span>
+            ? employeeNameContent(row.employee)
             : <span className="text-amber-500">Вакантно</span>;
 
           const headerOnClick = () => {
@@ -1590,7 +1599,7 @@ function EmployeesPage() {
             },
             render: (r) =>
               r.kind === "employee" ? (
-                fullName(r.employee) || <span className="text-gray-400">—</span>
+                employeeNameContent(r.employee)
               ) : (
                 <span className="cursor-pointer text-amber-500 hover:underline">
                   Вакантно
@@ -1689,38 +1698,9 @@ function EmployeesPage() {
         isError={reportQuery.isError}
         errorMessage={reportQuery.error?.message}
         emptyMessage={hasFilters ? "Ничего не найдено" : "Записей пока нет"}
+        showDelete={(row) => row.kind === "vacancy"}
         onDelete={(row) => {
-          if (row.kind === "employee") {
-            const employeeName = fullName(row.employee) || "этого сотрудника";
-            const vacancies = collectVacanciesForEmployee(
-              treeQuery.data ?? [],
-              row.employee.id,
-              {
-                name: row.org?.city || row.employee.city?.name || "",
-                code: row.org?.cityCode || row.employee.city?.code || "",
-              },
-            );
-            // row.vacancy может быть из отчёта, если дерева ещё нет
-            if (
-              vacancies.length === 0 &&
-              row.vacancy &&
-              row.vacancy.employer?.id === row.employee.id
-            ) {
-              vacancies.push(row.vacancy);
-            }
-            const confirmed = window.confirm(
-              vacancies.length > 0
-                ? `Удалить ${employeeName}? Вакансия останется свободной. Действие необратимо.`
-                : `Удалить ${employeeName}? Действие необратимо.`,
-            );
-            if (!confirmed) return;
-            deleteEmployeeMutation.mutate({
-              employeeId: row.employee.id,
-              vacancies,
-            });
-            return;
-          }
-
+          if (row.kind !== "vacancy") return;
           const vacancyTitle = row.org.position || "эту вакансию";
           const confirmed = window.confirm(
             `Удалить вакансию «${vacancyTitle}»? Действие необратимо.`,
@@ -1728,26 +1708,42 @@ function EmployeesPage() {
           if (!confirmed) return;
           deleteVacancyMutation.mutate(row.vacancy.id);
         }}
+        showArchive={(row) =>
+          row.kind === "employee" && row.employee.status !== "archived"
+        }
+        onArchive={(row) => {
+          if (row.kind !== "employee" || row.employee.status === "archived") return;
+          const employeeName = fullName(row.employee) || "этого сотрудника";
+          const confirmed = window.confirm(
+            `Архивировать ${employeeName}? Сотрудник будет снят со всех позиций.`,
+          );
+          if (!confirmed) return;
+          archiveEmployeeMutation.mutate(row.employee.id);
+        }}
         topRow={
+          archiveView ? undefined : (
           <EmployeeAddRow
             key={addRowKey}
             columnsCount={6}
             cities={citiesQuery.data ?? []}
             orgNodes={treeQuery.data ?? []}
             isPending={createEmployeeVacancyMutation.isPending}
-            error={formatVacancyError(createEmployeeVacancyMutation.error?.message)}
+            error={formatVacancyError(createEmployeeVacancyMutation.error)}
             onSubmit={(data) => createEmployeeVacancyMutation.mutate(data)}
           />
+          )
         }
         topRowMobile={
+          archiveView ? undefined : (
           <EmployeeAddCard
             key={addRowKey}
             cities={citiesQuery.data ?? []}
             orgNodes={treeQuery.data ?? []}
             isPending={createEmployeeVacancyMutation.isPending}
-            error={formatVacancyError(createEmployeeVacancyMutation.error?.message)}
+            error={formatVacancyError(createEmployeeVacancyMutation.error)}
             onSubmit={(data) => createEmployeeVacancyMutation.mutate(data)}
           />
+          )
         }
       />
       </div>
@@ -1778,7 +1774,7 @@ function EmployeesPage() {
             setEditVacancyModal(null);
           }}
           isPending={updateVacancyMutation.isPending}
-          error={formatVacancyError(updateVacancyMutation.error?.message)}
+          error={formatVacancyError(updateVacancyMutation.error)}
           onSubmit={(data) => {
             updateVacancyMutation.mutate({
               id: editVacancyModal.id,
@@ -1796,7 +1792,7 @@ function EmployeesPage() {
             setAssignEmployeeTarget(null);
           }}
           isPending={assignEmployeeMutation.isPending}
-          error={formatVacancyError(assignEmployeeMutation.error?.message)}
+          error={formatVacancyError(assignEmployeeMutation.error)}
           onSubmit={(fields) => {
             assignEmployeeMutation.mutate({
               vacancy: assignEmployeeTarget.vacancy,

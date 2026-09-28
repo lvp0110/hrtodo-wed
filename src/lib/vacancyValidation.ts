@@ -104,8 +104,30 @@ function extractUniqueConstraintName(message: string): string | null {
   return bare?.[1] ?? null;
 }
 
-export function formatVacancyError(message: string | null | undefined): string | null {
-  if (!message) return null;
+type VacancyErrorInput =
+  | string
+  | { message?: string | null; code?: number }
+  | null
+  | undefined;
+
+function isArchivedAssignmentConflict(message: string, code?: number): boolean {
+  if (/archiv|архив|not active/i.test(message)) return true;
+  if (code !== 409) return false;
+
+  const normalized = message.trim().toLowerCase();
+  return (
+    normalized === "" ||
+    normalized === "conflict" ||
+    normalized === "409 conflict"
+  );
+}
+
+export function formatVacancyError(error: VacancyErrorInput): string | null {
+  if (!error) return null;
+
+  const message = typeof error === "string" ? error : (error.message ?? "");
+  const code = typeof error === "object" ? error.code : undefined;
+  if (!message && code == null) return null;
 
   if (message.includes("missing auth cookie")) {
     return "Сессия истекла или вы не авторизованы. Обновите страницу и войдите снова.";
@@ -123,6 +145,10 @@ export function formatVacancyError(message: string | null | undefined): string |
     return KNOWN_UNIQUE_CONSTRAINTS[constraint];
   }
 
+  if (isArchivedAssignmentConflict(message, code)) {
+    return "Архивного сотрудника нельзя назначить на позицию.";
+  }
+
   // Прочие unique / сырые ошибки бэка — без подмены, чтобы была видна точная причина.
-  return message;
+  return message || null;
 }
