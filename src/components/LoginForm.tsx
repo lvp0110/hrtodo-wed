@@ -1,5 +1,6 @@
 import { useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { formatApiError } from "#/lib/apiError";
 import { authApi, authQueries } from "#/services/api";
 import type { LoginRequest } from "#/types/api";
 
@@ -92,9 +93,7 @@ export function LoginForm() {
 
           {loginMutation.isError && (
             <p className="text-sm text-red-500 dark:text-red-400">
-              {loginMutation.error instanceof Error
-                ? loginMutation.error.message
-                : "Не удалось войти"}
+              {formatApiError(loginMutation.error) ?? "Не удалось войти"}
             </p>
           )}
 

@@ -18,17 +18,32 @@ import {
   X,
 } from "lucide-react";
 import { selectableOrgNodeTypes } from "#/lib/orgNodeTypes";
-import { dictQueries, orgNodesApi, vacanciesApi } from "#/services/api";
+import { toEmployeeUpdateReq } from "#/lib/employeeUpdate";
+import { toVacancyUpdateReq } from "#/lib/vacancyUpdate";
+import {
+  dictQueries,
+  employeeReportQuery,
+  employeesApi,
+  orgNodesApi,
+  vacanciesApi,
+} from "#/services/api";
+import { ApiErrorModal } from "#/components/ApiErrorModal";
 import { CreateVacancyModal } from "#/components/CreateVacancyModal";
 import { DeptModal } from "#/components/DeptModal";
+import { EditVacancyModal } from "#/components/EditVacancyModal";
+import { EmployeeInfoModal } from "#/components/EmployeeInfoModal";
 import { dictInputClass } from "#/components/settings/DictFormModal";
+import { formatApiError, formatVacancyError } from "#/lib/apiError";
 import type {
   AddVacancyState,
   DeptFields,
   DeptModalState,
   VacancyFormFields,
+  VacancyModalData,
 } from "#/types/orgChart";
 import type {
+  EmployeeReportItem,
+  Employer,
   EmptyVacancy,
   NodeCreateReq,
   OrgNode,
@@ -43,6 +58,25 @@ export const Route = createFileRoute("/structure")({
 
 /** Сколько уровней дерева раскрыто по умолчанию. */
 const DEFAULT_EXPANDED_LEVELS = 3;
+
+/** Размер названия узла уменьшается с уровнем подчинения. */
+const NODE_TITLE_CLASS = [
+  "text-[22px] font-normal leading-7",
+  "text-[17px] font-normal leading-6",
+  "text-[15px] font-normal leading-5",
+  "text-[13px] font-normal leading-5",
+  "text-xs font-normal leading-5",
+] as const;
+
+function nodeTitleClass(depth: number): string {
+  const index = Math.min(Math.max(depth, 0), NODE_TITLE_CLASS.length - 1);
+  return NODE_TITLE_CLASS[index];
+}
+
+/** Внутренний отступ строки и ширина галочки. Вложенный блок начинается у галочки родителя. */
+const NODE_ROW_PAD = 4;
+const NODE_CHEVRON = 16;
+const NODE_INDENT = NODE_ROW_PAD + NODE_CHEVRON;
 
 function upsertVacancy(tree: OrgNode[], vacancy: Vacancy): OrgNode[] {
   return tree.map((node) => {
@@ -76,10 +110,76 @@ function replaceNodeType(
   });
 }
 
+function isOpenVacancy(vacancy: Vacancy): boolean {
+  return !vacancy.employer?.id;
+}
+
 function employerName(v: Vacancy): string {
-  if (!v.employer?.id) return "Вакантно";
+  if (isOpenVacancy(v)) return "Вакантно";
   const { first_name, second_name, surname } = v.employer;
   return [surname, first_name, second_name].filter(Boolean).join(" ");
+}
+
+function toVacancyModalData(vacancy: Vacancy, deptName: string): VacancyModalData {
+  return {
+    id: vacancy.id,
+    nodeId: vacancy.node_id,
+    position: vacancy.position?.name ?? vacancy.position?.code ?? "",
+    positionCode: vacancy.position?.code ?? vacancy.position?.name ?? "",
+    city: vacancy.city?.name ?? "",
+    cityCode: vacancy.city?.code ?? "",
+    office: vacancy.office?.name,
+    officeCode: vacancy.office?.code,
+    deptName,
+    isManager: vacancy.is_manager,
+    employer: vacancy.employer?.id
+      ? {
+          id: vacancy.employer.id,
+          name: employerName(vacancy),
+          email: vacancy.employer.email ?? "",
+        }
+      : null,
+    jobOffer: vacancy.job_offer_link ?? "",
+    description: vacancy.position_description ?? "",
+  };
+}
+
+function employeeFromReports(
+  employeeId: number,
+  reports: Array<EmployeeReportItem[] | undefined>,
+): Employer | undefined {
+  for (const report of reports) {
+    const found = report?.find((item) => item.employee.id === employeeId);
+    if (found) return found.employee;
+  }
+  return undefined;
+}
+
+/** В дереве у вакансии часто нет города и офиса — их берём из того же отчёта, что раздел «Сотрудники». */
+function withReportVacancyFields(
+  data: VacancyModalData,
+  reports: Array<EmployeeReportItem[] | undefined>,
+): VacancyModalData {
+  for (const report of reports) {
+    for (const item of report ?? []) {
+      const position = item.positions.find((entry) => entry.id === data.id);
+      if (!position) continue;
+      return {
+        ...data,
+        position: data.position || position.name || "",
+        positionCode: data.positionCode || position.code || "",
+        city: data.city || position.city?.name || "",
+        cityCode: data.cityCode || position.city?.code || "",
+        office: data.office || position.office?.name || "",
+        officeCode: data.officeCode || position.office?.code || "",
+        deptName: data.deptName || position.node?.name || "",
+        description: data.description || position.position_description || "",
+        jobOffer: data.jobOffer || position.job_offer_link || "",
+        isManager: data.isManager || position.is_manager,
+      };
+    }
+  }
+  return data;
 }
 
 function nodeChildCount(node: OrgNode): number {
@@ -137,6 +237,34 @@ function emptyVacancyTextMatches(vacancy: EmptyVacancy, query: string): boolean 
     textIncludes(vacancy.city?.name, query) ||
     (query.length >= 4 && textIncludes("Вакантно", query))
   );
+}
+
+function nodeHasOpenVacancy(node: OrgNode): boolean {
+  return (
+    (node.vacancies ?? []).some(isOpenVacancy) ||
+    (node.empty_vacancy?.length ?? 0) > 0
+  );
+}
+
+/** Оставляет отделы с вакансиями и их родителей, чтобы ветка осталась на месте. */
+function filterDepartmentsWithVacancies(nodes: OrgNode[]): {
+  nodes: OrgNode[];
+  expandIds: Set<number>;
+} {
+  const expandIds = new Set<number>();
+
+  const walk = (list: OrgNode[]): OrgNode[] => {
+    const result: OrgNode[] = [];
+    for (const node of list) {
+      const children = walk(node.children ?? []);
+      if (!nodeHasOpenVacancy(node) && children.length === 0) continue;
+      expandIds.add(node.id);
+      result.push({ ...node, children });
+    }
+    return result;
+  };
+
+  return { nodes: walk(nodes), expandIds };
 }
 
 /** Оставляет ветки с совпадением и id узлов, которые нужно раскрыть, чтобы совпадения были видны. */
@@ -228,6 +356,8 @@ interface TreeContext {
   onDrop: (targetId: number) => void;
   onDeleteNode: (node: OrgNode) => void;
   onDeleteVacancy: (v: Vacancy) => void;
+  onEditEmployee: (employee: Employer) => void;
+  onEditVacancy: (vacancy: Vacancy, deptName: string) => void;
   onAddDept: (node: OrgNode) => void;
   onAddVacancy: (node: OrgNode) => void;
   typeMenuNodeId: number | null;
@@ -238,35 +368,51 @@ interface TreeContext {
   onToggleTypeMenu: (id: number) => void;
   onCloseTypeMenu: () => void;
   onChangeType: (node: OrgNode, typeCode: string) => void;
+  showVacancies: boolean;
 }
 
 function VacancyRow({
   vacancy,
   depth,
+  deptName,
   ctx,
 }: {
   vacancy: Vacancy;
   depth: number;
+  deptName: string;
   ctx: TreeContext;
 }) {
   const filled = !!vacancy.employer?.id;
+  const position = vacancy.position?.name ?? vacancy.position?.code ?? "—";
+  const linkClass =
+    "min-w-0 truncate border-0 bg-transparent p-0 text-left text-blue-600 hover:underline dark:text-blue-400";
   return (
     <div
       className="group flex items-center gap-2 rounded-md py-1.5 pr-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-800/50"
-      style={{ paddingLeft: depth * 20 + 28 }}
+      style={{ paddingLeft: depth * 20 + 28, paddingBottom: 10 }}
     >
       {vacancy.is_manager && (
         <Star size={12} className="shrink-0 fill-amber-400 text-amber-400" />
       )}
-      <span className="truncate text-gray-700 dark:text-gray-300">
-        {vacancy.position?.name ?? vacancy.position?.code ?? "—"}
-      </span>
-      <span className="text-gray-300 dark:text-gray-600">·</span>
-      <span
-        className={`truncate text-xs ${filled ? "text-gray-500 dark:text-gray-400" : "text-amber-500"}`}
+      <button
+        type="button"
+        onClick={() => ctx.onEditVacancy(vacancy, deptName)}
+        className={linkClass}
       >
-        {employerName(vacancy)}
-      </span>
+        {position}
+      </button>
+      <span className="text-gray-300 dark:text-gray-600">·</span>
+      {filled ? (
+        <button
+          type="button"
+          onClick={() => ctx.onEditEmployee(vacancy.employer)}
+          className={`${linkClass} text-xs`}
+        >
+          {employerName(vacancy)}
+        </button>
+      ) : (
+        <span className="truncate text-xs text-amber-500">Вакантно</span>
+      )}
       {vacancy.city?.name && (
         <>
           <span className="text-gray-300 dark:text-gray-600">·</span>
@@ -275,15 +421,17 @@ function VacancyRow({
           </span>
         </>
       )}
-      <button
-        type="button"
-        title="Удалить вакансию"
-        disabled={ctx.busy}
-        onClick={() => ctx.onDeleteVacancy(vacancy)}
-        className="ml-auto shrink-0 rounded p-1 text-gray-400 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 disabled:opacity-30 group-hover:opacity-100 dark:hover:bg-red-500/10"
-      >
-        <Trash2 size={14} />
-      </button>
+      {!filled && (
+        <button
+          type="button"
+          title="Удалить вакансию"
+          disabled={ctx.busy}
+          onClick={() => ctx.onDeleteVacancy(vacancy)}
+          className="ml-auto shrink-0 rounded p-1 text-gray-400 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 disabled:opacity-30 group-hover:opacity-100 dark:hover:bg-red-500/10"
+        >
+          <Trash2 size={14} />
+        </button>
+      )}
     </div>
   );
 }
@@ -476,14 +624,14 @@ function TreeNode({
           e.stopPropagation();
           if (canAccept) ctx.onDrop(node.id);
         }}
-        className={`group flex select-none items-center gap-2 rounded-md border border-solid border-[#7198bb] py-2 pr-3 transition-colors ${
+        className={`group flex select-none items-center gap-2 rounded-md border border-solid border-[#7198bb] py-2 pr-3 pl-1 transition-colors ${
           canAccept ? "cursor-copy" : "cursor-pointer"
         } ${isDragging ? "opacity-40" : ""} ${
           isDropTarget
             ? "bg-blue-50 ring-2 ring-blue-400 dark:bg-blue-500/10"
             : "hover:bg-gray-100 dark:hover:bg-gray-800"
         }`}
-        style={{ paddingLeft: depth * 20 + 4 }}
+        style={{ marginLeft: depth * NODE_INDENT }}
       >
         <span
           data-node-toggle
@@ -498,7 +646,9 @@ function TreeNode({
           />
         </span>
         <NodeTypeControl node={node} ctx={ctx} />
-        <span className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+        <span
+          className={`truncate text-gray-900 dark:text-gray-100 ${nodeTitleClass(depth)}`}
+        >
           {node.name}
         </span>
         <div className="ml-auto flex shrink-0 items-center gap-1">
@@ -524,19 +674,23 @@ function TreeNode({
 
       {isOpen && (
         <div>
+          {(node.vacancies ?? [])
+            .filter((vacancy) => ctx.showVacancies || !isOpenVacancy(vacancy))
+            .map((v, i) => (
+              <VacancyRow
+                key={`v-${v.id}-${i}`}
+                vacancy={v}
+                depth={depth + 1}
+                deptName={node.name}
+                ctx={ctx}
+              />
+            ))}
+          {ctx.showVacancies &&
+            (node.empty_vacancy ?? []).map((v, i) => (
+              <EmptyVacancyRow key={`e-${i}`} vacancy={v} depth={depth + 1} />
+            ))}
           {(node.children ?? []).map((child) => (
             <TreeNode key={child.id} node={child} depth={depth + 1} ctx={ctx} />
-          ))}
-          {(node.vacancies ?? []).map((v, i) => (
-            <VacancyRow
-              key={`v-${v.id}-${i}`}
-              vacancy={v}
-              depth={depth + 1}
-              ctx={ctx}
-            />
-          ))}
-          {(node.empty_vacancy ?? []).map((v, i) => (
-            <EmptyVacancyRow key={`e-${i}`} vacancy={v} depth={depth + 1} />
           ))}
           <div
             className="flex items-center gap-4"
@@ -628,13 +782,21 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
     return acc;
   });
   const [searchQuery, setSearchQuery] = useState("");
+  const [vacancyFilter, setVacancyFilter] = useState(false);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dropTargetId, setDropTargetId] = useState<number | null>(null);
   const pickRef = useRef<{ id: number; x: number; y: number } | null>(null);
   const suppressClickRef = useRef(false);
   const [deptModal, setDeptModal] = useState<DeptModalState | null>(null);
   const [addVacancy, setAddVacancy] = useState<AddVacancyState | null>(null);
+  const [editVacancyModal, setEditVacancyModal] =
+    useState<VacancyModalData | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employer | null>(
+    null,
+  );
   const [typeMenuNodeId, setTypeMenuNodeId] = useState<number | null>(null);
+  const activeReportQuery = useQuery(employeeReportQuery("active"));
+  const archivedReportQuery = useQuery(employeeReportQuery("archived"));
 
   const nodeTypesQuery = useQuery(dictQueries.nodeTypes);
 
@@ -644,17 +806,21 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
     return acc;
   }, [tree]);
 
-  const filteredTree = useMemo(
-    () => filterStructureTree(tree, searchQuery),
-    [tree, searchQuery],
-  );
+  const filteredTree = useMemo(() => {
+    const base = vacancyFilter ? filterDepartmentsWithVacancies(tree) : null;
+    const searched = filterStructureTree(base?.nodes ?? tree, searchQuery);
+    if (!base) return searched;
+    const expandIds = new Set(base.expandIds);
+    for (const id of searched.expandIds) expandIds.add(id);
+    return { nodes: searched.nodes, expandIds };
+  }, [tree, searchQuery, vacancyFilter]);
 
   const effectiveExpanded = useMemo(() => {
-    if (!searchQuery.trim()) return expanded;
+    if (!searchQuery.trim() && !vacancyFilter) return expanded;
     const next = new Set(expanded);
     for (const id of filteredTree.expandIds) next.add(id);
     return next;
-  }, [expanded, filteredTree.expandIds, searchQuery]);
+  }, [expanded, filteredTree.expandIds, searchQuery, vacancyFilter]);
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["orgTree"] });
@@ -674,28 +840,16 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
       setDeptModal(null);
       invalidate();
     },
-    onError: (err) => {
-      if (deptModal) return;
-      window.alert(err instanceof Error ? err.message : "Не удалось перенести");
-    },
   });
 
   const deleteNodeMutation = useMutation({
     mutationFn: (id: number) => orgNodesApi.deleteNode(id),
     onSuccess: invalidate,
-    onError: (err) =>
-      window.alert(
-        err instanceof Error ? err.message : "Не удалось удалить узел",
-      ),
   });
 
   const deleteVacancyMutation = useMutation({
     mutationFn: (id: number) => vacanciesApi.delete(id),
     onSuccess: invalidate,
-    onError: (err) =>
-      window.alert(
-        err instanceof Error ? err.message : "Не удалось удалить вакансию",
-      ),
   });
 
   const createNodeMutation = useMutation({
@@ -724,8 +878,6 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
       );
       invalidate();
     },
-    onError: (err) =>
-      window.alert(err instanceof Error ? err.message : "Не удалось сменить тип"),
   });
 
   const createVacancyMutation = useMutation({
@@ -843,6 +995,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
   };
 
   const onDeleteVacancy = (v: Vacancy) => {
+    if (v.employer?.id) return;
     if (
       window.confirm(
         `Удалить вакансию «${v.position?.name ?? v.position?.code ?? "—"}»?`,
@@ -850,6 +1003,57 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
     ) {
       deleteVacancyMutation.mutate(v.id);
     }
+  };
+
+  const updateEmployeeMutation = useMutation({
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: number;
+      body: Parameters<typeof employeesApi.update>[1];
+    }) => employeesApi.update(id, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
+      queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
+      queryClient.invalidateQueries({ queryKey: ["orgTree"] });
+      setSelectedEmployee(null);
+    },
+  });
+
+  const updateVacancyMutation = useMutation({
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: number;
+      body: Parameters<typeof vacanciesApi.update>[1];
+    }) => vacanciesApi.update(id, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orgTree"] });
+      queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
+      queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
+      setEditVacancyModal(null);
+    },
+  });
+
+  const onEditEmployee = (employee: Employer) => {
+    const fromReport = employeeFromReports(employee.id, [
+      activeReportQuery.data,
+      archivedReportQuery.data,
+    ]);
+    updateEmployeeMutation.reset();
+    setSelectedEmployee(fromReport ?? employee);
+  };
+
+  const onEditVacancy = (vacancy: Vacancy, deptName: string) => {
+    updateVacancyMutation.reset();
+    setEditVacancyModal(
+      withReportVacancyFields(toVacancyModalData(vacancy, deptName), [
+        activeReportQuery.data,
+        archivedReportQuery.data,
+      ]),
+    );
   };
 
   const ctx: TreeContext = {
@@ -866,6 +1070,8 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
     onDrop,
     onDeleteNode,
     onDeleteVacancy,
+    onEditEmployee,
+    onEditVacancy,
     onAddDept: (node) => {
       moveMutation.reset();
       createNodeMutation.reset();
@@ -892,6 +1098,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
       }
       changeTypeMutation.mutate({ node, typeCode });
     },
+    showVacancies: vacancyFilter,
   };
 
   const heldNode =
@@ -907,6 +1114,18 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
           наведению на строку.
         </p>
         <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            aria-pressed={vacancyFilter}
+            onClick={() => setVacancyFilter((on) => !on)}
+            className={`rounded-md border px-3 py-1.5 text-sm text-amber-500 transition-colors ${
+              vacancyFilter
+                ? "border-amber-500 bg-amber-500/10"
+                : "border-amber-500/40 hover:bg-amber-500/10"
+            }`}
+          >
+            Вакансии
+          </button>
           <button
             type="button"
             onClick={() => setExpanded(new Set(allIds))}
@@ -943,7 +1162,9 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
         <div className="max-w-3xl min-w-0 flex-1 rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900">
           {filteredTree.nodes.length === 0 ? (
             <p className="px-3 py-2 text-sm text-gray-400 dark:text-gray-500">
-              Ничего не найдено
+              {vacancyFilter && !searchQuery.trim()
+                ? "Нет отделов с вакансиями"
+                : "Ничего не найдено"}
             </p>
           ) : (
             filteredTree.nodes.map((node) => (
@@ -979,11 +1200,9 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
           isPending={
             createNodeMutation.isPending || moveMutation.isPending
           }
-          error={
-            createNodeMutation.error?.message ??
-            moveMutation.error?.message ??
-            null
-          }
+          error={formatApiError(
+            createNodeMutation.error ?? moveMutation.error,
+          )}
           onSubmit={(data: DeptFields) => {
             if (data.moveNodeId) {
               const node = findNodeById(tree, data.moveNodeId);
@@ -1006,6 +1225,42 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
         />
       )}
 
+      {selectedEmployee && (
+        <EmployeeInfoModal
+          employee={selectedEmployee}
+          onClose={() => {
+            updateEmployeeMutation.reset();
+            setSelectedEmployee(null);
+          }}
+          isPending={updateEmployeeMutation.isPending}
+          error={formatApiError(updateEmployeeMutation.error)}
+          onSubmit={(fields) => {
+            updateEmployeeMutation.mutate({
+              id: selectedEmployee.id,
+              body: toEmployeeUpdateReq(selectedEmployee, fields),
+            });
+          }}
+        />
+      )}
+
+      {editVacancyModal && (
+        <EditVacancyModal
+          data={editVacancyModal}
+          onClose={() => {
+            updateVacancyMutation.reset();
+            setEditVacancyModal(null);
+          }}
+          isPending={updateVacancyMutation.isPending}
+          error={formatVacancyError(updateVacancyMutation.error)}
+          onSubmit={(data) => {
+            updateVacancyMutation.mutate({
+              id: editVacancyModal.id,
+              body: toVacancyUpdateReq(data),
+            });
+          }}
+        />
+      )}
+
       {addVacancy && (
         <CreateVacancyModal
           state={addVacancy}
@@ -1014,7 +1269,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
             setAddVacancy(null);
           }}
           isPending={createVacancyMutation.isPending}
-          error={createVacancyMutation.error?.message ?? null}
+          error={formatApiError(createVacancyMutation.error)}
           onSubmit={(data: VacancyFormFields) =>
             createVacancyMutation.mutate({
               node_id: Number(addVacancy.deptId),
@@ -1027,6 +1282,26 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
               job_offer_link: data.jobOffer,
             })
           }
+        />
+      )}
+
+      {(deleteNodeMutation.isError ||
+        deleteVacancyMutation.isError ||
+        changeTypeMutation.isError ||
+        (moveMutation.isError && !deptModal)) && (
+        <ApiErrorModal
+          error={
+            deleteNodeMutation.error ??
+            deleteVacancyMutation.error ??
+            changeTypeMutation.error ??
+            moveMutation.error
+          }
+          onClose={() => {
+            deleteNodeMutation.reset();
+            deleteVacancyMutation.reset();
+            changeTypeMutation.reset();
+            moveMutation.reset();
+          }}
         />
       )}
     </>
@@ -1051,7 +1326,7 @@ function StructurePage() {
         <p className="text-sm text-gray-500 dark:text-gray-400">Загрузка…</p>
       ) : treeQuery.isError ? (
         <p className="text-sm text-red-500">
-          {treeQuery.error?.message ?? "Не удалось загрузить структуру"}
+          {formatApiError(treeQuery.error) ?? "Не удалось загрузить структуру"}
         </p>
       ) : tree.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">

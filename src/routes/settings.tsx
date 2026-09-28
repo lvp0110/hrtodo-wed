@@ -4,6 +4,7 @@ export const Route = createFileRoute("/settings")({ component: SettingsLayout })
 
 const tabs = [
   { to: "/settings/cities", label: "Города" },
+  { to: "/settings/offices", label: "Офисы" },
   { to: "/settings/countries", label: "Страны" },
   { to: "/settings/orgnodetypes", label: "Типы узлов" },
 ] as const;
@@ -15,7 +16,7 @@ function SettingsLayout() {
         <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
           Настройки справочников
         </h1>
-        <nav className="mt-4 flex gap-1">
+        <nav className="mt-4 flex flex-wrap gap-1">
           {tabs.map((t) => (
             <Link
               key={t.to}

@@ -15,6 +15,8 @@ export function OrgNodeCard({ id, data }: NodeProps) {
     isRoot,
     vacancies,
     emptyVacancies,
+    highlighted,
+    nearby,
     onVacancyClick,
     onAddVacancyClick,
   } = data as {
@@ -23,6 +25,8 @@ export function OrgNodeCard({ id, data }: NodeProps) {
     code: string;
     isLeaf: boolean;
     isRoot: boolean;
+    highlighted?: boolean;
+    nearby?: boolean;
     vacancies: Vacancy[];
     emptyVacancies: EmptyVacancy[];
     onVacancyClick: (d: VacancyModalData) => void;
@@ -46,8 +50,20 @@ export function OrgNodeCard({ id, data }: NodeProps) {
   return (
     <>
       {!isRoot && <Handle type="target" position={Position.Top} />}
-      <div className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800 w-[280px] overflow-hidden">
-        <div className="px-4 py-3 bg-slate-600 dark:bg-slate-700 cursor-pointer hover:bg-slate-500 dark:hover:bg-slate-600 transition-colors select-none">
+      <div
+        className={`w-[280px] overflow-hidden rounded-lg border bg-white shadow-sm dark:bg-gray-800 ${
+          highlighted
+            ? "border-blue-500 ring-2 ring-blue-500"
+            : "border-gray-200 dark:border-gray-700"
+        }`}
+      >
+        <div
+          className={`cursor-pointer select-none px-4 py-3 transition-colors ${
+            highlighted
+              ? "bg-blue-600 hover:bg-blue-500"
+              : "bg-slate-600 hover:bg-slate-500 dark:bg-slate-700 dark:hover:bg-slate-600"
+          }`}
+        >
           <div className="text-xs text-slate-300 font-medium uppercase tracking-wide">
             {type}
           </div>
@@ -56,6 +72,7 @@ export function OrgNodeCard({ id, data }: NodeProps) {
           </div>
         </div>
 
+        {!nearby && (
         <ul className="divide-y divide-gray-100 dark:divide-gray-700">
           {vacancies.map((v, i) => (
             <li
@@ -183,6 +200,7 @@ export function OrgNodeCard({ id, data }: NodeProps) {
             <span className="text-xs">Добавить вакансию</span>
           </li>
         </ul>
+        )}
       </div>
       <Handle type="source" position={Position.Bottom} />
     </>

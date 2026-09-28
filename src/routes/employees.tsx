@@ -16,6 +16,8 @@ import {
   orgNodesApi,
   vacanciesApi,
 } from "#/services/api";
+import { ApiErrorModal } from "#/components/ApiErrorModal";
+import { DeleteArchivedEmployeeModal } from "#/components/DeleteArchivedEmployeeModal";
 import {
   AssignEmployeeModal,
   type AssignEmployeeFormFields,
@@ -53,6 +55,7 @@ import {
   formatVacancyError,
   NODE_POSITION_SLOT_EXISTS_MESSAGE,
 } from "#/lib/vacancyValidation";
+import { formatApiError } from "#/lib/apiError";
 import { findOrgNodeByName } from "#/lib/orgTree";
 
 /** Город по коду офиса — в дереве вакансий бэк отдаёт только office, без city. */
@@ -605,6 +608,9 @@ function EmployeesPage() {
   const [selectedEmployee, setSelectedEmployee] = useState<Employer | null>(
     null,
   );
+  const [employeeToDelete, setEmployeeToDelete] = useState<Employer | null>(
+    null,
+  );
   const [addRowKey, setAddRowKey] = useState(0);
   const activeReportQuery = useQuery(employeeReportQuery("active"));
   const archivedReportQuery = useQuery(employeeReportQuery("archived"));
@@ -709,6 +715,22 @@ function EmployeesPage() {
       queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
       queryClient.invalidateQueries({ queryKey: ["orgTree"] });
       setSelectedEmployee(null);
+    },
+  });
+
+  const deleteEmployeeMutation = useMutation({
+    mutationFn: (employeeId: number) => employeesApi.delete(employeeId),
+    onSuccess: (_data, employeeId) => {
+      queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
+      queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
+      queryClient.invalidateQueries({ queryKey: ["orgTree"] });
+      setEmployeeToDelete(null);
+      setSelectedEmployee((current) =>
+        current?.id === employeeId ? null : current,
+      );
+    },
+    onError: () => {
+      setEmployeeToDelete(null);
     },
   });
 
@@ -1302,11 +1324,7 @@ function EmployeesPage() {
             type="button"
             onClick={() => exportMutation.mutate()}
             disabled={exportMutation.isPending}
-            title={
-              exportMutation.isError
-                ? exportMutation.error.message
-                : "Выгрузить в Excel"
-            }
+            title="Выгрузить в Excel"
             aria-label="Выгрузить в Excel"
             className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-emerald-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-emerald-400 dark:hover:bg-gray-700"
           >
@@ -1414,10 +1432,24 @@ function EmployeesPage() {
         </div>
       </div>
 
-      {archiveEmployeeMutation.isError && (
-        <p className="mb-3 shrink-0 text-sm text-red-500 dark:text-red-400">
-          {archiveEmployeeMutation.error.message}
-        </p>
+      {(archiveEmployeeMutation.isError ||
+        deleteEmployeeMutation.isError ||
+        deleteVacancyMutation.isError ||
+        exportMutation.isError) && (
+        <ApiErrorModal
+          error={
+            archiveEmployeeMutation.error ??
+            deleteEmployeeMutation.error ??
+            deleteVacancyMutation.error ??
+            exportMutation.error
+          }
+          onClose={() => {
+            archiveEmployeeMutation.reset();
+            deleteEmployeeMutation.reset();
+            deleteVacancyMutation.reset();
+            exportMutation.reset();
+          }}
+        />
       )}
 
       <div className="min-h-0 flex-1 overflow-hidden">
@@ -1696,17 +1728,27 @@ function EmployeesPage() {
         rowKey={(r) => r.id}
         isLoading={reportQuery.isPending}
         isError={reportQuery.isError}
-        errorMessage={reportQuery.error?.message}
+        errorMessage={formatApiError(reportQuery.error)}
         emptyMessage={hasFilters ? "Ничего не найдено" : "Записей пока нет"}
-        showDelete={(row) => row.kind === "vacancy"}
+        showDelete={(row) =>
+          row.kind === "vacancy" ||
+          (archiveView &&
+            row.kind === "employee" &&
+            row.employee.status === "archived")
+        }
         onDelete={(row) => {
-          if (row.kind !== "vacancy") return;
-          const vacancyTitle = row.org.position || "эту вакансию";
-          const confirmed = window.confirm(
-            `Удалить вакансию «${vacancyTitle}»? Действие необратимо.`,
-          );
-          if (!confirmed) return;
-          deleteVacancyMutation.mutate(row.vacancy.id);
+          if (row.kind === "vacancy") {
+            const vacancyTitle = row.org.position || "эту вакансию";
+            const confirmed = window.confirm(
+              `Удалить вакансию «${vacancyTitle}»? Действие необратимо.`,
+            );
+            if (!confirmed) return;
+            deleteVacancyMutation.mutate(row.vacancy.id);
+            return;
+          }
+          if (!archiveView || row.employee.status !== "archived") return;
+          deleteEmployeeMutation.reset();
+          setEmployeeToDelete(row.employee);
         }}
         showArchive={(row) =>
           row.kind === "employee" && row.employee.status !== "archived"
@@ -1756,7 +1798,7 @@ function EmployeesPage() {
             setSelectedEmployee(null);
           }}
           isPending={updateEmployeeMutation.isPending}
-          error={updateEmployeeMutation.error?.message ?? null}
+          error={formatApiError(updateEmployeeMutation.error)}
           onSubmit={(fields) => {
             updateEmployeeMutation.mutate({
               id: selectedEmployee.id,
@@ -1781,6 +1823,19 @@ function EmployeesPage() {
               body: toVacancyUpdateReq(data),
             });
           }}
+        />
+      )}
+
+      {employeeToDelete && (
+        <DeleteArchivedEmployeeModal
+          employeeName={fullName(employeeToDelete)}
+          isPending={deleteEmployeeMutation.isPending}
+          onClose={() => {
+            if (deleteEmployeeMutation.isPending) return;
+            deleteEmployeeMutation.reset();
+            setEmployeeToDelete(null);
+          }}
+          onConfirm={() => deleteEmployeeMutation.mutate(employeeToDelete.id)}
         />
       )}
 
