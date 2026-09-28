@@ -145,7 +145,24 @@ function waitForOtherTab(): Promise<void> {
   });
 }
 
-async function requestRefresh(): Promise<RefreshSession> {
+function expiryWasRenewed(previousExpiresAt: string | null): RefreshSession | null {
+  const stored = readStored();
+  if (!stored) return null;
+
+  const nextMs = Date.parse(stored.expires_at);
+  if (Number.isNaN(nextMs) || nextMs <= Date.now()) return null;
+
+  if (!previousExpiresAt) return stored;
+
+  const previousMs = Date.parse(previousExpiresAt);
+  if (!Number.isNaN(previousMs) && nextMs <= previousMs) return null;
+
+  return stored;
+}
+
+async function requestRefresh(
+  previousExpiresAt: string | null,
+): Promise<RefreshSession> {
   const epoch = sessionEpoch;
   const headers: Record<string, string> = { Accept: "application/json" };
   const csrf = readCookie("csrf_token");
@@ -163,8 +180,15 @@ async function requestRefresh(): Promise<RefreshSession> {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
+    const message = String(err.error ?? res.statusText);
+    // Параллельный refresh уже сжёг этот токен и записал новый срок.
+    const renewed = expiryWasRenewed(previousExpiresAt);
+    if (renewed && String(message).includes("refresh session not found")) {
+      scheduleRefresh(renewed.expires_at);
+      return renewed;
+    }
     if (res.status === 401 || res.status === 403) expireClientSession();
-    throw authError(res.status, err.error ?? res.statusText);
+    throw authError(res.status, message);
   }
 
   const body = (await res.json()) as ApiResponse<RefreshSession>;
@@ -175,31 +199,54 @@ async function requestRefresh(): Promise<RefreshSession> {
   return body.data;
 }
 
+function runSingleRefresh(
+  task: () => Promise<RefreshSession>,
+): Promise<RefreshSession> {
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  if (locks?.request) {
+    return locks.request("hrtodo-auth-refresh", task);
+  }
+  return task();
+}
+
 async function performRefresh(force: boolean): Promise<RefreshSession> {
+  const seenExpiresAt = readStored()?.expires_at ?? null;
+
   // Таймер может выйти раньше, если другая вкладка уже продлила сессию.
-  // По 401 так делать нельзя: access cookie уже отвергнута сервером.
   if (!force) {
     const alreadyFresh = freshStored();
     if (alreadyFresh) return alreadyFresh;
   }
 
-  let locked = acquireLock();
-  if (!locked) {
-    await waitForOtherTab();
-    const refreshedElsewhere = freshStored();
-    if (refreshedElsewhere) return refreshedElsewhere;
-    locked = acquireLock();
-  }
+  return runSingleRefresh(async () => {
+    const renewed = expiryWasRenewed(seenExpiresAt);
+    if (renewed) {
+      scheduleRefresh(renewed.expires_at);
+      return renewed;
+    }
 
-  try {
     if (!force) {
       const raced = freshStored();
       if (raced) return raced;
     }
-    return await requestRefresh();
-  } finally {
-    if (locked) releaseLock();
-  }
+
+    let locked = false;
+    if (typeof navigator === "undefined" || !navigator.locks?.request) {
+      locked = acquireLock();
+      if (!locked) {
+        await waitForOtherTab();
+        const refreshedElsewhere = expiryWasRenewed(seenExpiresAt) ?? freshStored();
+        if (refreshedElsewhere) return refreshedElsewhere;
+        locked = acquireLock();
+      }
+    }
+
+    try {
+      return await requestRefresh(seenExpiresAt);
+    } finally {
+      if (locked) releaseLock();
+    }
+  });
 }
 
 /**
