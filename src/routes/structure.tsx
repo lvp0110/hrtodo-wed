@@ -357,7 +357,7 @@ function NodeTypeControl({
           e.stopPropagation();
           ctx.onToggleTypeMenu(node.id);
         }}
-        className="border-0 bg-transparent p-0 text-[length:var(--tsrd-font-size)] font-medium uppercase tracking-wide text-gray-400 hover:text-blue-600 disabled:opacity-50 dark:text-gray-500 dark:hover:text-blue-400"
+        className="border-0 bg-transparent p-0 text-[length:var(--tsrd-font-size)] font-medium uppercase tracking-wide text-blue-600 hover:opacity-60 disabled:opacity-50 dark:text-blue-400"
       >
         {typeLabel}
       </button>
