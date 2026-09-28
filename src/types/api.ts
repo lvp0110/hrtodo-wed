@@ -17,6 +17,12 @@ export interface Office {
   city_id: number;
 }
 
+export interface OfficeReq {
+  code: string;
+  name: string;
+  city_id: number;
+}
+
 export interface Country {
   id: number;
   code: string;

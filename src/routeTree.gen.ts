@@ -15,6 +15,7 @@ import { Route as EmployeesRouteImport } from './routes/employees'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsOrgnodetypesRouteImport } from './routes/settings/orgnodetypes'
+import { Route as SettingsOfficesRouteImport } from './routes/settings/offices'
 import { Route as SettingsCountriesRouteImport } from './routes/settings/countries'
 import { Route as SettingsCitiesRouteImport } from './routes/settings/cities'
 
@@ -48,6 +49,11 @@ const SettingsOrgnodetypesRoute = SettingsOrgnodetypesRouteImport.update({
   path: '/orgnodetypes',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsOfficesRoute = SettingsOfficesRouteImport.update({
+  id: '/offices',
+  path: '/offices',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsCountriesRoute = SettingsCountriesRouteImport.update({
   id: '/countries',
   path: '/countries',
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/structure': typeof StructureRoute
   '/settings/cities': typeof SettingsCitiesRoute
   '/settings/countries': typeof SettingsCountriesRoute
+  '/settings/offices': typeof SettingsOfficesRoute
   '/settings/orgnodetypes': typeof SettingsOrgnodetypesRoute
   '/settings/': typeof SettingsIndexRoute
 }
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/structure': typeof StructureRoute
   '/settings/cities': typeof SettingsCitiesRoute
   '/settings/countries': typeof SettingsCountriesRoute
+  '/settings/offices': typeof SettingsOfficesRoute
   '/settings/orgnodetypes': typeof SettingsOrgnodetypesRoute
   '/settings': typeof SettingsIndexRoute
 }
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/structure': typeof StructureRoute
   '/settings/cities': typeof SettingsCitiesRoute
   '/settings/countries': typeof SettingsCountriesRoute
+  '/settings/offices': typeof SettingsOfficesRoute
   '/settings/orgnodetypes': typeof SettingsOrgnodetypesRoute
   '/settings/': typeof SettingsIndexRoute
 }
@@ -98,6 +107,7 @@ export interface FileRouteTypes {
     | '/structure'
     | '/settings/cities'
     | '/settings/countries'
+    | '/settings/offices'
     | '/settings/orgnodetypes'
     | '/settings/'
   fileRoutesByTo: FileRoutesByTo
@@ -107,6 +117,7 @@ export interface FileRouteTypes {
     | '/structure'
     | '/settings/cities'
     | '/settings/countries'
+    | '/settings/offices'
     | '/settings/orgnodetypes'
     | '/settings'
   id:
@@ -117,6 +128,7 @@ export interface FileRouteTypes {
     | '/structure'
     | '/settings/cities'
     | '/settings/countries'
+    | '/settings/offices'
     | '/settings/orgnodetypes'
     | '/settings/'
   fileRoutesById: FileRoutesById
@@ -172,6 +184,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsOrgnodetypesRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/offices': {
+      id: '/settings/offices'
+      path: '/offices'
+      fullPath: '/settings/offices'
+      preLoaderRoute: typeof SettingsOfficesRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/countries': {
       id: '/settings/countries'
       path: '/countries'
@@ -192,6 +211,7 @@ declare module '@tanstack/react-router' {
 interface SettingsRouteChildren {
   SettingsCitiesRoute: typeof SettingsCitiesRoute
   SettingsCountriesRoute: typeof SettingsCountriesRoute
+  SettingsOfficesRoute: typeof SettingsOfficesRoute
   SettingsOrgnodetypesRoute: typeof SettingsOrgnodetypesRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
 }
@@ -199,6 +219,7 @@ interface SettingsRouteChildren {
 const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsCitiesRoute: SettingsCitiesRoute,
   SettingsCountriesRoute: SettingsCountriesRoute,
+  SettingsOfficesRoute: SettingsOfficesRoute,
   SettingsOrgnodetypesRoute: SettingsOrgnodetypesRoute,
   SettingsIndexRoute: SettingsIndexRoute,
 }

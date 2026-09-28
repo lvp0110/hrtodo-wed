@@ -11,6 +11,7 @@ import type {
   CityReq,
   Country,
   Office,
+  OfficeReq,
   CountryReq,
   EmployeeCreateReq,
   EmployeeReportItem,
@@ -318,6 +319,18 @@ export const officesApi = {
   /** Получить офисы по ID города — GET /offices/city/{cityId} */
   getByCity: (cityId: number): Promise<ApiResponse<Office[]>> =>
     request(`/offices/city/${cityId}`),
+
+  /** Создать офис — POST /offices */
+  create: (body: OfficeReq): Promise<ApiResponse<Office>> =>
+    request("/offices", { method: "POST", body }),
+
+  /** Обновить офис — PUT /offices/{id} */
+  update: (id: number, body: OfficeReq): Promise<ApiResponse<Office>> =>
+    request(`/offices/${id}`, { method: "PUT", body }),
+
+  /** Удалить офис — DELETE /offices/{id} */
+  delete: (id: number): Promise<void> =>
+    request(`/offices/${id}`, { method: "DELETE" }),
 };
 
 export const citiesApi = {
