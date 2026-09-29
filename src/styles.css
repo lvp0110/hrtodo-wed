@@ -123,6 +123,12 @@ a {
     transform 180ms ease;
 }
 
+/* Safari рисует select системным контролом и не применяет рамку, фон и скругление как у input. */
+.employees-page select {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .employees-dict-table table {
   border-collapse: separate;
   border-spacing: 0;

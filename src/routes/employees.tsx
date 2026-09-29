@@ -5,8 +5,8 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { FileSpreadsheet, Search, Star } from "lucide-react";
+import { useMemo, useState, type SelectHTMLAttributes } from "react";
+import { ChevronDown, FileSpreadsheet, Search, Star } from "lucide-react";
 import {
   dictQueries,
   employeeReportQuery,
@@ -594,6 +594,31 @@ function buildExportRequest(
   return body;
 }
 
+function FilterSelect({
+  className = "",
+  wrapperClassName = "w-full",
+  children,
+  ...props
+}: SelectHTMLAttributes<HTMLSelectElement> & {
+  wrapperClassName?: string;
+}) {
+  return (
+    <div className={`relative ${wrapperClassName}`}>
+      <select
+        {...props}
+        className={`${dictInputClass} appearance-none pr-9 [-webkit-appearance:none] ${className}`}
+      >
+        {children}
+      </select>
+      <ChevronDown
+        size={15}
+        aria-hidden
+        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+      />
+    </div>
+  );
+}
+
 function EmployeesPage() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<EmployeeFilters>(emptyFilters);
@@ -1139,7 +1164,7 @@ function EmployeesPage() {
             <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
               Страна
             </span>
-            <select
+            <FilterSelect
               value={filters.country}
               onChange={(e) =>
                 setFilters((prev) => ({
@@ -1150,7 +1175,6 @@ function EmployeesPage() {
                 }))
               }
               data-hint="Оставляет записи выбранной страны и сбрасывает город и офис"
-              className={dictInputClass}
             >
               <option value="">Все страны</option>
               {filterOptions.countries.map((country) => (
@@ -1158,14 +1182,14 @@ function EmployeesPage() {
                   {country}
                 </option>
               ))}
-            </select>
+            </FilterSelect>
           </label>
 
           <label className="max-md:min-w-0 max-md:flex-1 min-w-[140px]">
             <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
               Город
             </span>
-            <select
+            <FilterSelect
               value={filters.city}
               onChange={(e) =>
                 setFilters((prev) => ({
@@ -1176,7 +1200,7 @@ function EmployeesPage() {
               }
               disabled={Boolean(filters.country) && citiesForCountry.length === 0}
               data-hint="Оставляет записи выбранного города и сбрасывает офис"
-              className={`${dictInputClass} disabled:opacity-60`}
+              className="disabled:opacity-60"
             >
               <option value="">
                 {filters.country && citiesForCountry.length === 0
@@ -1188,21 +1212,21 @@ function EmployeesPage() {
                   {city}
                 </option>
               ))}
-            </select>
+            </FilterSelect>
           </label>
 
           <label className="max-md:min-w-0 max-md:flex-1 min-w-[160px]">
             <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
               Офис
             </span>
-            <select
+            <FilterSelect
               value={filters.office}
               onChange={(e) =>
                 setFilters((prev) => ({ ...prev, office: e.target.value }))
               }
               disabled={!filters.city || officesQuery.isPending}
               data-hint="Оставляет записи выбранного офиса. Список появляется после выбора города"
-              className={`${dictInputClass} disabled:opacity-60`}
+              className="disabled:opacity-60"
             >
               <option value="">
                 {!filters.city
@@ -1216,7 +1240,7 @@ function EmployeesPage() {
                   {office.name}
                 </option>
               ))}
-            </select>
+            </FilterSelect>
           </label>
         </div>
 
@@ -1263,32 +1287,31 @@ function EmployeesPage() {
             <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
               Пол
             </span>
-            <select
+            <FilterSelect
               value={filters.gender}
               onChange={(e) =>
                 setFilters((prev) => ({ ...prev, gender: e.target.value }))
               }
               data-hint="Оставляет сотрудников выбранного пола"
-              className={dictInputClass}
             >
               <option value="">Все</option>
               <option value="male">Мужской</option>
               <option value="female">Женский</option>
-            </select>
+            </FilterSelect>
           </label>
 
-          <div className="max-md:min-w-0 max-md:flex-1 min-w-[260px]">
+          <div className="max-md:min-w-0 max-md:flex-1 min-w-[332px]">
             <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
               Дата устройства
             </span>
             <div className="flex gap-2">
-              <select
+              <FilterSelect
                 value={filters.hireYear}
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, hireYear: e.target.value }))
                 }
                 data-hint="Оставляет сотрудников, принятых в выбранном году"
-                className={`${dictInputClass} max-md:min-w-0 max-md:flex-1 min-w-[104px]`}
+                wrapperClassName="max-md:min-w-0 max-md:flex-1 min-w-[112px]"
               >
                 <option value="">Год</option>
                 {filterOptions.hireYears.map((year) => (
@@ -1296,14 +1319,14 @@ function EmployeesPage() {
                     {year}
                   </option>
                 ))}
-              </select>
-              <select
+              </FilterSelect>
+              <FilterSelect
                 value={filters.hireMonth}
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, hireMonth: e.target.value }))
                 }
                 data-hint="Оставляет сотрудников, принятых в выбранном месяце"
-                className={`${dictInputClass} max-md:min-w-0 max-md:flex-1 min-w-[84px]`}
+                wrapperClassName="max-md:min-w-0 max-md:flex-1 min-w-[108px]"
               >
                 <option value="">Месяц</option>
                 {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0")).map(
@@ -1313,14 +1336,14 @@ function EmployeesPage() {
                     </option>
                   ),
                 )}
-              </select>
-              <select
+              </FilterSelect>
+              <FilterSelect
                 value={filters.hireDay}
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, hireDay: e.target.value }))
                 }
                 data-hint="Оставляет сотрудников, принятых в выбранный день месяца"
-                className={`${dictInputClass} max-md:min-w-0 max-md:flex-1 min-w-[72px]`}
+                wrapperClassName="max-md:min-w-0 max-md:flex-1 min-w-[96px]"
               >
                 <option value="">День</option>
                 {Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0")).map(
@@ -1330,7 +1353,7 @@ function EmployeesPage() {
                     </option>
                   ),
                 )}
-              </select>
+              </FilterSelect>
             </div>
           </div>
         </div>

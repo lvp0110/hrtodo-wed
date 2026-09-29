@@ -10,7 +10,7 @@ const tabs = [
   { to: "/settings/countries", label: "Страны", hint: "Открывает справочник стран" },
   {
     to: "/settings/orgnodetypes",
-    label: "Типы узлов",
+    label: "Типы отделов",
     hint: "Открывает справочник типов отделов на схеме",
   },
 ] as const;

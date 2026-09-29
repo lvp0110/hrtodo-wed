@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronRight,
   GripVertical,
+  Pencil,
   Plus,
   Search,
   Star,
@@ -19,6 +20,11 @@ import {
 } from "lucide-react";
 import { selectableOrgNodeTypes } from "#/lib/orgNodeTypes";
 import { toEmployeeUpdateReq } from "#/lib/employeeUpdate";
+import {
+  employeeFromReports,
+  toVacancyModalData,
+  withReportVacancyFields,
+} from "#/lib/vacancyModalData";
 import { toVacancyUpdateReq } from "#/lib/vacancyUpdate";
 import {
   dictQueries,
@@ -44,10 +50,10 @@ import type {
   VacancyModalData,
 } from "#/types/orgChart";
 import type {
-  EmployeeReportItem,
   Employer,
   EmptyVacancy,
   NodeCreateReq,
+  NodeUpdateReq,
   OrgNode,
   OrgNodeType,
   Vacancy,
@@ -120,68 +126,6 @@ function employerName(v: Vacancy): string {
   if (isOpenVacancy(v)) return "Вакантно";
   const { first_name, second_name, surname } = v.employer;
   return [surname, first_name, second_name].filter(Boolean).join(" ");
-}
-
-function toVacancyModalData(vacancy: Vacancy, deptName: string): VacancyModalData {
-  return {
-    id: vacancy.id,
-    nodeId: vacancy.node_id,
-    position: vacancy.position?.name ?? vacancy.position?.code ?? "",
-    positionCode: vacancy.position?.code ?? vacancy.position?.name ?? "",
-    city: vacancy.city?.name ?? "",
-    cityCode: vacancy.city?.code ?? "",
-    office: vacancy.office?.name,
-    officeCode: vacancy.office?.code,
-    deptName,
-    isManager: vacancy.is_manager,
-    employer: vacancy.employer?.id
-      ? {
-          id: vacancy.employer.id,
-          name: employerName(vacancy),
-          email: vacancy.employer.email ?? "",
-        }
-      : null,
-    jobOffer: vacancy.job_offer_link ?? "",
-    description: vacancy.position_description ?? "",
-  };
-}
-
-function employeeFromReports(
-  employeeId: number,
-  reports: Array<EmployeeReportItem[] | undefined>,
-): Employer | undefined {
-  for (const report of reports) {
-    const found = report?.find((item) => item.employee.id === employeeId);
-    if (found) return found.employee;
-  }
-  return undefined;
-}
-
-/** В дереве у вакансии часто нет города и офиса — их берём из того же отчёта, что раздел «Сотрудники». */
-function withReportVacancyFields(
-  data: VacancyModalData,
-  reports: Array<EmployeeReportItem[] | undefined>,
-): VacancyModalData {
-  for (const report of reports) {
-    for (const item of report ?? []) {
-      const position = item.positions.find((entry) => entry.id === data.id);
-      if (!position) continue;
-      return {
-        ...data,
-        position: data.position || position.name || "",
-        positionCode: data.positionCode || position.code || "",
-        city: data.city || position.city?.name || "",
-        cityCode: data.cityCode || position.city?.code || "",
-        office: data.office || position.office?.name || "",
-        officeCode: data.officeCode || position.office?.code || "",
-        deptName: data.deptName || position.node?.name || "",
-        description: data.description || position.position_description || "",
-        jobOffer: data.jobOffer || position.job_offer_link || "",
-        isManager: data.isManager || position.is_manager,
-      };
-    }
-  }
-  return data;
 }
 
 function nodeChildCount(node: OrgNode): number {
@@ -357,6 +301,7 @@ interface TreeContext {
   onLeaveTarget: (id: number) => void;
   onDrop: (targetId: number) => void;
   onDeleteNode: (node: OrgNode) => void;
+  onEditDept: (node: OrgNode) => void;
   onDeleteVacancy: (v: Vacancy) => void;
   onEditEmployee: (employee: Employer) => void;
   onEditVacancy: (vacancy: Vacancy, deptName: string) => void;
@@ -671,6 +616,20 @@ function TreeNode({
           )}
           <button
             type="button"
+            title="Редактировать отдел"
+            aria-label="Редактировать отдел"
+            data-hint="Открывает редактирование отдела"
+            disabled={ctx.busy}
+            onClick={(e) => {
+              e.stopPropagation();
+              ctx.onEditDept(node);
+            }}
+            className="rounded p-1 text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 group-hover:opacity-100 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+          >
+            <Pencil size={14} />
+          </button>
+          <button
+            type="button"
             title="Удалить отдел со всем содержимым"
             data-hint="Удаляет отдел вместе с вложенными отделами и вакансиями"
             disabled={ctx.busy}
@@ -875,6 +834,15 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
       if (body.parent_id !== null) {
         setExpanded((prev) => new Set(prev).add(body.parent_id!));
       }
+      setDeptModal(null);
+      invalidate();
+    },
+  });
+
+  const updateNodeMutation = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: NodeUpdateReq }) =>
+      orgNodesApi.updateNode(id, body),
+    onSuccess: () => {
       setDeptModal(null);
       invalidate();
     },
@@ -1086,6 +1054,19 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
     onLeaveTarget: (id) => setDropTargetId((cur) => (cur === id ? null : cur)),
     onDrop,
     onDeleteNode,
+    onEditDept: (node) => {
+      updateNodeMutation.reset();
+      createNodeMutation.reset();
+      moveMutation.reset();
+      setDeptModal({
+        mode: "edit",
+        id: String(node.id),
+        parentId: node.parent_id == null ? null : String(node.parent_id),
+        name: node.name,
+        type: node.type,
+        code: node.code,
+      });
+    },
     onDeleteVacancy,
     onEditEmployee,
     onEditVacancy,
@@ -1210,15 +1191,35 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
           onClose={() => {
             createNodeMutation.reset();
             moveMutation.reset();
+            updateNodeMutation.reset();
             setDeptModal(null);
           }}
           isPending={
-            createNodeMutation.isPending || moveMutation.isPending
+            createNodeMutation.isPending ||
+            moveMutation.isPending ||
+            updateNodeMutation.isPending
           }
           error={formatApiError(
-            createNodeMutation.error ?? moveMutation.error,
+            createNodeMutation.error ??
+              moveMutation.error ??
+              updateNodeMutation.error,
           )}
           onSubmit={(data: DeptFields) => {
+            if (deptModal.mode === "edit") {
+              updateNodeMutation.mutate({
+                id: Number(deptModal.id),
+                body: {
+                  code: data.code,
+                  name: data.name,
+                  type_code: data.type,
+                  parent_id:
+                    deptModal.parentId === null
+                      ? null
+                      : Number(deptModal.parentId),
+                },
+              });
+              return;
+            }
             if (data.moveNodeId) {
               const node = findNodeById(tree, data.moveNodeId);
               if (!node) return;
@@ -1339,10 +1340,11 @@ function StructurePage() {
           <CommentHeadingIcon />
         </h1>
         <PageDescription className="mt-2 max-w-3xl">
-          Потяните отдел — он закрепится справа от списка. Прокрутите список или
-          найдите родителя и нажмите на него, чтобы вставить. Стрелка раскрывает
-          ветку и во время переноса, Esc отменяет. Корзина для удаления — по
-          наведению на строку.
+          Карандаш открывает редактирование отдела. Потяните отдел — он
+          закрепится справа от списка. Прокрутите список или найдите родителя
+          и нажмите на него, чтобы вставить. Стрелка раскрывает ветку и во
+          время переноса, Esc отменяет. Корзина для удаления — по наведению на
+          строку.
         </PageDescription>
       </div>
 

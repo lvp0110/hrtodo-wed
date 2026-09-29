@@ -17,12 +17,23 @@ import {
 import { Search, X } from "lucide-react";
 import "@xyflow/react/dist/style.css";
 
-import { orgNodesApi, vacanciesApi } from "#/services/api";
+import {
+  employeeReportQuery,
+  employeesApi,
+  orgNodesApi,
+  vacanciesApi,
+} from "#/services/api";
 import { buildLayout } from "#/lib/orgTreeLayout";
 import { formatApiError } from "#/lib/apiError";
 import { formatVacancyError } from "#/lib/vacancyValidation";
+import { toEmployeeUpdateReq } from "#/lib/employeeUpdate";
 import { toVacancyUpdateReq } from "#/lib/vacancyUpdate";
+import {
+  employeeFromReports,
+  withReportVacancyFields,
+} from "#/lib/vacancyModalData";
 import { dictInputClass } from "#/components/settings/DictFormModal";
+import { ApiErrorModal } from "#/components/ApiErrorModal";
 import { CommentHeadingIcon } from "#/components/CommentHeadingIcon";
 import { PageDescription } from "#/components/PageHints";
 import { useTheme } from "#/components/ThemeProvider";
@@ -32,7 +43,9 @@ import { DeptModal } from "#/components/DeptModal";
 import { VacancyInfoModal } from "#/components/VacancyInfoModal";
 import { CreateVacancyModal } from "#/components/CreateVacancyModal";
 import { EditVacancyModal } from "#/components/EditVacancyModal";
+import { EmployeeInfoModal } from "#/components/EmployeeInfoModal";
 import type {
+  Employer,
   NodeCreateReq,
   NodeUpdateReq,
   OrgNode,
@@ -431,13 +444,13 @@ function DepartmentSearch({
           </div>
           <CommentHeadingIcon />
         </div>
-        <PageDescription className="mt-2 rounded-lg bg-white/95 px-3 py-2 shadow-sm dark:bg-gray-900/95">
-          Клик по шапке отдела открывает его карточку, по строке — вакансию.
-          Поиск приближает цепочку выше и ниже: клик по такому отделу
-          показывает сотрудников, повторный — скрывает. Кнопка у названия —
-          редактирование.
-          Пунктирная карточка создаёт отдел, строка «Добавить вакансию» —
-          вакансию.
+        <PageDescription className="mt-2">
+          Клик по должности открывает вакансию, по имени — карточку сотрудника.
+          Корзина удаляет свободную вакансию. Клик по шапке отдела открывает
+          его карточку. Поиск приближает цепочку выше и ниже: клик по такому
+          отделу показывает сотрудников, повторный — скрывает. Кнопка у
+          названия — редактирование. Пунктирная карточка создаёт отдел, строка
+          «Добавить вакансию» — вакансию.
         </PageDescription>
         {open && query.trim() && (
           <div
@@ -514,6 +527,9 @@ export function OrgChart() {
     useState<AddVacancyState | null>(null);
   const [editVacancyModal, setEditVacancyModal] =
     useState<VacancyModalData | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employer | null>(
+    null,
+  );
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [frame, setFrame] = useState({ width: 0, height: 0 });
@@ -545,6 +561,9 @@ export function OrgChart() {
       orgNodesApi.getTreeVacancies().then((res) => res.data as OrgNode[]),
     select: buildLayout,
   });
+
+  const activeReportQuery = useQuery(employeeReportQuery("active"));
+  const archivedReportQuery = useQuery(employeeReportQuery("archived"));
 
   const createNodeMutation = useMutation({
     mutationFn: (body: NodeCreateReq) => orgNodesApi.createNode(body),
@@ -589,6 +608,33 @@ export function OrgChart() {
     },
   });
 
+  const updateEmployeeMutation = useMutation({
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: number;
+      body: Parameters<typeof employeesApi.update>[1];
+    }) => employeesApi.update(id, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
+      queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
+      queryClient.invalidateQueries({ queryKey: ["orgTree"] });
+      setSelectedEmployee(null);
+    },
+  });
+
+  const deleteVacancyMutation = useMutation({
+    mutationFn: (id: number) => vacanciesApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orgTree"] });
+      queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
+      queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
+      setEditVacancyModal(null);
+      setVacancyModal(null);
+    },
+  });
+
   const baseNodes = useMemo(
     () =>
       layout?.nodes.map((n) =>
@@ -600,17 +646,42 @@ export function OrgChart() {
                 ...n.data,
                 highlighted: n.id === focusedId,
                 onVacancyClick: (d: VacancyModalData) => {
-                  // Заполненную вакансию (есть id) сразу открываем в форме редактирования.
-                  // Пустую (id === 0, пришла из empty_vacancy) показываем read-only.
-                  if (d.id > 0) setEditVacancyModal(d);
-                  else setVacancyModal(d);
+                  const enriched = withReportVacancyFields(d, [
+                    activeReportQuery.data,
+                    archivedReportQuery.data,
+                  ]);
+                  if (enriched.id > 0) setEditVacancyModal(enriched);
+                  else setVacancyModal(enriched);
+                },
+                onEditEmployeeClick: (employee: Employer) => {
+                  const fromReport = employeeFromReports(employee.id, [
+                    activeReportQuery.data,
+                    archivedReportQuery.data,
+                  ]);
+                  updateEmployeeMutation.reset();
+                  setSelectedEmployee(fromReport ?? employee);
+                },
+                onDeleteVacancyClick: (vacancy: Vacancy) => {
+                  if (vacancy.employer?.id || vacancy.id <= 0) return;
+                  const title =
+                    vacancy.position?.name ?? vacancy.position?.code ?? "—";
+                  if (window.confirm(`Удалить вакансию «${title}»?`)) {
+                    deleteVacancyMutation.mutate(vacancy.id);
+                  }
                 },
                 onAddVacancyClick: setAddVacancyModal,
               },
             }
           : n,
       ) ?? [],
-    [layout?.nodes, focusedId],
+    [
+      layout?.nodes,
+      focusedId,
+      activeReportQuery.data,
+      archivedReportQuery.data,
+      updateEmployeeMutation.reset,
+      deleteVacancyMutation.mutate,
+    ],
   );
 
   const neighborhood = useMemo(
@@ -857,6 +928,31 @@ export function OrgChart() {
               body: toVacancyUpdateReq(data),
             });
           }}
+        />
+      )}
+
+      {selectedEmployee && (
+        <EmployeeInfoModal
+          employee={selectedEmployee}
+          onClose={() => {
+            updateEmployeeMutation.reset();
+            setSelectedEmployee(null);
+          }}
+          isPending={updateEmployeeMutation.isPending}
+          error={formatApiError(updateEmployeeMutation.error)}
+          onSubmit={(fields) => {
+            updateEmployeeMutation.mutate({
+              id: selectedEmployee.id,
+              body: toEmployeeUpdateReq(selectedEmployee, fields),
+            });
+          }}
+        />
+      )}
+
+      {deleteVacancyMutation.isError && (
+        <ApiErrorModal
+          error={deleteVacancyMutation.error}
+          onClose={() => deleteVacancyMutation.reset()}
         />
       )}
     </>
