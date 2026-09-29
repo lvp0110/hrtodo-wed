@@ -52,12 +52,7 @@ import {
   type EmployeeVacancyCreateFields,
 } from "#/lib/employeeUpdate";
 import { toVacancyUpdateReq } from "#/lib/vacancyUpdate";
-import {
-  findExistingPositionSlot,
-  formatVacancyError,
-  NODE_POSITION_SLOT_EXISTS_MESSAGE,
-} from "#/lib/vacancyValidation";
-import { formatApiError } from "#/lib/apiError";
+import { formatApiError, formatVacancyError } from "#/lib/apiError";
 import { findOrgNodeByName } from "#/lib/orgTree";
 
 /** Город по коду офиса — в дереве вакансий бэк отдаёт только office, без city. */
@@ -839,17 +834,6 @@ function EmployeesPage() {
 
   const createEmployeeVacancyMutation = useMutation({
     mutationFn: async (data: EmployeeVacancyCreateFields) => {
-      // Проверка до POST /employees — иначе при node_position_slots_pkey
-      // снова появляются сотрудники без должности.
-      const existingSlot = findExistingPositionSlot(
-        treeQuery.data ?? [],
-        data.nodeId,
-        data.position,
-      );
-      if (existingSlot) {
-        throw new Error(NODE_POSITION_SLOT_EXISTS_MESSAGE);
-      }
-
       const shouldCreateEmployee =
         Boolean(data.surname.trim()) || Boolean(data.first_name.trim());
       let employeeId: number | null = null;
