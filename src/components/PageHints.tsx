@@ -61,7 +61,9 @@ export function PageDescription({
   if (!enabled) return null;
 
   return (
-    <p className={`text-xs text-gray-400 dark:text-gray-500 ${className}`}>
+    <p
+      className={`rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs leading-5 text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 ${className}`}
+    >
       {children}
     </p>
   );

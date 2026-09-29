@@ -1,6 +1,6 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { Pencil } from "lucide-react";
-import type { Vacancy, EmptyVacancy } from "#/types/api";
+import { Pencil, Trash2 } from "lucide-react";
+import type { Employer, Vacancy, EmptyVacancy } from "#/types/api";
 import type { AddVacancyState, VacancyModalData } from "#/types/orgChart";
 
 function employerName(v: Vacancy): string {
@@ -21,6 +21,8 @@ export function OrgNodeCard({ id, data }: NodeProps) {
     neighbor,
     toggleList,
     onVacancyClick,
+    onEditEmployeeClick,
+    onDeleteVacancyClick,
     onAddVacancyClick,
     onEditClick,
   } = data as {
@@ -36,6 +38,8 @@ export function OrgNodeCard({ id, data }: NodeProps) {
     vacancies: Vacancy[];
     emptyVacancies: EmptyVacancy[];
     onVacancyClick: (d: VacancyModalData) => void;
+    onEditEmployeeClick?: (employee: Employer) => void;
+    onDeleteVacancyClick?: (vacancy: Vacancy) => void;
     onAddVacancyClick: (d: AddVacancyState) => void;
     onEditClick?: () => void;
   };
@@ -58,6 +62,33 @@ export function OrgNodeCard({ id, data }: NodeProps) {
     e.stopPropagation();
     onAddVacancyClick({ deptId: id, deptName: label });
   }
+
+  function vacancyModalData(v: Vacancy): VacancyModalData {
+    return {
+      id: v.id,
+      nodeId: v.node_id,
+      position: v.position?.name ?? v.position?.code ?? "",
+      positionCode: v.position?.code ?? v.position?.name ?? "",
+      city: v.city?.name ?? "",
+      cityCode: v.city?.code ?? "",
+      office: v.office?.name,
+      officeCode: v.office?.code,
+      deptName: label,
+      isManager: v.is_manager,
+      employer: v.employer?.id
+        ? {
+            id: v.employer.id,
+            name: employerName(v),
+            email: v.employer.email,
+          }
+        : null,
+      jobOffer: v.job_offer_link,
+      description: v.position_description,
+    };
+  }
+
+  const linkClass =
+    "min-w-0 truncate border-0 bg-transparent p-0 text-left text-blue-600 hover:underline dark:text-blue-400";
 
   return (
     <>
@@ -121,70 +152,89 @@ export function OrgNodeCard({ id, data }: NodeProps) {
 
         {showEmployees && (
         <ul className="divide-y divide-gray-100 dark:divide-gray-700">
-          {vacancies.map((v, i) => (
+          {vacancies.map((v, i) => {
+            const canDelete = !v.employer?.id && v.id > 0;
+            return (
             <li
               key={i}
-              data-hint="Открывает вакансию: заполненную для правки, пустую только для просмотра"
-              className={`px-4 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${v.is_manager ? "border-l-2 border-l-amber-400 bg-amber-50/40 dark:bg-amber-500/5" : ""}`}
-              onMouseDown={stopAll}
-              onClick={(e) =>
-                openVacancy(e, {
-                  id: v.id,
-                  nodeId: v.node_id,
-                  position: v.position?.name ?? v.position?.code ?? "",
-                  positionCode: v.position?.code ?? v.position?.name ?? "",
-                  city: v.city?.name ?? "",
-                  cityCode: v.city?.code ?? "",
-                  office: v.office?.name,
-                  officeCode: v.office?.code,
-                  deptName: label,
-                  isManager: v.is_manager,
-                  employer: v.employer?.id
-                    ? {
-                        id: v.employer.id,
-                        name: employerName(v),
-                        email: v.employer.email,
-                      }
-                    : null,
-                  jobOffer: v.job_offer_link,
-                  description: v.position_description,
-                })
-              }
+              className={`flex items-start gap-1 px-4 py-1.5 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 ${v.is_manager ? "border-l-2 border-l-amber-400 bg-amber-50/40 dark:bg-amber-500/5" : ""}`}
             >
-              <div className="flex items-center gap-1 text-xs font-medium text-gray-800 dark:text-gray-200 truncate">
-                {v.is_manager && (
-                  <svg
-                    aria-label="Руководящая должность"
-                    width="11"
-                    height="11"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="text-amber-500 shrink-0"
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1 text-xs font-medium">
+                  {v.is_manager && (
+                    <svg
+                      aria-label="Руководящая должность"
+                      width="11"
+                      height="11"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      className="shrink-0 text-amber-500"
+                    >
+                      <path d="M12 2l2.6 7.6H22l-6.2 4.5 2.4 7.5L12 16.9 5.8 21.6l2.4-7.5L2 9.6h7.4z" />
+                    </svg>
+                  )}
+                  <button
+                    type="button"
+                    data-hint={
+                      v.id > 0
+                        ? "Открывает редактирование этой вакансии"
+                        : "Открывает просмотр свободной вакансии"
+                    }
+                    className={`${linkClass} font-medium`}
+                    onMouseDown={stopAll}
+                    onClick={(e) => openVacancy(e, vacancyModalData(v))}
                   >
-                    <path d="M12 2l2.6 7.6H22l-6.2 4.5 2.4 7.5L12 16.9 5.8 21.6l2.4-7.5L2 9.6h7.4z" />
-                  </svg>
-                )}
-                <span className="truncate">
-                  {v.position?.name ?? v.position?.code ?? "—"}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span
-                  className={`text-xs truncate ${v.employer?.id ? "text-gray-600 dark:text-gray-400" : "text-amber-500"}`}
-                >
-                  {employerName(v)}
-                </span>
-                {v.city?.name && (
-                  <>
-                    <span className="text-gray-300 dark:text-gray-600 text-xs">·</span>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
-                      {v.city.name}
+                    {v.position?.name ?? v.position?.code ?? "—"}
+                  </button>
+                </div>
+                <div className="mt-0.5 flex items-center gap-1.5">
+                  {v.employer?.id ? (
+                    <button
+                      type="button"
+                      data-hint="Открывает карточку сотрудника"
+                      className={`${linkClass} text-xs font-normal`}
+                      onMouseDown={stopAll}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditEmployeeClick?.(v.employer);
+                      }}
+                    >
+                      {employerName(v)}
+                    </button>
+                  ) : (
+                    <span className="truncate text-xs text-amber-500">
+                      Вакантно
                     </span>
-                  </>
-                )}
+                  )}
+                  {v.city?.name && (
+                    <>
+                      <span className="text-xs text-gray-300 dark:text-gray-600">·</span>
+                      <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                        {v.city.name}
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
+              {canDelete && (
+                <button
+                  type="button"
+                  title="Удалить вакансию"
+                  aria-label="Удалить вакансию"
+                  data-hint="Удаляет вакансию, на которую ещё не назначен сотрудник"
+                  className="nodrag nopan mt-0.5 shrink-0 rounded p-0.5 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
+                  onMouseDown={stopAll}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteVacancyClick?.(v);
+                  }}
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
             </li>
-          ))}
+            );
+          })}
           {emptyVacancies.map((v, i) => (
             <li
               key={`empty-${i}`}
