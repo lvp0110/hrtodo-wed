@@ -1,4 +1,5 @@
 import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
+import { CommentHeadingIcon } from "#/components/CommentHeadingIcon";
 
 export const Route = createFileRoute("/settings")({ component: SettingsLayout });
 
@@ -13,8 +14,9 @@ function SettingsLayout() {
   return (
     <div className="absolute inset-0 flex flex-col overflow-hidden">
       <header className="flex-shrink-0 border-b border-gray-200 bg-white px-8 pt-6 dark:border-gray-800 dark:bg-gray-900">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+        <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
           Настройки справочников
+          <CommentHeadingIcon />
         </h1>
         <nav className="mt-4 flex flex-wrap gap-1">
           {tabs.map((t) => (

@@ -28,6 +28,7 @@ import {
   vacanciesApi,
 } from "#/services/api";
 import { ApiErrorModal } from "#/components/ApiErrorModal";
+import { CommentHeadingIcon } from "#/components/CommentHeadingIcon";
 import { CreateVacancyModal } from "#/components/CreateVacancyModal";
 import { DeptModal } from "#/components/DeptModal";
 import { EditVacancyModal } from "#/components/EditVacancyModal";
@@ -61,8 +62,8 @@ const DEFAULT_EXPANDED_LEVELS = 3;
 
 /** Размер названия узла уменьшается с уровнем подчинения. */
 const NODE_TITLE_CLASS = [
-  "text-[22px] font-normal leading-7",
-  "text-[17px] font-normal leading-6",
+  "text-[18px] font-normal leading-6",
+  "text-[16px] font-normal leading-5",
   "text-[15px] font-normal leading-5",
   "text-[13px] font-normal leading-5",
   "text-xs font-normal leading-5",
@@ -1318,8 +1319,9 @@ function StructurePage() {
 
   return (
     <div className="absolute inset-0 overflow-auto bg-gray-50 px-8 py-6 dark:bg-gray-950">
-      <h1 className="mb-6 text-xl font-semibold text-gray-900 dark:text-gray-100">
+      <h1 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
         Структура
+        <CommentHeadingIcon />
       </h1>
 
       {treeQuery.isPending ? (
