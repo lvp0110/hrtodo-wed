@@ -6,7 +6,10 @@ import { DepartmentTreeSelect } from "#/components/DepartmentTreeSelect";
 import { EmployeeSelect } from "#/components/EmployeeSelect";
 import { dictQueries, officesApi, orgNodesApi } from "#/services/api";
 import { findManagerForVacancy } from "#/lib/orgTree";
-import { findEmployeeVacancyConflict } from "#/lib/vacancyValidation";
+import {
+  employeeVacancyConflictWarning,
+  findEmployeeVacancyConflict,
+} from "#/lib/vacancyValidation";
 import type {
   EditVacancyFormFields,
   VacancyModalData,
@@ -116,7 +119,6 @@ function EditVacancyForm({
   isPending,
   error,
 }: EditVacancyFormProps) {
-  const [localError, setLocalError] = useState<string | null>(null);
   const employeeOptions = useMemo(() => {
     const activeEmployees = employees.filter(
       (employee) => employee.status !== "archived",
@@ -163,7 +165,34 @@ function EditVacancyForm({
 
   const cityCode = watch("cityCode");
   const nodeId = watch("nodeId");
+  const position = watch("position");
+  const userId = watch("userId");
   const isManager = watch("isManager");
+  const [confirmedConflictKey, setConfirmedConflictKey] = useState<string | null>(
+    null,
+  );
+  const assignmentConflict = useMemo(
+    () =>
+      findEmployeeVacancyConflict(
+        orgNodes,
+        data.id,
+        nodeId,
+        position,
+        userId,
+      ),
+    [orgNodes, data.id, nodeId, position, userId],
+  );
+  const conflictKey = assignmentConflict
+    ? `${assignmentConflict.vacancyId}:${nodeId}:${position.trim().toLowerCase()}:${userId}`
+    : null;
+  const confirming = conflictKey !== null && confirmedConflictKey === conflictKey;
+  const assignmentWarning = assignmentConflict
+    ? `${employeeVacancyConflictWarning(assignmentConflict)} ${
+        confirming
+          ? "Нажмите «Всё равно сохранить», чтобы отправить."
+          : "Нажмите «Сохранить», чтобы подтвердить отправку."
+      }`
+    : null;
   const manager = useMemo(
     () => findManagerForVacancy(orgNodes, nodeId, data.id, isManager),
     [orgNodes, nodeId, data.id, isManager],
@@ -193,27 +222,12 @@ function EditVacancyForm({
   const officesDisabled = !cityCode || officesQuery.isPending || officesQuery.isError;
 
   function handleFormSubmit(formData: EditVacancyFormFields) {
-    setLocalError(null);
-
-    const conflict = findEmployeeVacancyConflict(
-      orgNodes,
-      data.id,
-      formData.nodeId,
-      formData.position,
-      formData.userId,
-    );
-
-    if (conflict) {
-      setLocalError(
-        `Сотрудник уже назначен на должность «${conflict.position}» в отделе «${conflict.deptName}».`,
-      );
+    if (conflictKey && confirmedConflictKey !== conflictKey) {
+      setConfirmedConflictKey(conflictKey);
       return;
     }
-
     onSubmit(formData);
   }
-
-  const displayError = localError ?? error;
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="px-6 py-5 space-y-4">
@@ -379,8 +393,14 @@ function EditVacancyForm({
         </span>
       </label>
 
-      {displayError && (
-        <p className="text-sm text-red-500 dark:text-red-400">{displayError}</p>
+      {assignmentWarning && (
+        <p className="text-sm text-amber-600 dark:text-amber-400">
+          {assignmentWarning}
+        </p>
+      )}
+
+      {error && (
+        <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
       )}
 
       <div className="flex gap-3 pt-1">
@@ -395,11 +415,15 @@ function EditVacancyForm({
         </button>
         <button
           type="submit"
-          data-hint="Сохраняет изменения вакансии и сотрудника"
+          data-hint={
+            confirming
+              ? "Отправляет изменения, несмотря на совпадение назначения"
+              : "Сохраняет изменения вакансии и сотрудника"
+          }
           disabled={!isValid || isPending}
           className="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          {isPending ? "Сохраняем…" : "Сохранить"}
+          {isPending ? "Сохраняем…" : confirming ? "Всё равно сохранить" : "Сохранить"}
         </button>
       </div>
     </form>

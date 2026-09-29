@@ -1,11 +1,6 @@
 import type { OrgNode } from "#/types/api";
 
-export {
-  NODE_POSITION_SLOT_EXISTS_MESSAGE,
-  formatVacancyError,
-} from "#/lib/apiError";
-
-type VacancyConflict = {
+export type VacancyConflict = {
   vacancyId: number;
   deptName: string;
   position: string;
@@ -24,6 +19,7 @@ function positionMatches(
   return code === key || name === key;
 }
 
+/** Тот же сотрудник уже на этой должности в этом отделе. */
 export function findEmployeeVacancyConflict(
   nodes: OrgNode[],
   vacancyId: number,
@@ -35,9 +31,9 @@ export function findEmployeeVacancyConflict(
 
   function walk(nodeList: OrgNode[]): VacancyConflict | null {
     for (const node of nodeList) {
-      for (const vacancy of node.vacancies) {
+      for (const vacancy of node.vacancies ?? []) {
         if (vacancy.id === vacancyId) continue;
-        if (vacancy.employer.id !== userId) continue;
+        if (vacancy.employer?.id !== userId) continue;
         if (vacancy.node_id !== nodeId) continue;
         if (!positionMatches(vacancy.position, positionKey)) continue;
 
@@ -49,7 +45,7 @@ export function findEmployeeVacancyConflict(
         };
       }
 
-      const inChild = walk(node.children);
+      const inChild = walk(node.children ?? []);
       if (inChild) return inChild;
     }
 
@@ -59,7 +55,7 @@ export function findEmployeeVacancyConflict(
   return walk(nodes);
 }
 
-/** Уже есть слот (занятый или «Вакантно») на должность в отделе — InsertVacancy даст node_position_slots_pkey. */
+/** В отделе уже есть слот на эту должность, в том числе строка «Вакантно». */
 export function findExistingPositionSlot(
   nodes: OrgNode[],
   nodeId: number,
@@ -89,3 +85,10 @@ export function findExistingPositionSlot(
   return walk(nodes);
 }
 
+export function existingPositionSlotWarning(conflict: VacancyConflict): string {
+  return `В отделе «${conflict.deptName}» уже есть слот на должность «${conflict.position}». Город и офис это совпадение не снимают.`;
+}
+
+export function employeeVacancyConflictWarning(conflict: VacancyConflict): string {
+  return `Сотрудник уже назначен на должность «${conflict.position}» в отделе «${conflict.deptName}».`;
+}

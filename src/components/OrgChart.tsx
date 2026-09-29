@@ -24,8 +24,7 @@ import {
   vacanciesApi,
 } from "#/services/api";
 import { buildLayout } from "#/lib/orgTreeLayout";
-import { formatApiError } from "#/lib/apiError";
-import { formatVacancyError } from "#/lib/vacancyValidation";
+import { formatApiError, formatVacancyError } from "#/lib/apiError";
 import { toEmployeeUpdateReq } from "#/lib/employeeUpdate";
 import { toVacancyUpdateReq } from "#/lib/vacancyUpdate";
 import {

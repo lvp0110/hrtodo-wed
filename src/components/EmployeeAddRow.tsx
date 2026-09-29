@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore, type ClipboardEvent } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ClipboardEvent } from "react";
 import { Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { dictInputClass } from "#/components/settings/DictFormModal";
@@ -9,6 +9,10 @@ import {
   isEmployeeVacancyFormComplete,
   type EmployeeVacancyCreateFields,
 } from "#/lib/employeeUpdate";
+import {
+  existingPositionSlotWarning,
+  findExistingPositionSlot,
+} from "#/lib/vacancyValidation";
 import { officesApi } from "#/services/api";
 import type { City, OrgNode } from "#/types/api";
 
@@ -249,6 +253,7 @@ interface EmployeeAddSharedProps {
 
 function useEmployeeAddForm({
   cities,
+  orgNodes,
   isPending,
   error,
   onSubmit,
@@ -261,6 +266,25 @@ function useEmployeeAddForm({
   const [localError, setLocalError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [showFieldErrors, setShowFieldErrors] = useState(false);
+  const [confirmedConflictKey, setConfirmedConflictKey] = useState<string | null>(
+    null,
+  );
+
+  const slotConflict = useMemo(() => {
+    if (!draft.nodeId || !draft.position.trim()) return null;
+    return findExistingPositionSlot(orgNodes, draft.nodeId, draft.position);
+  }, [orgNodes, draft.nodeId, draft.position]);
+  const conflictKey = slotConflict
+    ? `${slotConflict.vacancyId}:${draft.nodeId}:${draft.position.trim().toLowerCase()}`
+    : null;
+  const confirming = conflictKey !== null && confirmedConflictKey === conflictKey;
+  const slotWarning = slotConflict
+    ? `${existingPositionSlotWarning(slotConflict)} ${
+        confirming
+          ? "Нажмите «Всё равно создать», чтобы отправить."
+          : "Нажмите «Создать», чтобы подтвердить отправку."
+      }`
+    : null;
 
   const officesQuery = useQuery({
     queryKey: ["offices", "city", draft.cityId] as const,
@@ -298,6 +322,7 @@ function useEmployeeAddForm({
     setLocalError(null);
     setFieldErrors({});
     setShowFieldErrors(false);
+    setConfirmedConflictKey(null);
   }
 
   function updateDraft<K extends keyof EmployeeVacancyCreateFields>(
@@ -369,6 +394,10 @@ function useEmployeeAddForm({
     const errors = revealValidation();
     if (Object.keys(errors).length > 0) return;
     setLocalError(null);
+    if (conflictKey && confirmedConflictKey !== conflictKey) {
+      setConfirmedConflictKey(conflictKey);
+      return;
+    }
     onSubmit(draft);
   }
 
@@ -393,6 +422,8 @@ function useEmployeeAddForm({
     setIsExpanded,
     draft,
     displayError,
+    slotWarning,
+    confirming,
     fieldErrors: visibleFieldErrors,
     officesQuery,
     officesDisabled,
@@ -515,6 +546,8 @@ function EmployeeNameFields({
 
 function EmployeeAddActions({
   displayError,
+  warning,
+  confirming,
   isPending,
   onSubmit,
   onCancel,
@@ -522,6 +555,8 @@ function EmployeeAddActions({
   prepareWorkplaceReady,
 }: {
   displayError: string | null;
+  warning: string | null;
+  confirming: boolean;
   isPending: boolean;
   onSubmit: () => void;
   onCancel: () => void;
@@ -530,14 +565,23 @@ function EmployeeAddActions({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {warning && (
+        <p className="basis-full text-xs text-amber-600 dark:text-amber-400">
+          {warning}
+        </p>
+      )}
       <button
         type="button"
         onClick={onSubmit}
-        data-hint="Создаёт сотрудника и вакансию по заполненным полям"
+        data-hint={
+          confirming
+            ? "Отправляет форму, несмотря на совпадение с существующим слотом"
+            : "Создаёт сотрудника и вакансию по заполненным полям"
+        }
         disabled={isPending}
         className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {isPending ? "Создаём…" : "Создать"}
+        {isPending ? "Создаём…" : confirming ? "Всё равно создать" : "Создать"}
       </button>
       <button
         type="button"
@@ -699,6 +743,8 @@ export function EmployeeAddRow({
         <td colSpan={columnsCount} className="bg-blue-50 px-4 pb-3 pt-0 dark:bg-blue-950/40">
           <EmployeeAddActions
             displayError={form.displayError}
+            warning={form.slotWarning}
+            confirming={form.confirming}
             isPending={form.isPending}
             onSubmit={form.handleSubmit}
             onCancel={form.reset}
@@ -841,6 +887,8 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
       </div>
       <EmployeeAddActions
         displayError={form.displayError}
+        warning={form.slotWarning}
+        confirming={form.confirming}
         isPending={form.isPending}
         onSubmit={form.handleSubmit}
         onCancel={form.reset}

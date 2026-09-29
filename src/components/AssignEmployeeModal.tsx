@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { CloseButton } from "#/components/CloseButton";
 import { EmployeeSelect } from "#/components/EmployeeSelect";
 import { GENDER_OPTIONS } from "#/lib/employeeDisplay";
-import { findEmployeeVacancyConflict } from "#/lib/vacancyValidation";
+import {
+  employeeVacancyConflictWarning,
+  findEmployeeVacancyConflict,
+} from "#/lib/vacancyValidation";
 import { dictQueries, orgNodesApi } from "#/services/api";
 import type { EmployeeEditFields } from "#/lib/employeeUpdate";
 import type { VacancyModalData } from "#/types/orgChart";
@@ -41,6 +44,9 @@ export function AssignEmployeeModal({
   });
 
   const [localError, setLocalError] = useState<string | null>(null);
+  const [confirmedConflictKey, setConfirmedConflictKey] = useState<string | null>(
+    null,
+  );
 
   const {
     register,
@@ -65,6 +71,28 @@ export function AssignEmployeeModal({
   });
 
   const mode = watch("mode");
+  const existingUserId = watch("existingUserId");
+  const assignmentConflict = useMemo(() => {
+    if (mode !== "existing" || !existingUserId) return null;
+    return findEmployeeVacancyConflict(
+      orgTree.data ?? [],
+      vacancy.id,
+      vacancy.nodeId,
+      vacancy.position,
+      existingUserId,
+    );
+  }, [mode, existingUserId, orgTree.data, vacancy.id, vacancy.nodeId, vacancy.position]);
+  const conflictKey = assignmentConflict
+    ? `${assignmentConflict.vacancyId}:${existingUserId}`
+    : null;
+  const confirming = conflictKey !== null && confirmedConflictKey === conflictKey;
+  const assignmentWarning = assignmentConflict
+    ? `${employeeVacancyConflictWarning(assignmentConflict)} ${
+        confirming
+          ? "Нажмите «Всё равно назначить», чтобы отправить."
+          : "Нажмите «Назначить», чтобы подтвердить отправку."
+      }`
+    : null;
 
   function handleBackdropClick(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose();
@@ -83,27 +111,16 @@ export function AssignEmployeeModal({
       return;
     }
 
-    if (orgTree.isSuccess && data.mode === "existing" && data.existingUserId) {
-      const conflict = findEmployeeVacancyConflict(
-        orgTree.data ?? [],
-        vacancy.id,
-        vacancy.nodeId,
-        vacancy.position,
-        data.existingUserId,
-      );
-      if (conflict) {
-        setLocalError(
-          `Сотрудник уже назначен на должность «${conflict.position}» в отделе «${conflict.deptName}».`,
-        );
-        return;
-      }
+    if (conflictKey && confirmedConflictKey !== conflictKey) {
+      setConfirmedConflictKey(conflictKey);
+      return;
     }
 
     onSubmit(data);
   }
 
-  const dictsLoading = employees.isPending || orgTree.isPending;
-  const dictsError = employees.isError || orgTree.isError;
+  const dictsLoading = employees.isPending;
+  const dictsError = employees.isError;
   const displayError = localError ?? error;
   const employeeList = (employees.data ?? []).filter(
     (employee) => employee.status !== "archived",
@@ -295,6 +312,12 @@ export function AssignEmployeeModal({
               </>
             )}
 
+            {assignmentWarning && (
+              <p className="text-sm text-amber-600 dark:text-amber-400">
+                {assignmentWarning}
+              </p>
+            )}
+
             {displayError && (
               <p className="text-sm text-red-500 dark:text-red-400">{displayError}</p>
             )}
@@ -311,11 +334,15 @@ export function AssignEmployeeModal({
               </button>
               <button
                 type="submit"
-                data-hint="Назначает выбранного сотрудника на вакансию"
+                data-hint={
+                  confirming
+                    ? "Назначает сотрудника, несмотря на совпадение с другой вакансией"
+                    : "Назначает выбранного сотрудника на вакансию"
+                }
                 disabled={isPending}
                 className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {isPending ? "Назначаем…" : "Назначить"}
+                {isPending ? "Назначаем…" : confirming ? "Всё равно назначить" : "Назначить"}
               </button>
             </div>
           </form>
