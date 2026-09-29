@@ -17,6 +17,7 @@ type DepartmentTreeSelectBaseProps = {
   disabled?: boolean;
   className?: string;
   compact?: boolean;
+  hint?: string;
 };
 
 type DepartmentTreeSelectProps = DepartmentTreeSelectBaseProps &
@@ -87,6 +88,11 @@ function TreeRow({
             }}
             className="mt-0.5 shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
             aria-label={isExpanded ? "Свернуть" : "Развернуть"}
+            data-hint={
+              isExpanded
+                ? "Сворачивает вложенные отделы"
+                : "Раскрывает вложенные отделы"
+            }
           >
             <ChevronRight
               size={compact ? 14 : 16}
@@ -99,6 +105,7 @@ function TreeRow({
         <button
           type="button"
           onClick={() => onSelect(node)}
+          data-hint="Подставляет этот отдел"
           className="min-w-0 flex-1 text-left leading-snug break-words hover:underline"
         >
           {node.name}
@@ -130,6 +137,7 @@ export function DepartmentTreeSelect(props: DepartmentTreeSelectProps) {
     disabled = false,
     className = "",
     compact = false,
+    hint,
     variant,
   } = props;
 
@@ -265,6 +273,7 @@ export function DepartmentTreeSelect(props: DepartmentTreeSelectProps) {
         onClick={() => setIsOpen((open) => !open)}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
+        data-hint={hint}
         className={`${triggerClass} w-full min-w-0 disabled:opacity-60`}
       >
         <span
@@ -284,6 +293,11 @@ export function DepartmentTreeSelect(props: DepartmentTreeSelectProps) {
             type="button"
             role="option"
             aria-selected={rootSelected}
+            data-hint={
+              variant === "filter"
+                ? "Сбрасывает отбор по отделу"
+                : "Очищает выбранный отдел"
+            }
             onClick={selectRoot}
             className={`block w-full min-w-0 shrink-0 text-left leading-snug break-words ${panelRowClass} ${
               rootSelected
@@ -304,6 +318,7 @@ export function DepartmentTreeSelect(props: DepartmentTreeSelectProps) {
               onKeyDown={(e) => e.stopPropagation()}
               placeholder="Поиск отдела…"
               aria-label="Поиск отдела"
+              data-hint="Оставляет в списке отделы, в названии которых есть введённый текст"
               className={searchInputClass}
             />
           </div>

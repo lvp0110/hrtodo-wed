@@ -76,6 +76,7 @@ function OfficesPage() {
         <button
           type="button"
           onClick={() => setForm({ mode: "create" })}
+          data-hint="Открывает форму нового офиса"
           className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           <Plus size={16} />
@@ -209,7 +210,12 @@ function OfficeFormModal({
       submitLabel={isEdit ? "Сохранить" : "Создать"}
       pendingLabel={isEdit ? "Сохраняем…" : "Создаём…"}
     >
-      <Field label="Код" required error={errors.code?.message}>
+      <Field
+        label="Код"
+        required
+        hint="Задаёт короткий код, по которому офис хранится в справочнике"
+        error={errors.code?.message}
+      >
         <input
           {...register("code", { required: "Обязательное поле" })}
           autoFocus
@@ -218,7 +224,12 @@ function OfficeFormModal({
         />
       </Field>
 
-      <Field label="Название" required error={errors.name?.message}>
+      <Field
+        label="Название"
+        required
+        hint="Задаёт название офиса, которое видно в карточке сотрудника"
+        error={errors.name?.message}
+      >
         <input
           {...register("name", { required: "Обязательное поле" })}
           placeholder="Например: Головной офис"
@@ -226,7 +237,12 @@ function OfficeFormModal({
         />
       </Field>
 
-      <Field label="Город" required error={errors.city_id?.message}>
+      <Field
+        label="Город"
+        required
+        hint="Привязывает офис к городу"
+        error={errors.city_id?.message}
+      >
         <select
           {...register("city_id", {
             required: "Обязательное поле",

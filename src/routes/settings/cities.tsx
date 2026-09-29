@@ -60,6 +60,7 @@ function CitiesPage() {
         <button
           type="button"
           onClick={() => setForm({ mode: "create" })}
+          data-hint="Открывает форму нового города"
           className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           <Plus size={16} />
@@ -191,7 +192,12 @@ function CityFormModal({
       submitLabel={isEdit ? "Сохранить" : "Создать"}
       pendingLabel={isEdit ? "Сохраняем…" : "Создаём…"}
     >
-      <Field label="Код" required error={errors.code?.message}>
+      <Field
+        label="Код"
+        required
+        hint="Задаёт короткий код, по которому город хранится в справочнике"
+        error={errors.code?.message}
+      >
         <input
           {...register("code", { required: "Обязательное поле" })}
           autoFocus
@@ -200,7 +206,12 @@ function CityFormModal({
         />
       </Field>
 
-      <Field label="Название" required error={errors.name?.message}>
+      <Field
+        label="Название"
+        required
+        hint="Задаёт название города, которое видно в фильтрах и карточках"
+        error={errors.name?.message}
+      >
         <input
           {...register("name", { required: "Обязательное поле" })}
           placeholder="Например: Алматы"
@@ -208,7 +219,12 @@ function CityFormModal({
         />
       </Field>
 
-      <Field label="Страна" required error={errors.country_id?.message}>
+      <Field
+        label="Страна"
+        required
+        hint="Привязывает город к стране"
+        error={errors.country_id?.message}
+      >
         <select
           {...register("country_id", {
             required: "Обязательное поле",

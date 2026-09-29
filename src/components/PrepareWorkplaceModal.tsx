@@ -575,12 +575,14 @@ export function PrepareWorkplaceModal({
             <button
               type="button"
               onClick={handleDismiss}
+              data-hint="Закрывает окно и не отправляет письмо"
               className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
             >
               Отмена
             </button>
             <button
               type="submit"
+              data-hint="Отправляет письмо о подготовке рабочего места выбранному получателю"
               disabled={!recipientEmail.trim()}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
             >

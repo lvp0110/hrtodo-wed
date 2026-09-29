@@ -58,6 +58,7 @@ export function OrgNodeCard({ id, data }: NodeProps) {
         }`}
       >
         <div
+          data-hint="Открывает карточку отдела"
           className={`cursor-pointer select-none px-4 py-3 transition-colors ${
             highlighted
               ? "bg-blue-600 hover:bg-blue-500"
@@ -77,6 +78,7 @@ export function OrgNodeCard({ id, data }: NodeProps) {
           {vacancies.map((v, i) => (
             <li
               key={i}
+              data-hint="Открывает вакансию: заполненную для правки, пустую только для просмотра"
               className={`px-4 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${v.is_manager ? "border-l-2 border-l-amber-400 bg-amber-50/40 dark:bg-amber-500/5" : ""}`}
               onMouseDown={stopAll}
               onClick={(e) =>
@@ -140,6 +142,7 @@ export function OrgNodeCard({ id, data }: NodeProps) {
           {emptyVacancies.map((v, i) => (
             <li
               key={`empty-${i}`}
+              data-hint="Открывает просмотр свободной вакансии"
               className="px-4 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
               onMouseDown={stopAll}
               onClick={(e) =>
@@ -179,6 +182,7 @@ export function OrgNodeCard({ id, data }: NodeProps) {
 
           {/* Строка "добавить вакансию" */}
           <li
+            data-hint="Открывает форму новой вакансии в этом отделе"
             className="px-4 py-1.5 flex items-center gap-2 cursor-pointer text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors select-none"
             onMouseDown={stopAll}
             onClick={openAddVacancy}

@@ -10,19 +10,41 @@ import {
   Settings,
   Users,
 } from "lucide-react";
+import { PageHintsProvider } from "#/components/PageHints";
 import { authApi, authQueries } from "#/services/api";
 
 const NAV_ITEMS = [
-  { to: "/", icon: <Network size={16} />, label: "Оргструктура" },
-  { to: "/structure", icon: <ListTree size={16} />, label: "Структура" },
-  { to: "/employees", icon: <Users size={16} />, label: "Сотрудники" },
-  { to: "/settings", icon: <Settings size={16} />, label: "Настройки" },
+  {
+    to: "/",
+    icon: <Network size={16} />,
+    label: "Оргструктура",
+    hint: "Открывает схему отделов, должностей и вакансий",
+  },
+  {
+    to: "/structure",
+    icon: <ListTree size={16} />,
+    label: "Структура",
+    hint: "Открывает список отделов: их можно раскрывать, переносить и удалять",
+  },
+  {
+    to: "/employees",
+    icon: <Users size={16} />,
+    label: "Сотрудники",
+    hint: "Открывает таблицу сотрудников и вакансий с фильтрами и выгрузкой",
+  },
+  {
+    to: "/settings",
+    icon: <Settings size={16} />,
+    label: "Настройки",
+    hint: "Открывает справочники городов, офисов, стран и типов узлов",
+  },
 ] as const;
 
 interface NavItemProps {
   to: string;
   icon: ReactNode;
   label: string;
+  hint: string;
   collapsed: boolean;
   layout?: "sidebar" | "bottom";
 }
@@ -31,6 +53,7 @@ function NavItem({
   to,
   icon,
   label,
+  hint,
   collapsed,
   layout = "sidebar",
 }: NavItemProps) {
@@ -39,6 +62,7 @@ function NavItem({
   return (
     <Link
       to={to}
+      data-hint={hint}
       title={collapsed && !isBottom ? label : undefined}
       activeOptions={{ exact: to === "/" }}
       activeProps={{
@@ -103,6 +127,7 @@ function UserPanel({
       <button
         type="button"
         title="Выйти"
+        data-hint="Завершает сессию и открывает страницу входа"
         onClick={() => logoutMutation.mutate()}
         disabled={logoutMutation.isPending}
         className="flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
@@ -132,6 +157,7 @@ function UserPanel({
       <button
         type="button"
         title={collapsed ? "Выйти" : undefined}
+        data-hint="Завершает сессию и открывает страницу входа"
         onClick={() => logoutMutation.mutate()}
         disabled={logoutMutation.isPending}
         className={`flex w-full items-center rounded-lg py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100 ${
@@ -153,6 +179,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const collapsed = !expanded;
 
   return (
+    <PageHintsProvider>
     <div className="flex h-screen w-screen flex-col bg-gray-50 dark:bg-gray-950 sm:flex-row">
       <div className="relative hidden w-[70px] shrink-0 sm:block">
         <aside
@@ -179,6 +206,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             <button
               type="button"
               title={collapsed ? "Развернуть" : "Свернуть"}
+              data-hint={
+                collapsed
+                  ? "Показывает названия разделов в боковом меню"
+                  : "Оставляет в меню только значки разделов"
+              }
               onClick={() => setExpanded(!expanded)}
               className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
             >
@@ -196,6 +228,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 to={item.to}
                 icon={item.icon}
                 label={item.label}
+                hint={item.hint}
                 collapsed={collapsed}
               />
             ))}
@@ -215,15 +248,17 @@ export function AppShell({ children }: { children: ReactNode }) {
             <NavItem
               key={item.to}
               to={item.to}
-              icon={item.icon}
-              label={item.label}
-              collapsed={false}
-              layout="bottom"
+                icon={item.icon}
+                label={item.label}
+                hint={item.hint}
+                collapsed={false}
+                layout="bottom"
             />
           ))}
         </nav>
         <UserPanel collapsed layout="bottom" />
       </aside>
     </div>
+    </PageHintsProvider>
   );
 }

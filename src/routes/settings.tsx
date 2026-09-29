@@ -4,10 +4,14 @@ import { CommentHeadingIcon } from "#/components/CommentHeadingIcon";
 export const Route = createFileRoute("/settings")({ component: SettingsLayout });
 
 const tabs = [
-  { to: "/settings/cities", label: "Города" },
-  { to: "/settings/offices", label: "Офисы" },
-  { to: "/settings/countries", label: "Страны" },
-  { to: "/settings/orgnodetypes", label: "Типы узлов" },
+  { to: "/settings/cities", label: "Города", hint: "Открывает справочник городов" },
+  { to: "/settings/offices", label: "Офисы", hint: "Открывает справочник офисов" },
+  { to: "/settings/countries", label: "Страны", hint: "Открывает справочник стран" },
+  {
+    to: "/settings/orgnodetypes",
+    label: "Типы узлов",
+    hint: "Открывает справочник типов отделов на схеме",
+  },
 ] as const;
 
 function SettingsLayout() {
@@ -23,6 +27,7 @@ function SettingsLayout() {
             <Link
               key={t.to}
               to={t.to}
+              data-hint={t.hint}
               activeProps={{
                 className:
                   "border-blue-600 text-blue-700 dark:border-blue-400 dark:text-blue-300",

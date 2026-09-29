@@ -279,6 +279,7 @@ export function DeptModal({
             <button
               type="button"
               onClick={onClose}
+              data-hint="Закрывает форму и не меняет отдел"
               disabled={isPending}
               className="flex-1 px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
@@ -286,6 +287,7 @@ export function DeptModal({
             </button>
             <button
               type="submit"
+              data-hint="Сохраняет отдел: создаёт новый, переносит или обновляет существующий"
               disabled={!isValid || isPending || nodeTypesDisabled}
               className="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >

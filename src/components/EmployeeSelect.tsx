@@ -25,6 +25,7 @@ interface EmployeeSelectProps {
   vacantLabel?: string;
   className?: string;
   disabled?: boolean;
+  hint?: string;
 }
 
 export function EmployeeSelect({
@@ -34,6 +35,7 @@ export function EmployeeSelect({
   vacantLabel = "— Без сотрудника (вакантно) —",
   className = "",
   disabled = false,
+  hint,
 }: EmployeeSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -102,6 +104,7 @@ export function EmployeeSelect({
         onClick={() => setIsOpen((open) => !open)}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
+        data-hint={hint}
         className={`${dictInputClass} w-full min-w-0 text-left disabled:opacity-60`}
       >
         <span className="block truncate" title={selectedLabel}>
@@ -118,6 +121,7 @@ export function EmployeeSelect({
             type="button"
             role="option"
             aria-selected={isVacant}
+            data-hint="Снимает сотрудника и оставляет позицию вакантной"
             onClick={selectVacant}
             className={`block w-full min-w-0 px-3 py-2 text-left text-sm leading-snug break-words ${
               isVacant
@@ -138,6 +142,7 @@ export function EmployeeSelect({
               onKeyDown={(e) => e.stopPropagation()}
               placeholder="Поиск по ФИО"
               aria-label="Поиск по ФИО"
+              data-hint="Оставляет в списке сотрудников, в имени которых есть введённый текст"
               className={dictInputClass}
             />
           </div>
@@ -156,6 +161,7 @@ export function EmployeeSelect({
                     type="button"
                     role="option"
                     aria-selected={selected}
+                    data-hint="Назначает этого сотрудника на позицию"
                     onClick={() => selectEmployee(employee)}
                     className={`block w-full min-w-0 px-3 py-2 text-left text-sm leading-snug break-words ${
                       selected

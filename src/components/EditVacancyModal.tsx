@@ -305,6 +305,7 @@ function EditVacancyForm({
             setValue("nodeId", value, { shouldValidate: true })
           }
           placeholder="Выберите отдел"
+          hint="Переносит вакансию в выбранный отдел"
           className={errors.nodeId ? "rounded-lg ring-2 ring-red-400" : ""}
         />
         {errors.nodeId && (
@@ -320,6 +321,7 @@ function EditVacancyForm({
           employees={employeeOptions}
           value={watch("userId")}
           onChange={(userId) => setValue("userId", userId, { shouldValidate: true })}
+          hint="Назначает сотрудника на вакансию или оставляет её свободной"
         />
       </div>
 
@@ -369,6 +371,7 @@ function EditVacancyForm({
         <input
           {...register("isManager")}
           type="checkbox"
+          data-hint="Отмечает должность как руководящую"
           className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500"
         />
         <span className="text-sm text-gray-700 dark:text-gray-300">
@@ -384,6 +387,7 @@ function EditVacancyForm({
         <button
           type="button"
           onClick={onClose}
+          data-hint="Закрывает форму и не сохраняет изменения вакансии"
           disabled={isPending}
           className="flex-1 px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
@@ -391,6 +395,7 @@ function EditVacancyForm({
         </button>
         <button
           type="submit"
+          data-hint="Сохраняет изменения вакансии и сотрудника"
           disabled={!isValid || isPending}
           className="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >

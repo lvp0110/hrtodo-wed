@@ -61,6 +61,7 @@ function OrgNodeTypesPage() {
         <button
           type="button"
           onClick={() => setForm({ mode: "create" })}
+          data-hint="Открывает форму нового типа отдела"
           className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           <Plus size={16} />
@@ -165,7 +166,12 @@ function OrgNodeTypeFormModal({
       submitLabel={isEdit ? "Сохранить" : "Создать"}
       pendingLabel={isEdit ? "Сохраняем…" : "Создаём…"}
     >
-      <Field label="Код" required error={errors.code?.message}>
+      <Field
+        label="Код"
+        required
+        hint="Задаёт код типа, который используется в структуре"
+        error={errors.code?.message}
+      >
         <input
           {...register("code", { required: "Обязательное поле" })}
           autoFocus
@@ -174,7 +180,12 @@ function OrgNodeTypeFormModal({
         />
       </Field>
 
-      <Field label="Название" required error={errors.name?.message}>
+      <Field
+        label="Название"
+        required
+        hint="Задаёт название типа, которое видно в списке отделов"
+        error={errors.name?.message}
+      >
         <input
           {...register("name", { required: "Обязательное поле" })}
           placeholder="Например: Отдел"

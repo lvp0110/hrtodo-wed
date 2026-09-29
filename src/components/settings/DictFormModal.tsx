@@ -1,4 +1,4 @@
-import type { FormEvent, ReactNode } from "react";
+import { cloneElement, isValidElement, type FormEvent, type ReactElement, type ReactNode } from "react";
 import { CloseButton } from "#/components/CloseButton";
 
 interface DictFormModalProps {
@@ -61,6 +61,7 @@ export function DictFormModal({
             <button
               type="button"
               onClick={onClose}
+              data-hint="Закрывает форму и не сохраняет изменения"
               disabled={isPending}
               className="flex-1 px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
@@ -68,6 +69,7 @@ export function DictFormModal({
             </button>
             <button
               type="submit"
+              data-hint="Записывает введённые данные в справочник"
               disabled={!canSubmit || isPending}
               className="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
@@ -87,19 +89,28 @@ export function Field({
   label,
   required,
   error,
+  hint,
   children,
 }: {
   label: string;
   required?: boolean;
   error?: string;
+  hint?: string;
   children: ReactNode;
 }) {
+  const control =
+    hint && isValidElement(children)
+      ? cloneElement(children as ReactElement<{ "data-hint"?: string }>, {
+          "data-hint": hint,
+        })
+      : children;
+
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
         {label} {required && <span className="text-red-400">*</span>}
       </label>
-      {children}
+      {control}
       {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
     </div>
   );

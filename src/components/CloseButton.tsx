@@ -1,7 +1,11 @@
 export function CloseButton({ onClick }: { onClick: () => void }) {
   return (
     <button
+      type="button"
       onClick={onClick}
+      aria-label="Закрыть"
+      title="Закрыть"
+      data-hint="Закрывает окно без сохранения"
       className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 rounded"
     >
       <svg
