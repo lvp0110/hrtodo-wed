@@ -25,6 +25,7 @@ import { toVacancyUpdateReq } from "#/lib/vacancyUpdate";
 import { dictInputClass } from "#/components/settings/DictFormModal";
 import { CommentHeadingIcon } from "#/components/CommentHeadingIcon";
 import { PageDescription } from "#/components/PageHints";
+import { useTheme } from "#/components/ThemeProvider";
 import { OrgNodeCard } from "#/components/OrgNodeCard";
 import { AddNodeCard } from "#/components/AddNodeCard";
 import { DeptModal } from "#/components/DeptModal";
@@ -503,6 +504,7 @@ function upsertVacancy(tree: OrgNode[], vacancy: Vacancy): OrgNode[] {
 }
 
 export function OrgChart() {
+  const { resolved: colorMode } = useTheme();
   const queryClient = useQueryClient();
   const [deptModal, setDeptModal] = useState<DeptModalState | null>(null);
   const [vacancyModal, setVacancyModal] = useState<VacancyModalData | null>(
@@ -711,6 +713,7 @@ export function OrgChart() {
     <>
       <div ref={frameRef} className="absolute inset-0">
       <ReactFlow
+        colorMode={colorMode}
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
