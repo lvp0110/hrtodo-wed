@@ -49,6 +49,24 @@ export function usePageHints() {
   return value;
 }
 
+/** Описание функционала страницы. Видно, только пока включён значок комментариев. */
+export function PageDescription({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  const { enabled } = usePageHints();
+  if (!enabled) return null;
+
+  return (
+    <p className={`text-xs text-gray-400 dark:text-gray-500 ${className}`}>
+      {children}
+    </p>
+  );
+}
+
 export function PageHintsProvider({ children }: { children: ReactNode }) {
   const [enabled, setEnabled] = useState(false);
   const value = useMemo(

@@ -18,6 +18,7 @@ import {
 } from "#/services/api";
 import { ApiErrorModal } from "#/components/ApiErrorModal";
 import { CommentHeadingIcon } from "#/components/CommentHeadingIcon";
+import { PageDescription } from "#/components/PageHints";
 import { DeleteArchivedEmployeeModal } from "#/components/DeleteArchivedEmployeeModal";
 import {
   AssignEmployeeModal,
@@ -1097,10 +1098,19 @@ function EmployeesPage() {
 
   return (
     <div className="employees-page absolute inset-0 flex flex-col overflow-hidden bg-gray-50 px-4 py-6 min-[1070px]:px-8 dark:bg-gray-950">
-      <h1 className="mb-6 flex shrink-0 items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
-        Сотрудники
-        <CommentHeadingIcon />
-      </h1>
+      <div className="mb-6 shrink-0">
+        <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
+          Сотрудники
+          <CommentHeadingIcon />
+        </h1>
+        <PageDescription className="mt-2 max-w-3xl">
+          Фильтры сужают таблицу, счётчики переключают сотрудников, вакансии и
+          архив. Клик по ФИО открывает карточку, по городу, офису и отделу
+          фильтрует список, по должности открывает вакансию. Звезда оставляет
+          руководителей или их подчинённых. Кнопка с таблицей выгружает текущую
+          выборку в Excel.
+        </PageDescription>
+      </div>
       <div className="mb-6 flex shrink-0 flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:gap-3">
         <label className="max-md:w-full min-w-[160px] flex-1">
           <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">

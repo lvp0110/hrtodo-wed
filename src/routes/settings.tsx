@@ -1,5 +1,6 @@
 import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 import { CommentHeadingIcon } from "#/components/CommentHeadingIcon";
+import { PageDescription } from "#/components/PageHints";
 
 export const Route = createFileRoute("/settings")({ component: SettingsLayout });
 
@@ -22,6 +23,10 @@ function SettingsLayout() {
           Настройки справочников
           <CommentHeadingIcon />
         </h1>
+        <PageDescription className="mt-2 max-w-3xl">
+          Вкладки переключают справочник. «Добавить» открывает форму новой
+          записи, карандаш — редактирование, корзина — удаление.
+        </PageDescription>
         <nav className="mt-4 flex flex-wrap gap-1">
           {tabs.map((t) => (
             <Link

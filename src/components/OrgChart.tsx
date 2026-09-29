@@ -24,6 +24,7 @@ import { formatVacancyError } from "#/lib/vacancyValidation";
 import { toVacancyUpdateReq } from "#/lib/vacancyUpdate";
 import { dictInputClass } from "#/components/settings/DictFormModal";
 import { CommentHeadingIcon } from "#/components/CommentHeadingIcon";
+import { PageDescription } from "#/components/PageHints";
 import { OrgNodeCard } from "#/components/OrgNodeCard";
 import { AddNodeCard } from "#/components/AddNodeCard";
 import { DeptModal } from "#/components/DeptModal";
@@ -413,6 +414,11 @@ function DepartmentSearch({
           </div>
           <CommentHeadingIcon />
         </div>
+        <PageDescription className="mt-2 rounded-lg bg-white/95 px-3 py-2 shadow-sm dark:bg-gray-900/95">
+          Клик по шапке отдела открывает его карточку, по строке — вакансию.
+          Пунктирная карточка создаёт отдел, строка «Добавить вакансию» —
+          вакансию. Поиск находит отдел и приближает к нему цепочку выше и ниже.
+        </PageDescription>
         {open && query.trim() && (
           <div
             id="dept-search-list"

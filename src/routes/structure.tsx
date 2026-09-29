@@ -29,6 +29,7 @@ import {
 } from "#/services/api";
 import { ApiErrorModal } from "#/components/ApiErrorModal";
 import { CommentHeadingIcon } from "#/components/CommentHeadingIcon";
+import { PageDescription } from "#/components/PageHints";
 import { CreateVacancyModal } from "#/components/CreateVacancyModal";
 import { DeptModal } from "#/components/DeptModal";
 import { EditVacancyModal } from "#/components/EditVacancyModal";
@@ -1122,13 +1123,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
 
   return (
     <>
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <p className="text-xs text-gray-400 dark:text-gray-500">
-          Потяните отдел — он закрепится справа от списка. Прокрутите список или
-          найдите родителя и нажмите на него, чтобы вставить. Стрелка раскрывает
-          ветку и во время переноса, Esc отменяет. Корзина для удаления — по
-          наведению на строку.
-        </p>
+      <div className="mb-3 flex items-center justify-end gap-2">
         <div className="flex shrink-0 gap-2">
           <button
             type="button"
@@ -1338,10 +1333,18 @@ function StructurePage() {
 
   return (
     <div className="absolute inset-0 overflow-auto bg-gray-50 px-8 py-6 dark:bg-gray-950">
-      <h1 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
-        Структура
-        <CommentHeadingIcon />
-      </h1>
+      <div className="mb-6">
+        <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
+          Структура
+          <CommentHeadingIcon />
+        </h1>
+        <PageDescription className="mt-2 max-w-3xl">
+          Потяните отдел — он закрепится справа от списка. Прокрутите список или
+          найдите родителя и нажмите на него, чтобы вставить. Стрелка раскрывает
+          ветку и во время переноса, Esc отменяет. Корзина для удаления — по
+          наведению на строку.
+        </PageDescription>
+      </div>
 
       {treeQuery.isPending ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">Загрузка…</p>
