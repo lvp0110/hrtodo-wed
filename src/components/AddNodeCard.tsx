@@ -7,6 +7,7 @@ export function AddNodeCard() {
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
       <div
         style={{ width: ADD_NODE_WIDTH, height: ADD_NODE_HEIGHT }}
+        data-hint="Открывает форму нового отдела"
         className="group flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-400 dark:text-gray-500 hover:border-blue-400 hover:text-blue-500 dark:hover:border-blue-500 dark:hover:text-blue-400 cursor-pointer transition-colors shadow-sm"
       >
         <div className="flex items-center justify-center w-7 h-7 rounded-full border-2 border-current transition-colors">

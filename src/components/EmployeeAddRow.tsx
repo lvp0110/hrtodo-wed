@@ -231,6 +231,7 @@ function PrepareWorkplaceButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      data-hint="Открывает письмо о подготовке рабочего места для нового сотрудника"
       className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/40"
     >
       Подготовить рабочее место
@@ -435,6 +436,7 @@ function EmployeeNameFields({
           onChange={(e) => updateDraft("surname", e.target.value)}
           onPaste={handleNamePaste}
           placeholder="Фамилия"
+          data-hint="Записывает фамилию нового сотрудника. Можно вставить ФИО целиком"
           className={`${compactInputClass} ${fieldErrors?.surname ? invalidInputClass : ""}`}
         />
         <FieldError message={fieldErrors?.surname} />
@@ -446,6 +448,7 @@ function EmployeeNameFields({
           onChange={(e) => updateDraft("first_name", e.target.value)}
           onPaste={handleNamePaste}
           placeholder="Имя"
+          data-hint="Записывает имя нового сотрудника"
           className={`${compactInputClass} ${fieldErrors?.first_name ? invalidInputClass : ""}`}
         />
         <FieldError message={fieldErrors?.first_name} />
@@ -456,6 +459,7 @@ function EmployeeNameFields({
         onChange={(e) => updateDraft("second_name", e.target.value)}
         onPaste={handleNamePaste}
         placeholder="Отчество"
+        data-hint="Записывает отчество нового сотрудника"
         className={compactInputClass}
       />
       <input
@@ -463,6 +467,7 @@ function EmployeeNameFields({
         value={draft.personal_number}
         onChange={(e) => updateDraft("personal_number", e.target.value)}
         placeholder="Личный телефон"
+        data-hint="Сохраняет личный телефон сотрудника"
         className={compactInputClass}
         autoComplete="tel"
       />
@@ -471,6 +476,7 @@ function EmployeeNameFields({
         value={draft.work_number}
         onChange={(e) => updateDraft("work_number", e.target.value)}
         placeholder="Рабочий телефон"
+        data-hint="Сохраняет рабочий телефон сотрудника"
         className={compactInputClass}
         autoComplete="tel"
       />
@@ -479,12 +485,14 @@ function EmployeeNameFields({
         value={draft.email}
         onChange={(e) => updateDraft("email", e.target.value)}
         placeholder="Эл. почта"
+        data-hint="Сохраняет рабочую почту сотрудника"
         className={compactInputClass}
         autoComplete="email"
       />
       <select
         value={draft.gender}
         onChange={(e) => updateDraft("gender", e.target.value)}
+        data-hint="Указывает пол сотрудника"
         className={compactInputClass}
       >
         {GENDER_OPTIONS.map((option) => (
@@ -499,6 +507,7 @@ function EmployeeNameFields({
         onChange={(e) => updateDraft("hireDate", e.target.value)}
         className={compactInputClass}
         title="Дата устройства"
+        data-hint="Указывает дату выхода сотрудника на работу"
       />
     </>
   );
@@ -524,6 +533,7 @@ function EmployeeAddActions({
       <button
         type="button"
         onClick={onSubmit}
+        data-hint="Создаёт сотрудника и вакансию по заполненным полям"
         disabled={isPending}
         className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
       >
@@ -532,6 +542,7 @@ function EmployeeAddActions({
       <button
         type="button"
         onClick={onCancel}
+        data-hint="Закрывает форму и не создаёт запись"
         disabled={isPending}
         className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
       >
@@ -568,6 +579,7 @@ export function EmployeeAddRow({
   if (!form.isExpanded) {
     return (
       <tr
+        data-hint="Открывает форму нового сотрудника и вакансии"
         className="cursor-pointer bg-white text-sm font-normal normal-case tracking-normal text-gray-400 transition-colors hover:bg-gray-50 hover:text-blue-600 dark:bg-gray-900 dark:text-gray-500 dark:hover:bg-gray-800/40 dark:hover:text-blue-400"
         onClick={() => form.setIsExpanded(true)}
       >
@@ -599,6 +611,7 @@ export function EmployeeAddRow({
           <select
             value={form.draft.cityCode}
             onChange={(e) => form.handleCityChange(e.target.value)}
+            data-hint="Указывает город вакансии и обновляет список офисов"
             className={`${compactInputClass} min-w-[120px] ${form.fieldErrors.cityCode ? invalidInputClass : ""}`}
           >
             <option value="">Город *</option>
@@ -614,6 +627,7 @@ export function EmployeeAddRow({
           <select
             value={form.draft.officeCode}
             onChange={(e) => form.handleOfficeChange(e.target.value)}
+            data-hint="Привязывает вакансию к офису в выбранном городе"
             disabled={form.officesDisabled}
             className={`${compactInputClass} min-w-[120px] disabled:opacity-60 ${form.fieldErrors.officeCode ? invalidInputClass : ""}`}
           >
@@ -639,6 +653,7 @@ export function EmployeeAddRow({
             value={form.draft.nodeId}
             onChange={(nodeId) => form.updateDraft("nodeId", nodeId)}
             placeholder="Отдел *"
+            hint="Указывает отдел, в котором создаётся вакансия"
             compact
             className={form.fieldErrors.nodeId ? "rounded-lg ring-2 ring-red-400" : ""}
           />
@@ -651,6 +666,7 @@ export function EmployeeAddRow({
               value={form.draft.position}
               onChange={(e) => form.updateDraft("position", e.target.value)}
               placeholder="Должность *"
+              data-hint="Задаёт название должности для новой вакансии"
               className={`${compactInputClass} min-w-[140px] ${form.fieldErrors.position ? invalidInputClass : ""}`}
             />
             <FieldError message={form.fieldErrors.position} />
@@ -659,6 +675,7 @@ export function EmployeeAddRow({
                 type="checkbox"
                 checked={form.draft.isManager}
                 onChange={(e) => form.updateDraft("isManager", e.target.checked)}
+                data-hint="Отмечает должность как руководящую"
                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600"
               />
               <span>Руководящая должность</span>
@@ -672,6 +689,7 @@ export function EmployeeAddRow({
             value={form.draft.comment}
             onChange={(e) => form.updateDraft("comment", e.target.value)}
             placeholder="Комментарии"
+            data-hint="Сохраняет служебный комментарий к сотруднику и вакансии"
             rows={3}
             className={`${compactInputClass} w-full resize-y`}
           />
@@ -717,6 +735,7 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
       <button
         type="button"
         onClick={() => form.setIsExpanded(true)}
+        data-hint="Открывает форму нового сотрудника и вакансии"
         className="flex w-full items-center gap-2 bg-white px-4 py-3 text-left text-sm text-gray-400 transition-colors hover:bg-gray-50 hover:text-blue-600 dark:bg-gray-900 dark:text-gray-500 dark:hover:bg-gray-800/40 dark:hover:text-blue-400"
       >
         <Plus size={14} />
@@ -741,6 +760,7 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
             <select
               value={form.draft.cityCode}
               onChange={(e) => form.handleCityChange(e.target.value)}
+            data-hint="Указывает город вакансии и обновляет список офисов"
               className={`${compactInputClass} ${form.fieldErrors.cityCode ? invalidInputClass : ""}`}
             >
               <option value="">Город *</option>
@@ -756,6 +776,7 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
             <select
               value={form.draft.officeCode}
               onChange={(e) => form.handleOfficeChange(e.target.value)}
+            data-hint="Привязывает вакансию к офису в выбранном городе"
               disabled={form.officesDisabled}
               className={`${compactInputClass} disabled:opacity-60 ${form.fieldErrors.officeCode ? invalidInputClass : ""}`}
             >
@@ -781,6 +802,7 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
               value={form.draft.nodeId}
               onChange={(nodeId) => form.updateDraft("nodeId", nodeId)}
               placeholder="Отдел *"
+            hint="Указывает отдел, в котором создаётся вакансия"
               compact
               className={form.fieldErrors.nodeId ? "rounded-lg ring-2 ring-red-400" : ""}
             />
@@ -792,6 +814,7 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
               value={form.draft.position}
               onChange={(e) => form.updateDraft("position", e.target.value)}
               placeholder="Должность *"
+              data-hint="Задаёт название должности для новой вакансии"
               className={`${compactInputClass} ${form.fieldErrors.position ? invalidInputClass : ""}`}
             />
             <FieldError message={form.fieldErrors.position} />
@@ -801,6 +824,7 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
               type="checkbox"
               checked={form.draft.isManager}
               onChange={(e) => form.updateDraft("isManager", e.target.checked)}
+              data-hint="Отмечает должность как руководящую"
               className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600"
             />
             <span>Руководящая должность</span>
@@ -809,6 +833,7 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
             value={form.draft.comment}
             onChange={(e) => form.updateDraft("comment", e.target.value)}
             placeholder="Комментарии"
+            data-hint="Сохраняет служебный комментарий к сотруднику и вакансии"
             rows={3}
             className={`${compactInputClass} w-full resize-y sm:col-span-2`}
           />

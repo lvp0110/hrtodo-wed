@@ -23,6 +23,8 @@ import { formatApiError } from "#/lib/apiError";
 import { formatVacancyError } from "#/lib/vacancyValidation";
 import { toVacancyUpdateReq } from "#/lib/vacancyUpdate";
 import { dictInputClass } from "#/components/settings/DictFormModal";
+import { CommentHeadingIcon } from "#/components/CommentHeadingIcon";
+import { PageDescription } from "#/components/PageHints";
 import { OrgNodeCard } from "#/components/OrgNodeCard";
 import { AddNodeCard } from "#/components/AddNodeCard";
 import { DeptModal } from "#/components/DeptModal";
@@ -368,7 +370,8 @@ function DepartmentSearch({
   return (
     <Panel position="top-left" className="!m-3">
       <div ref={rootRef} className="nodrag nopan nowheel w-80">
-        <div className="relative">
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
           <Search
             size={15}
             className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-gray-400"
@@ -389,6 +392,7 @@ function DepartmentSearch({
             onKeyDown={onKeyDown}
             placeholder="Поиск по департаментам"
             aria-label="Поиск по департаментам"
+            data-hint="Находит отдел на схеме и приближает к нему"
             aria-expanded={open}
             aria-controls="dept-search-list"
             aria-activedescendant={
@@ -400,13 +404,21 @@ function DepartmentSearch({
             <button
               type="button"
               title="Очистить поиск"
+              data-hint="Сбрасывает поиск и возвращает общий вид схемы"
               onClick={clear}
               className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             >
               <X size={14} />
             </button>
           )}
+          </div>
+          <CommentHeadingIcon />
         </div>
+        <PageDescription className="mt-2 rounded-lg bg-white/95 px-3 py-2 shadow-sm dark:bg-gray-900/95">
+          Клик по шапке отдела открывает его карточку, по строке — вакансию.
+          Пунктирная карточка создаёт отдел, строка «Добавить вакансию» —
+          вакансию. Поиск находит отдел и приближает к нему цепочку выше и ниже.
+        </PageDescription>
         {open && query.trim() && (
           <div
             id="dept-search-list"
@@ -427,6 +439,7 @@ function DepartmentSearch({
                     type="button"
                     role="option"
                     aria-selected={selected}
+                    data-hint="Приближает схему к этому отделу"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => choose(dept)}
                     className={`block w-full px-3 py-2 text-left ${

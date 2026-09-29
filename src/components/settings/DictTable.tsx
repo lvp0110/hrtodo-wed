@@ -9,6 +9,10 @@ export interface DictColumn<T> {
   headerClassName?: string;
   onClick?: (row: T) => void;
   onHeaderClick?: () => void;
+  /** Что делает клик по ячейке. */
+  hint?: string | ((row: T) => string | undefined);
+  /** Что делает клик по заголовку. */
+  headerHint?: string;
 }
 
 interface DictTableProps<T> {
@@ -23,6 +27,9 @@ interface DictTableProps<T> {
   onArchive?: (row: T) => void;
   /** Если задан, кнопка архива показывается только для строк, где предикат истинен. */
   showArchive?: (row: T) => boolean;
+  editHint?: string;
+  deleteHint?: string | ((row: T) => string | undefined);
+  archiveHint?: string;
   rowHoverVariant?: "background" | "border";
   isLoading?: boolean;
   isError?: boolean;
@@ -42,6 +49,15 @@ const rowHoverClasses = {
     "hover:ring-1 hover:ring-inset hover:ring-gray-300 dark:hover:ring-gray-600",
 } as const;
 
+function rowHint<T>(
+  hint: string | ((row: T) => string | undefined) | undefined,
+  row: T,
+): string | undefined {
+  if (!hint) return undefined;
+  const text = typeof hint === "function" ? hint(row) : hint;
+  return text || undefined;
+}
+
 function RowActions<T>({
   row,
   onEdit,
@@ -49,6 +65,9 @@ function RowActions<T>({
   showDelete,
   onArchive,
   showArchive,
+  editHint,
+  deleteHint,
+  archiveHint,
 }: {
   row: T;
   onEdit?: (row: T) => void;
@@ -56,6 +75,9 @@ function RowActions<T>({
   showDelete?: (row: T) => boolean;
   onArchive?: (row: T) => void;
   showArchive?: (row: T) => boolean;
+  editHint?: string;
+  deleteHint?: string | ((row: T) => string | undefined);
+  archiveHint?: string;
 }) {
   const deleteVisible = Boolean(onDelete) && (showDelete ? showDelete(row) : true);
   const archiveVisible = Boolean(onArchive) && (showArchive ? showArchive(row) : true);
@@ -69,6 +91,7 @@ function RowActions<T>({
           type="button"
           onClick={() => onEdit(row)}
           aria-label="Редактировать"
+          data-hint={editHint ?? "Открывает форму редактирования этой записи"}
           className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-100"
         >
           <Pencil size={15} />
@@ -80,6 +103,7 @@ function RowActions<T>({
           onClick={() => onArchive?.(row)}
           aria-label="Архивировать"
           title="Архивировать"
+          data-hint={archiveHint ?? "Переносит запись в архив"}
           className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-100"
         >
           <Archive size={15} />
@@ -90,6 +114,9 @@ function RowActions<T>({
           type="button"
           onClick={() => onDelete?.(row)}
           aria-label="Удалить"
+          data-hint={
+            rowHint(deleteHint, row) ?? "Удаляет эту запись из справочника"
+          }
           className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
         >
           <Trash2 size={15} />
@@ -109,6 +136,9 @@ export function DictTable<T>({
   showDelete,
   onArchive,
   showArchive,
+  editHint,
+  deleteHint,
+  archiveHint,
   rowHoverVariant = "background",
   isLoading = false,
   isError = false,
@@ -166,6 +196,9 @@ export function DictTable<T>({
                       showDelete={showDelete}
                       onArchive={onArchive}
                       showArchive={showArchive}
+                      editHint={editHint}
+                      deleteHint={deleteHint}
+                      archiveHint={archiveHint}
                     />
                   ))}
                 </div>
@@ -183,6 +216,7 @@ export function DictTable<T>({
               <th
                 key={c.key}
                 onClick={c.onHeaderClick}
+                data-hint={c.onHeaderClick ? c.headerHint : undefined}
                 className={`bg-gray-50 px-4 py-3 font-medium dark:bg-gray-900 ${c.headerClassName ?? ""}${
                   c.onHeaderClick ? " cursor-pointer select-none" : ""
                 }`}
@@ -254,6 +288,7 @@ export function DictTable<T>({
                           }
                         : undefined
                     }
+                    data-hint={c.onClick ? rowHint(c.hint, row) : undefined}
                     className={`px-4 py-3 align-middle${c.onClick ? " cursor-pointer" : ""} ${c.className ?? ""}`}
                   >
                     {c.render(row)}
@@ -268,6 +303,9 @@ export function DictTable<T>({
                       showDelete={showDelete}
                       onArchive={onArchive}
                       showArchive={showArchive}
+                      editHint={editHint}
+                      deleteHint={deleteHint}
+                      archiveHint={archiveHint}
                     />
                   </td>
                 )}

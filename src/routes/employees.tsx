@@ -17,6 +17,8 @@ import {
   vacanciesApi,
 } from "#/services/api";
 import { ApiErrorModal } from "#/components/ApiErrorModal";
+import { CommentHeadingIcon } from "#/components/CommentHeadingIcon";
+import { PageDescription } from "#/components/PageHints";
 import { DeleteArchivedEmployeeModal } from "#/components/DeleteArchivedEmployeeModal";
 import {
   AssignEmployeeModal,
@@ -1096,6 +1098,19 @@ function EmployeesPage() {
 
   return (
     <div className="employees-page absolute inset-0 flex flex-col overflow-hidden bg-gray-50 px-4 py-6 min-[1070px]:px-8 dark:bg-gray-950">
+      <div className="mb-6 shrink-0">
+        <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
+          Сотрудники
+          <CommentHeadingIcon />
+        </h1>
+        <PageDescription className="mt-2 max-w-3xl">
+          Фильтры сужают таблицу, счётчики переключают сотрудников, вакансии и
+          архив. Клик по ФИО открывает карточку, по городу, офису и отделу
+          фильтрует список, по должности открывает вакансию. Звезда оставляет
+          руководителей или их подчинённых. Кнопка с таблицей выгружает текущую
+          выборку в Excel.
+        </PageDescription>
+      </div>
       <div className="mb-6 flex shrink-0 flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:gap-3">
         <label className="max-md:w-full min-w-[160px] flex-1">
           <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -1113,6 +1128,7 @@ function EmployeesPage() {
                 setFilters((prev) => ({ ...prev, name: e.target.value }))
               }
               placeholder="Поиск по ФИО"
+              data-hint="Оставляет в таблице сотрудников, в имени которых есть введённый текст"
               className={`${dictInputClass} pl-9`}
             />
           </div>
@@ -1133,6 +1149,7 @@ function EmployeesPage() {
                   office: "",
                 }))
               }
+              data-hint="Оставляет записи выбранной страны и сбрасывает город и офис"
               className={dictInputClass}
             >
               <option value="">Все страны</option>
@@ -1158,6 +1175,7 @@ function EmployeesPage() {
                 }))
               }
               disabled={Boolean(filters.country) && citiesForCountry.length === 0}
+              data-hint="Оставляет записи выбранного города и сбрасывает офис"
               className={`${dictInputClass} disabled:opacity-60`}
             >
               <option value="">
@@ -1183,6 +1201,7 @@ function EmployeesPage() {
                 setFilters((prev) => ({ ...prev, office: e.target.value }))
               }
               disabled={!filters.city || officesQuery.isPending}
+              data-hint="Оставляет записи выбранного офиса. Список появляется после выбора города"
               className={`${dictInputClass} disabled:opacity-60`}
             >
               <option value="">
@@ -1210,6 +1229,7 @@ function EmployeesPage() {
             tree={treeQuery.data ?? []}
             isLoading={treeQuery.isPending}
             value={filters.department}
+            hint="Оставляет записи выбранного отдела"
             onChange={(department) =>
               setFilters((prev) => ({ ...prev, department }))
             }
@@ -1232,6 +1252,7 @@ function EmployeesPage() {
                 setFilters((prev) => ({ ...prev, position: e.target.value }))
               }
               placeholder="Поиск по должности"
+              data-hint="Оставляет записи, в названии должности которых есть введённый текст"
               className={`${dictInputClass} pl-9`}
             />
           </div>
@@ -1247,6 +1268,7 @@ function EmployeesPage() {
               onChange={(e) =>
                 setFilters((prev) => ({ ...prev, gender: e.target.value }))
               }
+              data-hint="Оставляет сотрудников выбранного пола"
               className={dictInputClass}
             >
               <option value="">Все</option>
@@ -1265,6 +1287,7 @@ function EmployeesPage() {
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, hireYear: e.target.value }))
                 }
+                data-hint="Оставляет сотрудников, принятых в выбранном году"
                 className={`${dictInputClass} max-md:min-w-0 max-md:flex-1 min-w-[104px]`}
               >
                 <option value="">Год</option>
@@ -1279,6 +1302,7 @@ function EmployeesPage() {
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, hireMonth: e.target.value }))
                 }
+                data-hint="Оставляет сотрудников, принятых в выбранном месяце"
                 className={`${dictInputClass} max-md:min-w-0 max-md:flex-1 min-w-[84px]`}
               >
                 <option value="">Месяц</option>
@@ -1295,6 +1319,7 @@ function EmployeesPage() {
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, hireDay: e.target.value }))
                 }
+                data-hint="Оставляет сотрудников, принятых в выбранный день месяца"
                 className={`${dictInputClass} max-md:min-w-0 max-md:flex-1 min-w-[72px]`}
               >
                 <option value="">День</option>
@@ -1314,6 +1339,7 @@ function EmployeesPage() {
           <button
             type="button"
             onClick={resetAllFilters}
+            data-hint="Очищает все фильтры и снова показывает полный список"
             disabled={!hasFilters}
             className="min-w-[150px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
           >
@@ -1326,6 +1352,7 @@ function EmployeesPage() {
             disabled={exportMutation.isPending}
             title="Выгрузить в Excel"
             aria-label="Выгрузить в Excel"
+            data-hint="Скачивает текущую выборку таблицы файлом Excel"
             className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-emerald-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-emerald-400 dark:hover:bg-gray-700"
           >
             <FileSpreadsheet size={20} />
@@ -1341,6 +1368,7 @@ function EmployeesPage() {
                 setArchiveView(false);
                 setRowKindFilter((prev) => (prev === "employee" ? "all" : "employee"));
               }}
+              data-hint="Показывает только сотрудников. Повторное нажатие возвращает весь список"
               className={`inline-flex min-w-[72px] items-center justify-center rounded-lg border px-3 py-2 text-sm transition-colors ${
                 !archiveView && rowKindFilter === "employee"
                   ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-300"
@@ -1374,6 +1402,7 @@ function EmployeesPage() {
                 setArchiveView(false);
                 setRowKindFilter((prev) => (prev === "vacancy" ? "all" : "vacancy"));
               }}
+              data-hint="Показывает только вакансии. Повторное нажатие возвращает весь список"
               className={`inline-flex min-w-[72px] items-center justify-center rounded-lg border px-3 py-2 text-sm transition-colors ${
                 !archiveView && rowKindFilter === "vacancy"
                   ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-300"
@@ -1409,6 +1438,7 @@ function EmployeesPage() {
                 setManagerFilterId(null);
                 setArchiveView((prev) => !prev);
               }}
+              data-hint="Переключает таблицу между действующими сотрудниками и архивом"
               className={`inline-flex min-w-[72px] items-center justify-center rounded-lg border px-3 py-2 text-sm transition-colors ${
                 archiveView
                   ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-300"
@@ -1487,6 +1517,11 @@ function EmployeesPage() {
                       );
                     }}
                     aria-label="Руководитель"
+                    data-hint={
+                      managerFilterId === row.employee.id
+                        ? "Снимает отбор по подчинённым этого руководителя"
+                        : "Оставляет в таблице только подчинённых этого руководителя"
+                    }
                     title={
                       managerFilterId === row.employee.id
                         ? "Сбросить фильтр"
@@ -1507,11 +1542,17 @@ function EmployeesPage() {
               }
               headerContent={nameColumn}
               headerOnClick={headerOnClick}
+              headerHint={
+                row.kind === "employee"
+                  ? "Открывает карточку сотрудника"
+                  : "Открывает назначение сотрудника на эту вакансию"
+              }
               actions={actions}
               fields={[
                 {
                   key: "city",
                   label: "Город",
+                  hint: "Фильтрует таблицу по этому городу",
                   onClick: city
                     ? () => setFilters((prev) => ({ ...prev, city, office: "" }))
                     : undefined,
@@ -1524,6 +1565,7 @@ function EmployeesPage() {
                 {
                   key: "office",
                   label: "Офис",
+                  hint: "Фильтрует таблицу по этому офису",
                   onClick:
                     office && row.org
                       ? () =>
@@ -1542,6 +1584,7 @@ function EmployeesPage() {
                 {
                   key: "department",
                   label: "Отдел",
+                  hint: "Фильтрует таблицу по этому отделу",
                   onClick: department
                     ? () => setFilters((prev) => ({ ...prev, department }))
                     : undefined,
@@ -1554,6 +1597,7 @@ function EmployeesPage() {
                 {
                   key: "position",
                   label: "Должность",
+                  hint: "Открывает редактирование этой вакансии",
                   onClick: row.vacancy
                     ? () => setEditVacancyModal(row.vacancy!)
                     : undefined,
@@ -1591,11 +1635,20 @@ function EmployeesPage() {
               setManagersOnlyFilter((prev) => !prev);
               setManagerFilterId(null);
             },
+            headerHint: managersOnlyFilter
+              ? "Снимает отбор и снова показывает всех сотрудников"
+              : "Оставляет в таблице только руководителей",
             className: "text-center",
             onClick: (r) => {
               if (r.kind !== "employee" || !r.org?.isManager) return;
               setManagersOnlyFilter(false);
               setManagerFilterId((prev) => (prev === r.employee.id ? null : r.employee.id));
+            },
+            hint: (r) => {
+              if (r.kind !== "employee" || !r.org?.isManager) return undefined;
+              return managerFilterId === r.employee.id
+                ? "Снимает отбор по подчинённым этого руководителя"
+                : "Оставляет в таблице только подчинённых этого руководителя";
             },
             render: (r) =>
               r.kind === "employee" && r.org?.isManager ? (
@@ -1629,6 +1682,10 @@ function EmployeesPage() {
               }
               setAssignEmployeeTarget({ vacancy: row.vacancy, org: row.org });
             },
+            hint: (row) =>
+              row.kind === "employee"
+                ? "Открывает карточку сотрудника"
+                : "Открывает назначение сотрудника на эту вакансию",
             render: (r) =>
               r.kind === "employee" ? (
                 employeeNameContent(r.employee)
@@ -1647,6 +1704,8 @@ function EmployeesPage() {
               const city = r.org?.city;
               if (city) setFilters((prev) => ({ ...prev, city, office: "" }));
             },
+            hint: (r) =>
+              r.org?.city ? "Фильтрует таблицу по этому городу" : undefined,
             render: (r) => {
               const city = r.org?.city;
               return city ? (
@@ -1672,6 +1731,8 @@ function EmployeesPage() {
                 office: org.office,
               }));
             },
+            hint: (r) =>
+              r.org?.office ? "Фильтрует таблицу по этому офису" : undefined,
             render: (r) => {
               const office = r.org?.office;
               return office ? (
@@ -1692,6 +1753,10 @@ function EmployeesPage() {
               const department = r.org?.department;
               if (department) setFilters((prev) => ({ ...prev, department }));
             },
+            hint: (r) =>
+              r.org?.department
+                ? "Фильтрует таблицу по этому отделу"
+                : undefined,
             render: (r) => {
               const department = r.org?.department;
               return department ? (
@@ -1712,6 +1777,8 @@ function EmployeesPage() {
               const vacancy = r.vacancy;
               if (vacancy) setEditVacancyModal(vacancy);
             },
+            hint: (r) =>
+              r.vacancy ? "Открывает редактирование этой вакансии" : undefined,
             render: (r) => {
               const position = r.org?.position;
               return position ? (
@@ -1736,6 +1803,12 @@ function EmployeesPage() {
             row.kind === "employee" &&
             row.employee.status === "archived")
         }
+        deleteHint={(row) =>
+          row.kind === "vacancy"
+            ? "Безвозвратно удаляет вакансию"
+            : "Безвозвратно удаляет сотрудника из архива"
+        }
+        archiveHint="Снимает сотрудника со всех позиций и переносит его в архив"
         onDelete={(row) => {
           if (row.kind === "vacancy") {
             const vacancyTitle = row.org.position || "эту вакансию";

@@ -4,6 +4,7 @@ type CardField = {
   key: string;
   label: string;
   onClick?: () => void;
+  hint?: string;
   content: ReactNode;
 };
 
@@ -11,6 +12,7 @@ interface EmployeesRowCardProps {
   headerLeading?: ReactNode;
   headerContent: ReactNode;
   headerOnClick?: () => void;
+  headerHint?: string;
   fields: CardField[];
   actions?: ReactNode;
 }
@@ -19,6 +21,7 @@ export function EmployeesRowCard({
   headerLeading,
   headerContent,
   headerOnClick,
+  headerHint,
   fields,
   actions,
 }: EmployeesRowCardProps) {
@@ -32,6 +35,7 @@ export function EmployeesRowCard({
               headerOnClick ? " cursor-pointer" : ""
             }`}
             onClick={headerOnClick}
+            data-hint={headerOnClick ? headerHint : undefined}
           >
             {headerContent}
           </div>
@@ -48,6 +52,7 @@ export function EmployeesRowCard({
             <dd
               className={`mt-0.5 break-words${field.onClick ? " cursor-pointer" : ""}`}
               onClick={field.onClick}
+              data-hint={field.onClick ? field.hint : undefined}
             >
               {field.content}
             </dd>

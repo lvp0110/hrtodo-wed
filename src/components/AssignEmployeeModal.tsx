@@ -317,6 +317,7 @@ export function AssignEmployeeModal({
               <button
                 type="button"
                 onClick={onClose}
+                data-hint="Закрывает окно и не назначает сотрудника"
                 disabled={isPending}
                 className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
               >
@@ -324,6 +325,7 @@ export function AssignEmployeeModal({
               </button>
               <button
                 type="submit"
+                data-hint="Назначает выбранного сотрудника на вакансию"
                 disabled={isPending}
                 className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
               >

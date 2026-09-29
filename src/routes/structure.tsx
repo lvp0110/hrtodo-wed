@@ -28,6 +28,8 @@ import {
   vacanciesApi,
 } from "#/services/api";
 import { ApiErrorModal } from "#/components/ApiErrorModal";
+import { CommentHeadingIcon } from "#/components/CommentHeadingIcon";
+import { PageDescription } from "#/components/PageHints";
 import { CreateVacancyModal } from "#/components/CreateVacancyModal";
 import { DeptModal } from "#/components/DeptModal";
 import { EditVacancyModal } from "#/components/EditVacancyModal";
@@ -61,8 +63,8 @@ const DEFAULT_EXPANDED_LEVELS = 3;
 
 /** Размер названия узла уменьшается с уровнем подчинения. */
 const NODE_TITLE_CLASS = [
-  "text-[22px] font-normal leading-7",
-  "text-[17px] font-normal leading-6",
+  "text-[18px] font-normal leading-6",
+  "text-[16px] font-normal leading-5",
   "text-[15px] font-normal leading-5",
   "text-[13px] font-normal leading-5",
   "text-xs font-normal leading-5",
@@ -397,6 +399,7 @@ function VacancyRow({
       <button
         type="button"
         onClick={() => ctx.onEditVacancy(vacancy, deptName)}
+        data-hint="Открывает редактирование этой вакансии"
         className={linkClass}
       >
         {position}
@@ -406,6 +409,7 @@ function VacancyRow({
         <button
           type="button"
           onClick={() => ctx.onEditEmployee(vacancy.employer)}
+          data-hint="Открывает карточку сотрудника"
           className={`${linkClass} text-xs`}
         >
           {employerName(vacancy)}
@@ -425,6 +429,7 @@ function VacancyRow({
         <button
           type="button"
           title="Удалить вакансию"
+          data-hint="Удаляет вакансию, на которую ещё не назначен сотрудник"
           disabled={ctx.busy}
           onClick={() => ctx.onDeleteVacancy(vacancy)}
           className="ml-auto shrink-0 rounded p-1 text-gray-400 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 disabled:opacity-30 group-hover:opacity-100 dark:hover:bg-red-500/10"
@@ -500,6 +505,7 @@ function NodeTypeControl({
       <button
         type="button"
         title="Изменить тип"
+        data-hint="Открывает список, чтобы сменить тип отдела"
         disabled={ctx.typePending}
         onClick={(e) => {
           e.stopPropagation();
@@ -539,6 +545,7 @@ function NodeTypeControl({
                     type="button"
                     role="option"
                     aria-selected={selected}
+                    data-hint="Меняет тип отдела на выбранный"
                     disabled={ctx.typePending}
                     onClick={() => ctx.onChangeType(node, type.code)}
                     className={`block w-full truncate px-3 py-2 text-left text-sm disabled:opacity-50 ${
@@ -624,6 +631,7 @@ function TreeNode({
           e.stopPropagation();
           if (canAccept) ctx.onDrop(node.id);
         }}
+        data-hint="Раскрывает или сворачивает отдел. Во время переноса вставляет сюда переносимый отдел"
         className={`group flex select-none items-center gap-2 rounded-md border border-solid border-[#7198bb] py-2 pr-3 pl-1 transition-colors ${
           canAccept ? "cursor-copy" : "cursor-pointer"
         } ${isDragging ? "opacity-40" : ""} ${
@@ -639,7 +647,11 @@ function TreeNode({
         >
           {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </span>
-        <span data-drag-handle className="inline-flex shrink-0">
+        <span
+          data-drag-handle
+          data-hint="Берёт отдел, чтобы перенести его к другому родителю"
+          className="inline-flex shrink-0"
+        >
           <GripVertical
             size={14}
             className="cursor-grab text-gray-300 active:cursor-grabbing dark:text-gray-600"
@@ -660,6 +672,7 @@ function TreeNode({
           <button
             type="button"
             title="Удалить отдел со всем содержимым"
+            data-hint="Удаляет отдел вместе с вложенными отделами и вакансиями"
             disabled={ctx.busy}
             onClick={(e) => {
               e.stopPropagation();
@@ -699,6 +712,7 @@ function TreeNode({
             <button
               type="button"
               onClick={() => ctx.onAddDept(node)}
+              data-hint="Открывает форму нового отдела внутри этого"
               className="flex items-center gap-1 py-1.5 text-xs font-medium text-gray-400 transition-colors hover:text-blue-500 dark:text-gray-500 dark:hover:text-blue-400"
             >
               <Plus size={13} /> Добавить отдел
@@ -706,6 +720,7 @@ function TreeNode({
             <button
               type="button"
               onClick={() => ctx.onAddVacancy(node)}
+              data-hint="Открывает форму новой вакансии в этом отделе"
               className="flex items-center gap-1 py-1.5 text-xs font-medium text-gray-400 transition-colors hover:text-blue-500 dark:text-gray-500 dark:hover:text-blue-400"
             >
               <Plus size={13} /> Добавить вакансию
@@ -740,6 +755,7 @@ function HeldNodeCard({
         <button
           type="button"
           title="Отменить перенос"
+          data-hint="Возвращает отдел на место и отменяет перенос"
           onClick={onCancel}
           className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
         >
@@ -753,6 +769,7 @@ function HeldNodeCard({
           e.dataTransfer.setData("text/plain", String(node.id));
         }}
         onDragEnd={onDragFinished}
+        data-hint="Перетаскивает отдел на нового родителя"
         className="flex cursor-grab items-center gap-2 rounded-md border border-solid border-[#7198bb] py-2 pr-3 pl-2 active:cursor-grabbing"
       >
         <GripVertical
@@ -1106,17 +1123,12 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
 
   return (
     <>
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <p className="text-xs text-gray-400 dark:text-gray-500">
-          Потяните отдел — он закрепится справа от списка. Прокрутите список или
-          найдите родителя и нажмите на него, чтобы вставить. Стрелка раскрывает
-          ветку и во время переноса, Esc отменяет. Корзина для удаления — по
-          наведению на строку.
-        </p>
+      <div className="mb-3 flex items-center justify-end gap-2">
         <div className="flex shrink-0 gap-2">
           <button
             type="button"
             aria-pressed={vacancyFilter}
+            data-hint="Показывает или скрывает свободные вакансии в списке отделов"
             onClick={() => setVacancyFilter((on) => !on)}
             className={`rounded-md border px-3 py-1.5 text-sm text-amber-500 transition-colors ${
               vacancyFilter
@@ -1129,6 +1141,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
           <button
             type="button"
             onClick={() => setExpanded(new Set(allIds))}
+            data-hint="Раскрывает все отделы в списке"
             className="rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
           >
             Развернуть всё
@@ -1136,6 +1149,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
           <button
             type="button"
             onClick={() => setExpanded(new Set())}
+            data-hint="Сворачивает все отделы в списке"
             className="rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
           >
             Свернуть всё
@@ -1154,6 +1168,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Поиск по отделу, должности или сотруднику"
             aria-label="Поиск по структуре"
+            data-hint="Оставляет в списке отделы, должности и сотрудников, подходящие под запрос"
             className={`${dictInputClass} border-gray-200 pl-9 dark:border-gray-700`}
           />
         </div>
@@ -1318,9 +1333,18 @@ function StructurePage() {
 
   return (
     <div className="absolute inset-0 overflow-auto bg-gray-50 px-8 py-6 dark:bg-gray-950">
-      <h1 className="mb-6 text-xl font-semibold text-gray-900 dark:text-gray-100">
-        Структура
-      </h1>
+      <div className="mb-6">
+        <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
+          Структура
+          <CommentHeadingIcon />
+        </h1>
+        <PageDescription className="mt-2 max-w-3xl">
+          Потяните отдел — он закрепится справа от списка. Прокрутите список или
+          найдите родителя и нажмите на него, чтобы вставить. Стрелка раскрывает
+          ветку и во время переноса, Esc отменяет. Корзина для удаления — по
+          наведению на строку.
+        </PageDescription>
+      </div>
 
       {treeQuery.isPending ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">Загрузка…</p>
