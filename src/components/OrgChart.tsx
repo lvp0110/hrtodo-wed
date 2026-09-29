@@ -25,6 +25,7 @@ import { toVacancyUpdateReq } from "#/lib/vacancyUpdate";
 import { dictInputClass } from "#/components/settings/DictFormModal";
 import { CommentHeadingIcon } from "#/components/CommentHeadingIcon";
 import { PageDescription } from "#/components/PageHints";
+import { useTheme } from "#/components/ThemeProvider";
 import { OrgNodeCard } from "#/components/OrgNodeCard";
 import { AddNodeCard } from "#/components/AddNodeCard";
 import { DeptModal } from "#/components/DeptModal";
@@ -122,6 +123,7 @@ function buildNeighborhood(
   nodes: Node[],
   focusedId: string,
   frame: { width: number; height: number },
+  expandedIds: Set<string>,
 ): Neighborhood | null {
   const orgNodes = nodes.filter((node) => node.type === "orgNode");
   const byId = new Map(orgNodes.map((node) => [node.id, node]));
@@ -152,15 +154,25 @@ function buildNeighborhood(
     const positions = new Map<string, { x: number; y: number }>();
     const selectedHeight = cardHeight(selected, false);
     const centerX = selected.position.x + CARD_W / 2;
+    const shownHeight = (node: Node) =>
+      cardHeight(node, compact && !expandedIds.has(node.id));
 
-    let above = selected.position.y;
+    // Верхняя точка считается по сжатым шапкам, чтобы заголовок оставался
+    // на месте, а раскрытый список рос вниз и сдвигал карточки под ним.
+    let top = selected.position.y;
     for (const ancestor of ancestors) {
-      const height = cardHeight(ancestor, compact);
-      above -= CLUSTER_GAP_Y + height;
-      positions.set(ancestor.id, { x: centerX - CARD_W / 2, y: above });
+      top -= CLUSTER_GAP_Y + cardHeight(ancestor, compact);
     }
 
-    let below = selected.position.y + selectedHeight + CLUSTER_GAP_Y;
+    let y = top;
+    for (const ancestor of [...ancestors].reverse()) {
+      positions.set(ancestor.id, { x: centerX - CARD_W / 2, y });
+      y += shownHeight(ancestor) + CLUSTER_GAP_Y;
+    }
+
+    positions.set(selected.id, { x: selected.position.x, y });
+
+    let below = y + selectedHeight + CLUSTER_GAP_Y;
     for (const level of levels) {
       for (let index = 0; index < level.length; index += cols) {
         const row = level.slice(index, index + cols);
@@ -169,7 +181,7 @@ function buildNeighborhood(
         let x = centerX - rowWidth / 2;
         let rowHeight = 0;
         for (const node of row) {
-          const height = cardHeight(node, compact);
+          const height = shownHeight(node);
           positions.set(node.id, { x, y: below });
           rowHeight = Math.max(rowHeight, height);
           x += CARD_W + CLUSTER_GAP_X;
@@ -194,6 +206,7 @@ function buildNeighborhood(
     const viewBottom = centerY + visibleH / 2 - 16;
 
     for (const [id, position] of positions) {
+      if (id === focusedId) continue;
       const node = byId.get(id);
       if (!node) continue;
       const height = cardHeight(node, compact);
@@ -250,9 +263,11 @@ function filterDepartments(
 function FocusCamera({
   focusedId,
   memberIds,
+  layoutKey,
 }: {
   focusedId: string | null;
   memberIds: string[];
+  layoutKey: string;
 }) {
   const { fitView } = useReactFlow();
   const zoomedRef = useRef(false);
@@ -274,7 +289,9 @@ function FocusCamera({
       };
     }
 
-    const ids = membersKey ? membersKey.split("\0") : [focusedId];
+    const chain = membersKey ? membersKey.split("\0") : [focusedId];
+    const opened = layoutKey ? layoutKey.split("\0") : [];
+    const ids = opened.length ? [focusedId, ...opened] : chain;
     const timer = window.setTimeout(() => {
       zoomedRef.current = true;
       void fitView({
@@ -285,7 +302,7 @@ function FocusCamera({
       });
     }, 120);
     return () => window.clearTimeout(timer);
-  }, [focusedId, membersKey, fitView]);
+  }, [focusedId, membersKey, layoutKey, fitView]);
 
   return null;
 }
@@ -314,7 +331,7 @@ function DepartmentSearch({
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(event.target as globalThis.Node)) setOpen(false);
     };
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);
@@ -416,8 +433,11 @@ function DepartmentSearch({
         </div>
         <PageDescription className="mt-2 rounded-lg bg-white/95 px-3 py-2 shadow-sm dark:bg-gray-900/95">
           Клик по шапке отдела открывает его карточку, по строке — вакансию.
+          Поиск приближает цепочку выше и ниже: клик по такому отделу
+          показывает сотрудников, повторный — скрывает. Кнопка у названия —
+          редактирование.
           Пунктирная карточка создаёт отдел, строка «Добавить вакансию» —
-          вакансию. Поиск находит отдел и приближает к нему цепочку выше и ниже.
+          вакансию.
         </PageDescription>
         {open && query.trim() && (
           <div
@@ -484,6 +504,7 @@ function upsertVacancy(tree: OrgNode[], vacancy: Vacancy): OrgNode[] {
 }
 
 export function OrgChart() {
+  const { resolved: colorMode } = useTheme();
   const queryClient = useQueryClient();
   const [deptModal, setDeptModal] = useState<DeptModalState | null>(null);
   const [vacancyModal, setVacancyModal] = useState<VacancyModalData | null>(
@@ -494,10 +515,23 @@ export function OrgChart() {
   const [editVacancyModal, setEditVacancyModal] =
     useState<VacancyModalData | null>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [frame, setFrame] = useState({ width: 0, height: 0 });
   const frameRef = useRef<HTMLDivElement>(null);
   const onHighlight = useCallback((id: string | null) => {
     setFocusedId(id);
+    setExpandedIds(new Set());
+  }, []);
+
+  const openDeptEditor = useCallback((node: Node) => {
+    setDeptModal({
+      mode: "edit",
+      id: node.id,
+      parentId: (node.data.parentId as string | null) ?? null,
+      name: node.data.label as string,
+      type: node.data.type as string,
+      code: node.data.code as string,
+    });
   }, []);
 
   const {
@@ -581,8 +615,14 @@ export function OrgChart() {
 
   const neighborhood = useMemo(
     () =>
-      focusedId ? buildNeighborhood(baseNodes, focusedId, frame) : null,
-    [baseNodes, focusedId, frame],
+      focusedId
+        ? buildNeighborhood(baseNodes, focusedId, frame, expandedIds)
+        : null,
+    [baseNodes, focusedId, frame, expandedIds],
+  );
+  const expandedKey = useMemo(
+    () => [...expandedIds].sort().join("\0"),
+    [expandedIds],
   );
   const focusIds = useMemo(() => {
     if (!focusedId) return [];
@@ -595,6 +635,7 @@ export function OrgChart() {
     return baseNodes.map((node) => {
       const position = neighborhood.positions.get(node.id);
       const inCluster = neighborhood.memberIds.has(node.id);
+      const isNeighbor = inCluster && node.id !== focusedId;
       const hideAdd =
         node.type === "addNode" &&
         neighborhood.memberIds.has(String(node.data.parentId));
@@ -606,14 +647,15 @@ export function OrgChart() {
         zIndex: inCluster ? (node.id === focusedId ? 30 : 20) : node.zIndex,
         data: {
           ...node.data,
+          neighbor: isNeighbor,
+          toggleList: isNeighbor && neighborhood.compact,
           nearby:
-            neighborhood.compact &&
-            inCluster &&
-            node.id !== focusedId,
+            neighborhood.compact && isNeighbor && !expandedIds.has(node.id),
+          onEditClick: () => openDeptEditor(node),
         },
       };
     });
-  }, [baseNodes, neighborhood, focusedId]);
+  }, [baseNodes, neighborhood, focusedId, expandedIds, openDeptEditor]);
 
   const edges = useMemo(() => {
     const source = layout?.edges ?? [];
@@ -671,6 +713,7 @@ export function OrgChart() {
     <>
       <div ref={frameRef} className="absolute inset-0">
       <ReactFlow
+        colorMode={colorMode}
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
@@ -685,19 +728,33 @@ export function OrgChart() {
               parentLabel: node.data.parentLabel as string,
             });
           } else if (node.type === "orgNode") {
-            setDeptModal({
-              mode: "edit",
-              id: node.id,
-              parentId: (node.data.parentId as string | null) ?? null,
-              name: node.data.label as string,
-              type: node.data.type as string,
-              code: node.data.code as string,
-            });
+            const isNeighbor =
+              !!focusedId &&
+              neighborhood?.memberIds.has(node.id) &&
+              node.id !== focusedId;
+            if (isNeighbor) {
+              const target = _event.target as HTMLElement | null;
+              const onField = !!target?.closest?.("[data-dept-field]");
+              if (neighborhood?.compact && onField && !target?.closest?.("[data-dept-edit]")) {
+                setExpandedIds((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(node.id)) next.delete(node.id);
+                  else next.add(node.id);
+                  return next;
+                });
+              }
+              return;
+            }
+            openDeptEditor(node);
           }
         }}
       >
         <DepartmentSearch departments={departments} onHighlight={onHighlight} />
-        <FocusCamera focusedId={focusedId} memberIds={focusIds} />
+        <FocusCamera
+          focusedId={focusedId}
+          memberIds={focusIds}
+          layoutKey={expandedKey}
+        />
         <Background gap={24} size={1} />
       </ReactFlow>
       </div>

@@ -23,6 +23,8 @@ interface EmployeeSelectProps {
   value: number | null;
   onChange: (userId: number | null) => void;
   vacantLabel?: string;
+  allowVacant?: boolean;
+  placeholder?: string;
   className?: string;
   disabled?: boolean;
   hint?: string;
@@ -33,6 +35,8 @@ export function EmployeeSelect({
   value,
   onChange,
   vacantLabel = "— Без сотрудника (вакантно) —",
+  allowVacant = true,
+  placeholder = "Выберите сотрудника",
   className = "",
   disabled = false,
   hint,
@@ -49,7 +53,9 @@ export function EmployeeSelect({
 
   const selectedLabel = selectedEmployee
     ? employeeLabel(selectedEmployee)
-    : vacantLabel;
+    : allowVacant
+      ? vacantLabel
+      : placeholder;
 
   const filteredEmployees = useMemo(() => {
     const matched = employees.filter((employee) =>
@@ -107,7 +113,14 @@ export function EmployeeSelect({
         data-hint={hint}
         className={`${dictInputClass} w-full min-w-0 text-left disabled:opacity-60`}
       >
-        <span className="block truncate" title={selectedLabel}>
+        <span
+          className={`block truncate ${
+            !selectedEmployee && !allowVacant
+              ? "text-gray-400 dark:text-gray-500"
+              : ""
+          }`}
+          title={selectedLabel}
+        >
           {selectedLabel}
         </span>
       </button>
@@ -117,20 +130,22 @@ export function EmployeeSelect({
           role="listbox"
           className="absolute inset-x-0 top-full z-50 mt-1 max-h-72 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
         >
-          <button
-            type="button"
-            role="option"
-            aria-selected={isVacant}
-            data-hint="Снимает сотрудника и оставляет позицию вакантной"
-            onClick={selectVacant}
-            className={`block w-full min-w-0 px-3 py-2 text-left text-sm leading-snug break-words ${
-              isVacant
-                ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
-                : "text-gray-800 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
-            }`}
-          >
-            {vacantLabel}
-          </button>
+          {allowVacant && (
+            <button
+              type="button"
+              role="option"
+              aria-selected={isVacant}
+              data-hint="Снимает сотрудника и оставляет позицию вакантной"
+              onClick={selectVacant}
+              className={`block w-full min-w-0 px-3 py-2 text-left text-sm leading-snug break-words ${
+                isVacant
+                  ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+                  : "text-gray-800 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+              }`}
+            >
+              {vacantLabel}
+            </button>
+          )}
 
           <div className="border-b border-gray-100 bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900">
             <input

@@ -2,12 +2,12 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { CloseButton } from "#/components/CloseButton";
+import { EmployeeSelect } from "#/components/EmployeeSelect";
 import { GENDER_OPTIONS } from "#/lib/employeeDisplay";
 import { findEmployeeVacancyConflict } from "#/lib/vacancyValidation";
 import { dictQueries, orgNodesApi } from "#/services/api";
 import type { EmployeeEditFields } from "#/lib/employeeUpdate";
 import type { VacancyModalData } from "#/types/orgChart";
-import type { Employer } from "#/types/api";
 
 const inputClass =
   "w-full px-3 py-2 text-sm rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent";
@@ -25,18 +25,6 @@ interface AssignEmployeeModalProps {
   onSubmit: (data: AssignEmployeeFormFields) => void;
   isPending?: boolean;
   error?: string | null;
-}
-
-function employeeLabel({
-  surname,
-  first_name,
-  second_name,
-}: {
-  surname: string;
-  first_name: string;
-  second_name: string;
-}) {
-  return [surname, first_name, second_name].filter(Boolean).join(" ");
 }
 
 export function AssignEmployeeModal({
@@ -58,6 +46,7 @@ export function AssignEmployeeModal({
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<AssignEmployeeFormFields>({
     mode: "onChange",
@@ -125,7 +114,7 @@ export function AssignEmployeeModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onMouseDown={handleBackdropClick}
     >
-      <div className="mx-4 w-full max-w-md overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900">
+      <div className="mx-4 w-full max-w-md overflow-visible rounded-xl bg-white shadow-xl dark:bg-gray-900">
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
           <div>
             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
@@ -185,19 +174,16 @@ export function AssignEmployeeModal({
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Сотрудник <span className="text-red-400">*</span>
                 </label>
-                <select
-                  {...register("existingUserId", {
-                    setValueAs: (v) => (v === "" || v == null ? null : Number(v)),
-                  })}
-                  className={`${inputClass} border-gray-200 dark:border-gray-700`}
-                >
-                  <option value="">Выберите сотрудника</option>
-                  {employeeList.map((emp: Employer) => (
-                    <option key={emp.id} value={emp.id}>
-                      {employeeLabel(emp)}
-                    </option>
-                  ))}
-                </select>
+                <EmployeeSelect
+                  employees={employeeList}
+                  value={watch("existingUserId")}
+                  onChange={(userId) =>
+                    setValue("existingUserId", userId, { shouldValidate: true })
+                  }
+                  allowVacant={false}
+                  placeholder="Выберите сотрудника"
+                  hint="Открывает список сотрудников с поиском по ФИО"
+                />
               </div>
             ) : (
               <>

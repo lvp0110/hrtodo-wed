@@ -8,6 +8,7 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "#/components/AppShell";
 import { LoginForm } from "#/components/LoginForm";
+import { ThemeProvider } from "#/components/ThemeProvider";
 import { authQueries, dictQueries, employeeReportQuery, orgNodesApi } from "#/services/api";
 
 function RootShell() {
@@ -67,9 +68,9 @@ function RootShell() {
 
 export const Route = createRootRoute({
   component: () => (
-    <>
+    <ThemeProvider>
       <RootShell />
       <TanStackRouterDevtools position="bottom-right" />
-    </>
+    </ThemeProvider>
   ),
 });

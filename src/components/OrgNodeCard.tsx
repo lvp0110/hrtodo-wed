@@ -1,4 +1,5 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Pencil } from "lucide-react";
 import type { Vacancy, EmptyVacancy } from "#/types/api";
 import type { AddVacancyState, VacancyModalData } from "#/types/orgChart";
 
@@ -17,8 +18,11 @@ export function OrgNodeCard({ id, data }: NodeProps) {
     emptyVacancies,
     highlighted,
     nearby,
+    neighbor,
+    toggleList,
     onVacancyClick,
     onAddVacancyClick,
+    onEditClick,
   } = data as {
     label: string;
     type: string;
@@ -27,11 +31,19 @@ export function OrgNodeCard({ id, data }: NodeProps) {
     isRoot: boolean;
     highlighted?: boolean;
     nearby?: boolean;
+    neighbor?: boolean;
+    toggleList?: boolean;
     vacancies: Vacancy[];
     emptyVacancies: EmptyVacancy[];
     onVacancyClick: (d: VacancyModalData) => void;
     onAddVacancyClick: (d: AddVacancyState) => void;
+    onEditClick?: () => void;
   };
+
+  const showEmployees = !nearby;
+  const showEdit = Boolean(neighbor && showEmployees && onEditClick);
+  const headerToggles = Boolean(toggleList);
+  const headerOpens = !neighbor || headerToggles;
 
   function stopAll(e: React.SyntheticEvent) {
     e.stopPropagation();
@@ -58,22 +70,56 @@ export function OrgNodeCard({ id, data }: NodeProps) {
         }`}
       >
         <div
-          data-hint="Открывает карточку отдела"
-          className={`cursor-pointer select-none px-4 py-3 transition-colors ${
+          data-dept-field
+          data-hint={
+            headerToggles
+              ? nearby
+                ? "Показывает сотрудников отдела"
+                : "Скрывает сотрудников отдела"
+              : headerOpens
+                ? "Открывает карточку отдела"
+                : undefined
+          }
+          className={`select-none px-4 py-3 transition-colors ${
+            headerOpens ? "cursor-pointer" : ""
+          } ${
             highlighted
-              ? "bg-blue-600 hover:bg-blue-500"
-              : "bg-slate-600 hover:bg-slate-500 dark:bg-slate-700 dark:hover:bg-slate-600"
+              ? `bg-blue-600${headerOpens ? " hover:bg-blue-500" : ""}`
+              : `bg-slate-600 dark:bg-slate-700${
+                  headerOpens
+                    ? " hover:bg-slate-500 dark:hover:bg-slate-600"
+                    : ""
+                }`
           }`}
         >
           <div className="text-xs text-slate-300 font-medium uppercase tracking-wide">
             {type}
           </div>
-          <div className="text-sm font-semibold leading-tight text-white mt-0.5">
-            {label}
+          <div className="mt-0.5 flex items-start gap-1.5">
+            <div className="min-w-0 text-sm font-semibold leading-tight text-white">
+              {label}
+            </div>
+            {showEdit && (
+              <button
+                type="button"
+                title="Редактировать отдел"
+                aria-label="Редактировать отдел"
+                data-dept-edit
+                data-hint="Открывает редактирование отдела"
+                onMouseDown={stopAll}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEditClick?.();
+                }}
+                className="nodrag nopan mt-0.5 shrink-0 rounded p-0.5 text-white/80 hover:bg-white/15 hover:text-white"
+              >
+                <Pencil size={13} />
+              </button>
+            )}
           </div>
         </div>
 
-        {!nearby && (
+        {showEmployees && (
         <ul className="divide-y divide-gray-100 dark:divide-gray-700">
           {vacancies.map((v, i) => (
             <li

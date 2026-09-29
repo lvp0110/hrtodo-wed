@@ -11,6 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import { PageHintsProvider } from "#/components/PageHints";
+import { ThemeSwitch } from "#/components/ThemeSwitch";
 import { authApi, authQueries } from "#/services/api";
 
 const NAV_ITEMS = [
@@ -143,7 +144,7 @@ function UserPanel({
   }
 
   return (
-    <div className="mt-auto border-t border-gray-100 pt-3 dark:border-gray-800">
+    <div className="border-t border-gray-100 pt-3 dark:border-gray-800">
       {!collapsed && (
         <div className="px-3 pb-2">
           <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -234,7 +235,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             ))}
           </nav>
 
-          <UserPanel collapsed={collapsed} />
+          <div className="mt-auto">
+            <ThemeSwitch collapsed={collapsed} />
+            <UserPanel collapsed={collapsed} />
+          </div>
         </aside>
       </div>
 
@@ -256,6 +260,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             />
           ))}
         </nav>
+        <ThemeSwitch collapsed layout="bottom" />
         <UserPanel collapsed layout="bottom" />
       </aside>
     </div>
