@@ -57,8 +57,10 @@ export interface Employer {
   phone?: string;
   personal_number?: string;
   work_number?: string;
-  hire_date?: string;
+  hire_date?: string | null;
   gender?: string;
+  archived_at?: string | null;
+  archived_by?: string | null;
   city?: Entity | null;
   city_id?: number | null;
   office?: (Entity & { id?: number }) | null;
@@ -118,6 +120,39 @@ export interface EmployeeReportPosition {
 export interface EmployeeReportItem {
   employee: Employer;
   positions: EmployeeReportPosition[];
+}
+
+export type EmployeeHistoryEndType =
+  | "transferred"
+  | "unassigned"
+  | "archived"
+  | "correction";
+
+export interface EmployeePositionHistory {
+  id: number;
+  employee_id: number;
+  position_slot_id?: number | null;
+  node_id?: number | null;
+  office_id?: number | null;
+  position_code: string;
+  position_name: string;
+  node_code: string;
+  node_name: string;
+  office_code: string;
+  office_name: string;
+  is_manager: boolean;
+  started_at: string;
+  started_by?: string | null;
+  ended_at?: string | null;
+  ended_by?: string | null;
+  end_type?: EmployeeHistoryEndType | null;
+  end_reason?: string | null;
+  created_at: string;
+}
+
+export interface AssignEmployeeReq {
+  position_slot_id: number;
+  reason?: string;
 }
 
 export interface OrgNodeType {

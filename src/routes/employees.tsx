@@ -5,8 +5,8 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useMemo, useState, type SelectHTMLAttributes } from "react";
-import { ChevronDown, FileSpreadsheet, Search, Star } from "lucide-react";
+import { useMemo, useState, type ReactNode, type SelectHTMLAttributes } from "react";
+import { ChevronDown, FileSpreadsheet, IdCard, Search, Star } from "lucide-react";
 import {
   dictQueries,
   employeeReportQuery,
@@ -38,6 +38,8 @@ import type {
   City,
   Country,
   EmployeeReportItem,
+  EmployeeHistoryEndType,
+  EmployeePositionHistory,
   Employer,
   ExportRequest,
   Office,
@@ -124,6 +126,193 @@ function getHireDateParts(value: string | null | undefined): {
   const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
   return { year: match[1], month: match[2], day: match[3] };
+}
+
+const HISTORY_END_LABEL: Record<EmployeeHistoryEndType, string> = {
+  transferred: "Перевод",
+  unassigned: "Снятие",
+  archived: "Архив",
+  correction: "Корректировка",
+};
+
+const CARD_COLUMN_COUNT = 4;
+
+type HistoryLoad =
+  | { status: "ok"; items: EmployeePositionHistory[] }
+  | { status: "error" };
+
+function parseCardDate(value: string): Date | null {
+  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatCardDate(value: string | null | undefined): string {
+  if (!value?.trim()) return "—";
+  const date = parseCardDate(value);
+  if (!date) return "—";
+  return date.toLocaleDateString("ru-RU");
+}
+
+function pluralRu(value: number, one: string, few: string, many: string): string {
+  const abs = Math.abs(value) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return many;
+  if (last === 1) return one;
+  if (last >= 2 && last <= 4) return few;
+  return many;
+}
+
+function formatTenure(
+  hireDate: string | null | undefined,
+  until: string | null | undefined,
+): string {
+  if (!hireDate?.trim()) return "—";
+  const start = parseCardDate(hireDate);
+  const end = until?.trim() ? parseCardDate(until) : new Date();
+  if (!start || !end || end < start) return "—";
+
+  let years = end.getFullYear() - start.getFullYear();
+  let months = end.getMonth() - start.getMonth();
+  if (end.getDate() < start.getDate()) months -= 1;
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+  if (years < 0) return "—";
+
+  const parts: string[] = [];
+  if (years > 0) {
+    parts.push(`${years} ${pluralRu(years, "год", "года", "лет")}`);
+  }
+  if (months > 0) {
+    parts.push(`${months} ${pluralRu(months, "месяц", "месяца", "месяцев")}`);
+  }
+  if (parts.length > 0) return parts.join(" ");
+
+  const days = Math.floor((end.getTime() - start.getTime()) / 86_400_000);
+  if (days <= 0) return "меньше дня";
+  return `${days} ${pluralRu(days, "день", "дня", "дней")}`;
+}
+
+function sortHistory(items: EmployeePositionHistory[]): EmployeePositionHistory[] {
+  return [...items].sort((a, b) => {
+    const byStart = b.started_at.localeCompare(a.started_at);
+    return byStart !== 0 ? byStart : b.id - a.id;
+  });
+}
+
+function historyJournalText(item: EmployeePositionHistory): string {
+  const title = item.position_name || item.position_code || "Должность";
+  const place = [item.node_name, item.office_name].filter(Boolean).join(" · ");
+  const period = item.ended_at
+    ? `${formatCardDate(item.started_at)} — ${formatCardDate(item.ended_at)}`
+    : `с ${formatCardDate(item.started_at)}`;
+  return [
+    `${title}${item.is_manager ? " · руководитель" : ""}${item.ended_at ? "" : " · сейчас"}`,
+    place,
+    period,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function historyReasonText(item: EmployeePositionHistory): string {
+  const endLabel = item.end_type ? HISTORY_END_LABEL[item.end_type] : "";
+  return [endLabel, item.end_reason?.trim()].filter(Boolean).join(" · ");
+}
+
+async function loadEmployeeHistories(
+  ids: number[],
+): Promise<Record<number, HistoryLoad>> {
+  const unique = [...new Set(ids)];
+  const result: Record<number, HistoryLoad> = {};
+  let cursor = 0;
+  const workerCount = Math.min(6, unique.length);
+
+  async function worker() {
+    while (cursor < unique.length) {
+      const id = unique[cursor];
+      cursor += 1;
+      if (id == null) return;
+      try {
+        const res = await employeesApi.history(id);
+        result[id] = { status: "ok", items: res.data ?? [] };
+      } catch {
+        result[id] = { status: "error" };
+      }
+    }
+  }
+
+  if (workerCount > 0) {
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  }
+  return result;
+}
+
+function mutedDash() {
+  return <span className="text-gray-400">—</span>;
+}
+
+function cardHireDate(row: EmployeesTableRow): ReactNode {
+  if (row.kind !== "employee") return mutedDash();
+  return row.employee.hire_date ? formatCardDate(row.employee.hire_date) : mutedDash();
+}
+
+function cardTenure(row: EmployeesTableRow): ReactNode {
+  if (row.kind !== "employee") return mutedDash();
+  const tenure = formatTenure(
+    row.employee.hire_date,
+    row.employee.status === "archived" ? row.employee.archived_at : null,
+  );
+  return tenure === "—" ? mutedDash() : tenure;
+}
+
+function cardHistoryList(
+  row: EmployeesTableRow,
+  histories: Record<number, HistoryLoad> | undefined,
+  pending: boolean,
+  mode: "journal" | "reason",
+): ReactNode {
+  if (row.kind !== "employee") return mutedDash();
+  const load = histories?.[row.employee.id];
+  if (!load) {
+    if (pending) {
+      return <span className="text-gray-400">Загрузка…</span>;
+    }
+    return <span className="text-red-500 dark:text-red-400">Не удалось загрузить</span>;
+  }
+  if (load.status === "error") {
+    return <span className="text-red-500 dark:text-red-400">Не удалось загрузить</span>;
+  }
+
+  const items = sortHistory(load.items);
+  if (items.length === 0) {
+    return mode === "journal" ? (
+      <span className="text-gray-400">Перемещений пока нет</span>
+    ) : (
+      mutedDash()
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {items.map((item) => {
+        const text = mode === "journal" ? historyJournalText(item) : historyReasonText(item);
+        return (
+          <div
+            key={item.id}
+            className="whitespace-pre-line break-words border-b border-gray-100 pb-2 last:border-b-0 last:pb-0 dark:border-gray-800"
+          >
+            {text || mutedDash()}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 type EmployeeVacancyInfo = {
@@ -617,6 +806,7 @@ function FilterSelect({
 function EmployeesPage() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<EmployeeFilters>(emptyFilters);
+  const [showCardColumns, setShowCardColumns] = useState(false);
   const [archiveView, setArchiveView] = useState(false);
   const [rowKindFilter, setRowKindFilter] = useState<RowKindFilter>("all");
   const [managersOnlyFilter, setManagersOnlyFilter] = useState(false);
@@ -637,6 +827,20 @@ function EmployeesPage() {
   const activeReportQuery = useQuery(employeeReportQuery("active"));
   const archivedReportQuery = useQuery(employeeReportQuery("archived"));
   const reportQuery = archiveView ? archivedReportQuery : activeReportQuery;
+  const historiesQuery = useQuery({
+    queryKey: [
+      "employees",
+      "histories",
+      archiveView ? "archived" : "active",
+      reportQuery.dataUpdatedAt,
+    ] as const,
+    enabled: showCardColumns && reportQuery.isSuccess,
+    staleTime: 60_000,
+    queryFn: () =>
+      loadEmployeeHistories(
+        (reportQuery.data ?? []).map((item) => item.employee.id),
+      ),
+  });
   const citiesQuery = useQuery(dictQueries.cities);
   const countriesQuery = useQuery(dictQueries.countries);
   const treeQuery = useQuery({
@@ -1116,8 +1320,9 @@ function EmployeesPage() {
           Фильтры сужают таблицу, счётчики переключают сотрудников, вакансии и
           архив. Клик по ФИО открывает карточку, по городу, офису и отделу
           фильтрует список, по должности открывает вакансию. Звезда оставляет
-          руководителей или их подчинённых. Кнопка с таблицей выгружает текущую
-          выборку в Excel.
+          руководителей или их подчинённых. Кнопка карточки добавляет в таблицу
+          дату устройства, журнал перемещений, причину изменений и стаж. Кнопка
+          с таблицей выгружает текущую выборку в Excel.
         </PageDescription>
       </div>
       <div className="mb-6 flex shrink-0 flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:gap-3">
@@ -1353,18 +1558,6 @@ function EmployeesPage() {
             Сбросить фильтры
           </button>
 
-          <button
-            type="button"
-            onClick={() => exportMutation.mutate()}
-            disabled={exportMutation.isPending}
-            title="Выгрузить в Excel"
-            aria-label="Выгрузить в Excel"
-            data-hint="Скачивает текущую выборку таблицы файлом Excel"
-            className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-emerald-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-emerald-400 dark:hover:bg-gray-700"
-          >
-            <FileSpreadsheet size={20} />
-          </button>
-
           <div className="shrink-0">
             <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
               Сотрудники
@@ -1466,6 +1659,42 @@ function EmployeesPage() {
               )}
             </button>
           </div>
+
+          <button
+            type="button"
+            aria-pressed={showCardColumns}
+            aria-label={
+              showCardColumns
+                ? "Скрыть данные карточки"
+                : "Показать данные карточки"
+            }
+            title={
+              showCardColumns
+                ? "Скрыть данные карточки"
+                : "Показать данные карточки"
+            }
+            data-hint="Добавляет в таблицу дату устройства, журнал перемещений, причину изменений и стаж"
+            onClick={() => setShowCardColumns((value) => !value)}
+            className={`inline-flex h-[42px] w-[72px] shrink-0 items-center justify-center rounded-lg border transition-colors ${
+              showCardColumns
+                ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-300"
+                : "border-gray-200 bg-white text-gray-500 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            }`}
+          >
+            <IdCard size={32} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => exportMutation.mutate()}
+            disabled={exportMutation.isPending}
+            title="Выгрузить в Excel"
+            aria-label="Выгрузить в Excel"
+            data-hint="Скачивает текущую выборку таблицы файлом Excel"
+            className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-emerald-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-emerald-400 dark:hover:bg-gray-700"
+          >
+            <FileSpreadsheet size={20} />
+          </button>
         </div>
       </div>
 
@@ -1492,7 +1721,9 @@ function EmployeesPage() {
       <div className="min-h-0 flex-1 overflow-hidden">
       <DictTable<EmployeesTableRow>
         rowHoverVariant="border"
-        wrapperClassName="employees-dict-table h-full"
+        wrapperClassName={`employees-dict-table h-full${
+          showCardColumns ? " employees-card-columns" : ""
+        }`}
         renderMobileCard={(row, actions) => {
           const nameColumn = row.kind === "employee"
             ? employeeNameContent(row.employee)
@@ -1614,6 +1845,40 @@ function EmployeesPage() {
                     <span className="text-gray-400">—</span>
                   ),
                 },
+                ...(showCardColumns
+                  ? [
+                      {
+                        key: "hireDate",
+                        label: "Дата устройства",
+                        content: cardHireDate(row),
+                      },
+                      {
+                        key: "history",
+                        label: "Журнал перемещений",
+                        content: cardHistoryList(
+                          row,
+                          historiesQuery.data,
+                          !historiesQuery.data && !historiesQuery.isError,
+                          "journal",
+                        ),
+                      },
+                      {
+                        key: "changeReason",
+                        label: "Причина изменений",
+                        content: cardHistoryList(
+                          row,
+                          historiesQuery.data,
+                          !historiesQuery.data && !historiesQuery.isError,
+                          "reason",
+                        ),
+                      },
+                      {
+                        key: "tenure",
+                        label: "Стаж",
+                        content: cardTenure(row),
+                      },
+                    ]
+                  : []),
               ]}
             />
           );
@@ -1797,6 +2062,50 @@ function EmployeesPage() {
               );
             },
           },
+          ...(showCardColumns
+            ? [
+                {
+                  key: "hireDate",
+                  header: "Дата устройства",
+                  headerClassName: "whitespace-nowrap",
+                  className: "whitespace-nowrap align-top",
+                  render: (row: EmployeesTableRow) => cardHireDate(row),
+                },
+                {
+                  key: "history",
+                  header: "Журнал перемещений",
+                  headerClassName: "whitespace-normal",
+                  className: "min-w-[220px] whitespace-normal align-top",
+                  render: (row: EmployeesTableRow) =>
+                    cardHistoryList(
+                      row,
+                      historiesQuery.data,
+                      !historiesQuery.data && !historiesQuery.isError,
+                      "journal",
+                    ),
+                },
+                {
+                  key: "changeReason",
+                  header: "Причина изменений",
+                  headerClassName: "whitespace-normal",
+                  className: "min-w-[160px] whitespace-normal align-top",
+                  render: (row: EmployeesTableRow) =>
+                    cardHistoryList(
+                      row,
+                      historiesQuery.data,
+                      !historiesQuery.data && !historiesQuery.isError,
+                      "reason",
+                    ),
+                },
+                {
+                  key: "tenure",
+                  header: "Стаж",
+                  headerClassName: "whitespace-nowrap",
+                  className: "whitespace-nowrap align-top",
+                  render: (row: EmployeesTableRow) => cardTenure(row),
+                },
+              ]
+            : []),
         ]}
         rows={filteredRows}
         rowKey={(r) => r.id}
@@ -1846,7 +2155,8 @@ function EmployeesPage() {
           archiveView ? undefined : (
           <EmployeeAddRow
             key={addRowKey}
-            columnsCount={6}
+            columnsCount={6 + (showCardColumns ? CARD_COLUMN_COUNT : 0)}
+            trailingEmptyColumns={showCardColumns ? CARD_COLUMN_COUNT : 0}
             cities={citiesQuery.data ?? []}
             orgNodes={treeQuery.data ?? []}
             isPending={createEmployeeVacancyMutation.isPending}
