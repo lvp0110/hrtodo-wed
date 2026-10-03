@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { CloseButton } from "#/components/CloseButton";
 import { DepartmentTreeSelect } from "#/components/DepartmentTreeSelect";
 import { EmployeeSelect } from "#/components/EmployeeSelect";
@@ -40,13 +40,63 @@ export function EditVacancyModal({
     queryKey: ["orgTree"],
     queryFn: () => orgNodesApi.getTreeVacancies().then((res) => res.data ?? []),
   });
+  const cityList = cities.data ?? [];
+  const needsCityLookup = !data.cityCode && Boolean(data.officeCode);
+  const officeByCityQueries = useQueries({
+    queries: needsCityLookup
+      ? cityList.map((city) => ({
+          queryKey: ["offices", "city", city.id] as const,
+          queryFn: () =>
+            officesApi.getByCity(city.id).then((res) => res.data ?? []),
+          staleTime: 60_000,
+        }))
+      : [],
+  });
+  const resolvedCity = useMemo(() => {
+    if (!needsCityLookup) return null;
+    const index = officeByCityQueries.findIndex((query) =>
+      query.data?.some((office) => office.code === data.officeCode),
+    );
+    return index >= 0 ? (cityList[index] ?? null) : null;
+  }, [needsCityLookup, officeByCityQueries, data.officeCode, cityList]);
+  const modalData = useMemo<VacancyModalData>(() => {
+    if (!resolvedCity) return data;
+    return {
+      ...data,
+      city: data.city || resolvedCity.name,
+      cityCode: data.cityCode || resolvedCity.code,
+    };
+  }, [data, resolvedCity]);
+  const initialCityId =
+    cityList.find((city) => city.code === modalData.cityCode)?.id ?? null;
+  const initialOffices = useQuery({
+    queryKey: ["offices", "city", initialCityId] as const,
+    queryFn: () =>
+      officesApi.getByCity(initialCityId!).then((res) => res.data ?? []),
+    enabled: initialCityId !== null,
+    staleTime: 60_000,
+  });
 
   function handleBackdropClick(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose();
   }
 
+  const cityLookupDone =
+    !needsCityLookup ||
+    (cities.isSuccess &&
+      (cityList.length === 0 ||
+        (officeByCityQueries.length === cityList.length &&
+          officeByCityQueries.every((query) => query.isFetched))));
+  const officesReady =
+    initialCityId === null ||
+    initialOffices.isSuccess ||
+    initialOffices.isError;
   const dictsReady =
-    cities.isSuccess && employees.isSuccess && orgTree.isSuccess;
+    cities.isSuccess &&
+    employees.isSuccess &&
+    orgTree.isSuccess &&
+    cityLookupDone &&
+    officesReady;
   const dictsError = cities.isError || employees.isError || orgTree.isError;
 
   return (
@@ -82,7 +132,7 @@ export function EditVacancyModal({
 
           {dictsReady && (
             <EditVacancyForm
-              data={data}
+              data={modalData}
               cities={cities.data}
               employees={employees.data}
               orgNodes={orgTree.data ?? []}
@@ -208,18 +258,37 @@ function EditVacancyForm({
     enabled: selectedCityId !== null,
   });
 
-  useEffect(() => {
-    const currentOfficeCode = getValues("officeCode");
-    if (
-      currentOfficeCode &&
-      officesQuery.data &&
-      !officesQuery.data.some((office) => office.code === currentOfficeCode)
-    ) {
-      setValue("officeCode", "");
-    }
-  }, [cityCode, officesQuery.data, setValue, getValues]);
-
   const officesDisabled = !cityCode || officesQuery.isPending || officesQuery.isError;
+  const officeRestored = useRef(false);
+
+  useEffect(() => {
+    if (!officesQuery.isSuccess || !officesQuery.data) return;
+    const currentOfficeCode = getValues("officeCode");
+    const codes = new Set(officesQuery.data.map((office) => office.code));
+    if (currentOfficeCode && !codes.has(currentOfficeCode)) {
+      setValue("officeCode", "");
+      return;
+    }
+    const initial = data.officeCode ?? "";
+    if (
+      !officeRestored.current &&
+      !currentOfficeCode &&
+      initial &&
+      codes.has(initial) &&
+      cityCode === data.cityCode
+    ) {
+      setValue("officeCode", initial);
+    }
+    if (cityCode === data.cityCode) officeRestored.current = true;
+  }, [
+    cityCode,
+    data.cityCode,
+    data.officeCode,
+    officesQuery.isSuccess,
+    officesQuery.data,
+    setValue,
+    getValues,
+  ]);
 
   function handleFormSubmit(formData: EditVacancyFormFields) {
     if (conflictKey && confirmedConflictKey !== conflictKey) {
