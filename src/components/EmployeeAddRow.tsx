@@ -628,7 +628,7 @@ export function EmployeeAddRow({
         onClick={() => form.setIsExpanded(true)}
       >
         <td colSpan={columnsCount} className="bg-white px-4 py-3 dark:bg-gray-900">
-          <span className="inline-flex items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-md border border-solid border-[#7198bb] px-3 py-1.5">
             <Plus size={14} />
             Добавить сотрудника и вакансию
           </span>
@@ -782,7 +782,7 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
         type="button"
         onClick={() => form.setIsExpanded(true)}
         data-hint="Открывает форму нового сотрудника и вакансии"
-        className="flex w-full items-center gap-2 bg-white px-4 py-3 text-left text-sm text-gray-400 transition-colors hover:bg-gray-50 hover:text-blue-600 dark:bg-gray-900 dark:text-gray-500 dark:hover:bg-gray-800/40 dark:hover:text-blue-400"
+        className="flex w-full items-center gap-2 rounded-md border border-solid border-[#7198bb] bg-white px-4 py-3 text-left text-sm text-gray-400 transition-colors hover:bg-gray-50 hover:text-blue-600 dark:bg-gray-900 dark:text-gray-500 dark:hover:bg-gray-800/40 dark:hover:text-blue-400"
       >
         <Plus size={14} />
         Добавить сотрудника и вакансию

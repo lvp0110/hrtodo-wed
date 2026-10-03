@@ -128,11 +128,45 @@ function employerName(v: Vacancy): string {
   return [surname, first_name, second_name].filter(Boolean).join(" ");
 }
 
-function nodeChildCount(node: OrgNode): number {
+/** Уникальные сотрудники отдела и всех вложенных отделов. */
+function collectEmployeeTotals(nodes: OrgNode[]): Map<number, number> {
+  const totals = new Map<number, number>();
+
+  const walk = (node: OrgNode): Set<number> => {
+    const ids = new Set<number>();
+    for (const vacancy of node.vacancies ?? []) {
+      const id = vacancy.employer?.id;
+      if (id) ids.add(id);
+    }
+    for (const child of node.children ?? []) {
+      for (const id of walk(child)) ids.add(id);
+    }
+    totals.set(node.id, ids.size);
+    return ids;
+  };
+
+  for (const node of nodes) walk(node);
+  return totals;
+}
+
+function CountBadge({
+  count,
+  label,
+  className,
+}: {
+  count: number;
+  label: string;
+  className: string;
+}) {
+  if (count <= 0) return null;
   return (
-    (node.children?.length ?? 0) +
-    (node.vacancies?.length ?? 0) +
-    (node.empty_vacancy?.length ?? 0)
+    <span
+      title={label}
+      data-hint={label}
+      className={`rounded-full px-2 py-0.5 text-xs ${className}`}
+    >
+      {count}
+    </span>
   );
 }
 
@@ -316,6 +350,7 @@ interface TreeContext {
   onCloseTypeMenu: () => void;
   onChangeType: (node: OrgNode, typeCode: string) => void;
   showVacancies: boolean;
+  employeeTotals: Map<number, number>;
 }
 
 function VacancyRow({
@@ -520,7 +555,11 @@ function TreeNode({
   depth: number;
   ctx: TreeContext;
 }) {
-  const childCount = nodeChildCount(node);
+  const departmentCount = node.children?.length ?? 0;
+  const vacancies = node.vacancies ?? [];
+  const vacancyCount = vacancies.filter((vacancy) => !isOpenVacancy(vacancy)).length;
+  const emptyVacancyCount =
+    vacancies.filter(isOpenVacancy).length + (node.empty_vacancy?.length ?? 0);
   const isOpen = ctx.expanded.has(node.id);
   const isDragging = ctx.draggingId === node.id;
   const isDropTarget = ctx.dropTargetId === node.id;
@@ -609,10 +648,32 @@ function TreeNode({
           {node.name}
         </span>
         <div className="ml-auto flex shrink-0 items-center gap-1">
-          {childCount > 0 && (
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-              {childCount}
-            </span>
+          <CountBadge
+            count={departmentCount}
+            label="Количество дочерних отделов"
+            className="bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+          />
+          {isOpen ? (
+            <>
+              <CountBadge
+                count={vacancyCount}
+                label="Количество вакансий"
+                className="bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300"
+              />
+              {ctx.showVacancies && (
+                <CountBadge
+                  count={emptyVacancyCount}
+                  label="Количество пустых вакансий"
+                  className="bg-amber-500/10 text-amber-500"
+                />
+              )}
+            </>
+          ) : (
+            <CountBadge
+              count={ctx.employeeTotals.get(node.id) ?? 0}
+              label="Общее количество сотрудников"
+              className="bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300"
+            />
           )}
           <button
             type="button"
@@ -757,6 +818,8 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
     collectDefaultExpanded(tree, 1, acc);
     return acc;
   });
+  /** Узлы, которые пользователь свернул поверх авто-раскрытия фильтра. */
+  const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [vacancyFilter, setVacancyFilter] = useState(false);
   const [draggingId, setDraggingId] = useState<number | null>(null);
@@ -782,6 +845,8 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
     return acc;
   }, [tree]);
 
+  const employeeTotals = useMemo(() => collectEmployeeTotals(tree), [tree]);
+
   const filteredTree = useMemo(() => {
     const base = vacancyFilter ? filterDepartmentsWithVacancies(tree) : null;
     const searched = filterStructureTree(base?.nodes ?? tree, searchQuery);
@@ -791,12 +856,26 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
     return { nodes: searched.nodes, expandIds };
   }, [tree, searchQuery, vacancyFilter]);
 
+  const forceExpand = vacancyFilter || searchQuery.trim().length > 0;
+
   const effectiveExpanded = useMemo(() => {
-    if (!searchQuery.trim() && !vacancyFilter) return expanded;
+    if (!forceExpand) return expanded;
     const next = new Set(expanded);
-    for (const id of filteredTree.expandIds) next.add(id);
+    for (const id of filteredTree.expandIds) {
+      if (!collapsedIds.has(id)) next.add(id);
+    }
     return next;
-  }, [expanded, filteredTree.expandIds, searchQuery, vacancyFilter]);
+  }, [expanded, filteredTree.expandIds, collapsedIds, forceExpand]);
+
+  const revealNode = (id: number) => {
+    setExpanded((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+    setCollapsedIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["orgTree"] });
@@ -812,7 +891,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
         parent_id: vars.parentId,
       }),
     onSuccess: (_data, vars) => {
-      setExpanded((prev) => new Set(prev).add(vars.parentId));
+      revealNode(vars.parentId);
       setDeptModal(null);
       invalidate();
     },
@@ -831,9 +910,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
   const createNodeMutation = useMutation({
     mutationFn: (body: NodeCreateReq) => orgNodesApi.createNode(body),
     onSuccess: (_data, body) => {
-      if (body.parent_id !== null) {
-        setExpanded((prev) => new Set(prev).add(body.parent_id!));
-      }
+      if (body.parent_id !== null) revealNode(body.parent_id);
       setDeptModal(null);
       invalidate();
     },
@@ -873,7 +950,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
           old ? upsertVacancy(old, vacancy) : old,
         );
       }
-      setExpanded((prev) => new Set(prev).add(body.node_id));
+      revealNode(body.node_id);
       setAddVacancy(null);
       invalidate();
     },
@@ -885,13 +962,22 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
     deleteVacancyMutation.isPending ||
     changeTypeMutation.isPending;
 
-  const toggle = (id: number) =>
+  const toggle = (id: number) => {
+    const willOpen = !effectiveExpanded.has(id);
     setExpanded((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
+      if (willOpen) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+    if (!forceExpand) return;
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (willOpen) next.delete(id);
       else next.add(id);
       return next;
     });
+  };
 
   const canDrop = (targetId: number) =>
     draggingId !== null &&
@@ -1097,6 +1183,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
       changeTypeMutation.mutate({ node, typeCode });
     },
     showVacancies: vacancyFilter,
+    employeeTotals,
   };
 
   const heldNode =
@@ -1110,7 +1197,10 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
             type="button"
             aria-pressed={vacancyFilter}
             data-hint="Показывает или скрывает свободные вакансии в списке отделов"
-            onClick={() => setVacancyFilter((on) => !on)}
+            onClick={() => {
+              setCollapsedIds(new Set());
+              setVacancyFilter((on) => !on);
+            }}
             className={`rounded-md border px-3 py-1.5 text-sm text-amber-500 transition-colors ${
               vacancyFilter
                 ? "border-amber-500 bg-amber-500/10"
@@ -1121,7 +1211,10 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
           </button>
           <button
             type="button"
-            onClick={() => setExpanded(new Set(allIds))}
+            onClick={() => {
+              setCollapsedIds(new Set());
+              setExpanded(new Set(allIds));
+            }}
             data-hint="Раскрывает все отделы в списке"
             className="rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
           >
@@ -1129,7 +1222,12 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
           </button>
           <button
             type="button"
-            onClick={() => setExpanded(new Set())}
+            onClick={() => {
+              setExpanded(new Set());
+              setCollapsedIds(
+                forceExpand ? new Set(filteredTree.expandIds) : new Set(),
+              );
+            }}
             data-hint="Сворачивает все отделы в списке"
             className="rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
           >
@@ -1146,7 +1244,13 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
           <input
             type="search"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              const wasActive = searchQuery.trim().length > 0;
+              const willBeActive = value.trim().length > 0;
+              if (wasActive !== willBeActive) setCollapsedIds(new Set());
+              setSearchQuery(value);
+            }}
             placeholder="Поиск по отделу, должности или сотруднику"
             aria-label="Поиск по структуре"
             data-hint="Оставляет в списке отделы, должности и сотрудников, подходящие под запрос"
