@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, useSyncExternalStore, type ClipboardEvent } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ClipboardEvent, type MouseEvent } from "react";
 import { Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { CloseButton } from "#/components/CloseButton";
 import { dictInputClass } from "#/components/settings/DictFormModal";
 import { DepartmentTreeSelect } from "#/components/DepartmentTreeSelect";
 import { PrepareWorkplaceModal } from "#/components/PrepareWorkplaceModal";
@@ -162,6 +163,51 @@ export function clearEmployeeAddDraft() {
   employeeAddStoreListeners.forEach((listener) => listener());
 }
 
+interface EmployeeAddStoreApi {
+  snapshot: () => EmployeeAddFormStore;
+  subscribe: (listener: () => void) => () => void;
+  update: (
+    updater:
+      | EmployeeAddFormStore
+      | ((prev: EmployeeAddFormStore) => EmployeeAddFormStore),
+  ) => void;
+  clear: () => void;
+}
+
+const globalEmployeeAddStore: EmployeeAddStoreApi = {
+  snapshot: getEmployeeAddStoreSnapshot,
+  subscribe: subscribeEmployeeAddStore,
+  update: setEmployeeAddStore,
+  clear: clearEmployeeAddDraft,
+};
+
+function createLocalEmployeeAddStore(
+  initial: EmployeeAddFormStore,
+): EmployeeAddStoreApi {
+  let state = initial;
+  const listeners = new Set<() => void>();
+  return {
+    snapshot: () => state,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    update: (updater) => {
+      state = typeof updater === "function" ? updater(state) : updater;
+      listeners.forEach((listener) => listener());
+    },
+    clear: () => {
+      state = {
+        draft: { ...emptyDraft, nodeId: initial.draft.nodeId },
+        isExpanded: true,
+      };
+      listeners.forEach((listener) => listener());
+    },
+  };
+}
+
 const compactInputClass = `${dictInputClass} min-w-0 px-2 py-1.5 text-xs`;
 const fieldErrorClass = "mt-1 text-xs text-red-500 dark:text-red-400";
 const invalidInputClass = "border-red-400 dark:border-red-500";
@@ -257,10 +303,11 @@ function useEmployeeAddForm({
   isPending,
   error,
   onSubmit,
-}: EmployeeAddSharedProps) {
+  store = globalEmployeeAddStore,
+}: EmployeeAddSharedProps & { store?: EmployeeAddStoreApi }) {
   const { draft, isExpanded } = useSyncExternalStore(
-    subscribeEmployeeAddStore,
-    getEmployeeAddStoreSnapshot,
+    store.subscribe,
+    store.snapshot,
     getEmployeeAddStoreServerSnapshot,
   );
   const [localError, setLocalError] = useState<string | null>(null);
@@ -298,12 +345,12 @@ function useEmployeeAddForm({
       officesQuery.data &&
       !officesQuery.data.some((office) => office.code === draft.officeCode)
     ) {
-      setEmployeeAddStore((prev) => ({
+      store.update((prev) => ({
         ...prev,
         draft: { ...prev.draft, officeCode: "", officeId: null },
       }));
     }
-  }, [draft.cityCode, draft.officeCode, officesQuery.data]);
+  }, [draft.cityCode, draft.officeCode, officesQuery.data, store]);
 
   useEffect(() => {
     if (!showFieldErrors) return;
@@ -314,11 +361,11 @@ function useEmployeeAddForm({
   const visibleFieldErrors = showFieldErrors ? fieldErrors : {};
 
   function setIsExpanded(value: boolean) {
-    setEmployeeAddStore((prev) => ({ ...prev, isExpanded: value }));
+    store.update((prev) => ({ ...prev, isExpanded: value }));
   }
 
   function reset() {
-    clearEmployeeAddDraft();
+    store.clear();
     setLocalError(null);
     setFieldErrors({});
     setShowFieldErrors(false);
@@ -329,7 +376,7 @@ function useEmployeeAddForm({
     key: K,
     value: EmployeeVacancyCreateFields[K],
   ) {
-    setEmployeeAddStore((prev) => ({
+    store.update((prev) => ({
       ...prev,
       draft: { ...prev.draft, [key]: value },
     }));
@@ -341,7 +388,7 @@ function useEmployeeAddForm({
     first_name: string;
     second_name: string;
   }) {
-    setEmployeeAddStore((prev) => ({
+    store.update((prev) => ({
       ...prev,
       draft: { ...prev.draft, ...parts },
     }));
@@ -349,13 +396,13 @@ function useEmployeeAddForm({
   }
 
   function applyDraft(data: EmployeeVacancyCreateFields) {
-    setEmployeeAddStore((prev) => ({ ...prev, draft: data }));
+    store.update((prev) => ({ ...prev, draft: data }));
     setLocalError(null);
   }
 
   function handleCityChange(cityCode: string) {
     const city = cities.find((item) => item.code === cityCode);
-    setEmployeeAddStore((prev) => ({
+    store.update((prev) => ({
       ...prev,
       draft: {
         ...prev.draft,
@@ -370,7 +417,7 @@ function useEmployeeAddForm({
 
   function handleOfficeChange(officeCode: string) {
     const office = officesQuery.data?.find((item) => item.code === officeCode);
-    setEmployeeAddStore((prev) => ({
+    store.update((prev) => ({
       ...prev,
       draft: {
         ...prev.draft,
@@ -771,27 +818,21 @@ export function EmployeeAddRow({
   );
 }
 
-export function EmployeeAddCard(props: EmployeeAddSharedProps) {
-  const { cities, orgNodes } = props;
-  const form = useEmployeeAddForm(props);
+function EmployeeAddFormBody({
+  form,
+  cities,
+  orgNodes,
+  onCancel,
+}: {
+  form: ReturnType<typeof useEmployeeAddForm>;
+  cities: City[];
+  orgNodes: OrgNode[];
+  onCancel: () => void;
+}) {
   const [isPrepareModalOpen, setIsPrepareModalOpen] = useState(false);
 
-  if (!form.isExpanded) {
-    return (
-      <button
-        type="button"
-        onClick={() => form.setIsExpanded(true)}
-        data-hint="Открывает форму нового сотрудника и вакансии"
-        className="flex w-full items-center gap-2 rounded-md border border-solid border-[#7198bb] bg-white px-4 py-3 text-left text-sm text-gray-400 transition-colors hover:bg-gray-50 hover:text-blue-600 dark:bg-gray-900 dark:text-gray-500 dark:hover:bg-gray-800/40 dark:hover:text-blue-400"
-      >
-        <Plus size={14} />
-        Добавить сотрудника и вакансию
-      </button>
-    );
-  }
-
   return (
-    <div className="space-y-3 bg-blue-50 p-4 dark:bg-blue-950/40">
+    <div className="space-y-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <EmployeeNameFields
@@ -891,7 +932,7 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
         confirming={form.confirming}
         isPending={form.isPending}
         onSubmit={form.handleSubmit}
-        onCancel={form.reset}
+        onCancel={onCancel}
         prepareWorkplaceReady={form.prepareWorkplaceReady}
         onPrepareWorkplace={() => {
           if (form.handlePrepareWorkplace()) {
@@ -909,6 +950,90 @@ export function EmployeeAddCard(props: EmployeeAddSharedProps) {
           onMessageChange={(message) => form.updateDraft("message", message)}
         />
       )}
+    </div>
+  );
+}
+
+export function EmployeeAddCard(props: EmployeeAddSharedProps) {
+  const { cities, orgNodes } = props;
+  const form = useEmployeeAddForm(props);
+
+  if (!form.isExpanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => form.setIsExpanded(true)}
+        data-hint="Открывает форму нового сотрудника и вакансии"
+        className="flex w-full items-center gap-2 rounded-md border border-solid border-[#7198bb] bg-white px-4 py-3 text-left text-sm text-gray-400 transition-colors hover:bg-gray-50 hover:text-blue-600 dark:bg-gray-900 dark:text-gray-500 dark:hover:bg-gray-800/40 dark:hover:text-blue-400"
+      >
+        <Plus size={14} />
+        Добавить сотрудника и вакансию
+      </button>
+    );
+  }
+
+  return (
+    <div className="bg-blue-50 p-4 dark:bg-blue-950/40">
+      <EmployeeAddFormBody
+        form={form}
+        cities={cities}
+        orgNodes={orgNodes}
+        onCancel={form.reset}
+      />
+    </div>
+  );
+}
+
+export function EmployeeAddModal({
+  nodeId,
+  deptName,
+  onClose,
+  ...props
+}: EmployeeAddSharedProps & {
+  nodeId: number;
+  deptName: string;
+  onClose: () => void;
+}) {
+  const store = useMemo(
+    () =>
+      createLocalEmployeeAddStore({
+        draft: { ...emptyDraft, nodeId },
+        isExpanded: true,
+      }),
+    [nodeId],
+  );
+  const form = useEmployeeAddForm({ ...props, store });
+
+  function handleBackdropClick(event: MouseEvent) {
+    if (event.target === event.currentTarget && !form.isPending) onClose();
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+      onMouseDown={handleBackdropClick}
+    >
+      <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900">
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+              Добавить сотрудника и вакансию
+            </h2>
+            <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+              {deptName}
+            </p>
+          </div>
+          <CloseButton onClick={onClose} />
+        </div>
+        <div className="overflow-y-auto px-6 py-5">
+          <EmployeeAddFormBody
+            form={form}
+            cities={props.cities}
+            orgNodes={props.orgNodes}
+            onCancel={onClose}
+          />
+        </div>
+      </div>
     </div>
   );
 }

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { selectableOrgNodeTypes } from "#/lib/orgNodeTypes";
 import { toEmployeeUpdateReq } from "#/lib/employeeUpdate";
+import { createEmployeeVacancy } from "#/lib/createEmployeeVacancy";
 import {
   employeeFromReports,
   toVacancyModalData,
@@ -36,7 +37,7 @@ import {
 import { ApiErrorModal } from "#/components/ApiErrorModal";
 import { CommentHeadingIcon } from "#/components/CommentHeadingIcon";
 import { PageDescription } from "#/components/PageHints";
-import { CreateVacancyModal } from "#/components/CreateVacancyModal";
+import { EmployeeAddModal } from "#/components/EmployeeAddRow";
 import { DeptModal } from "#/components/DeptModal";
 import { EditVacancyModal } from "#/components/EditVacancyModal";
 import { EmployeeInfoModal } from "#/components/EmployeeInfoModal";
@@ -46,7 +47,6 @@ import type {
   AddVacancyState,
   DeptFields,
   DeptModalState,
-  VacancyFormFields,
   VacancyModalData,
 } from "#/types/orgChart";
 import type {
@@ -57,7 +57,6 @@ import type {
   OrgNode,
   OrgNodeType,
   Vacancy,
-  VacancyReq,
 } from "#/types/api";
 
 export const Route = createFileRoute("/structure")({
@@ -85,24 +84,6 @@ function nodeTitleClass(depth: number): string {
 const NODE_ROW_PAD = 4;
 const NODE_CHEVRON = 16;
 const NODE_INDENT = NODE_ROW_PAD + NODE_CHEVRON;
-
-function upsertVacancy(tree: OrgNode[], vacancy: Vacancy): OrgNode[] {
-  return tree.map((node) => {
-    if (node.id === vacancy.node_id) {
-      const existing = node.vacancies ?? [];
-      const idx = existing.findIndex((v) => v.id === vacancy.id);
-      const vacancies =
-        idx >= 0
-          ? existing.map((v, i) => (i === idx ? vacancy : v))
-          : [...existing, vacancy];
-      return { ...node, vacancies };
-    }
-    if (node.children?.length) {
-      return { ...node, children: upsertVacancy(node.children, vacancy) };
-    }
-    return node;
-  });
-}
 
 function replaceNodeType(
   tree: OrgNode[],
@@ -838,6 +819,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
   const archivedReportQuery = useQuery(employeeReportQuery("archived"));
 
   const nodeTypesQuery = useQuery(dictQueries.nodeTypes);
+  const citiesQuery = useQuery(dictQueries.cities);
 
   const allIds = useMemo(() => {
     const acc = new Set<number>();
@@ -942,16 +924,13 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
     },
   });
 
-  const createVacancyMutation = useMutation({
-    mutationFn: (body: VacancyReq) => vacanciesApi.create(body),
-    onSuccess: ({ data: vacancy }, body) => {
-      if (vacancy) {
-        queryClient.setQueryData<OrgNode[]>(["orgTree"], (old) =>
-          old ? upsertVacancy(old, vacancy) : old,
-        );
-      }
-      revealNode(body.node_id);
+  const createEmployeeVacancyMutation = useMutation({
+    mutationFn: createEmployeeVacancy,
+    onSuccess: (_data, body) => {
+      revealNode(body.nodeId);
       setAddVacancy(null);
+      queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
+      queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
       invalidate();
     },
   });
@@ -1382,26 +1361,19 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
       )}
 
       {addVacancy && (
-        <CreateVacancyModal
-          state={addVacancy}
+        <EmployeeAddModal
+          key={addVacancy.deptId}
+          nodeId={Number(addVacancy.deptId)}
+          deptName={addVacancy.deptName}
+          cities={citiesQuery.data ?? []}
+          orgNodes={tree}
+          isPending={createEmployeeVacancyMutation.isPending}
+          error={formatVacancyError(createEmployeeVacancyMutation.error)}
           onClose={() => {
-            createVacancyMutation.reset();
+            createEmployeeVacancyMutation.reset();
             setAddVacancy(null);
           }}
-          isPending={createVacancyMutation.isPending}
-          error={formatApiError(createVacancyMutation.error)}
-          onSubmit={(data: VacancyFormFields) =>
-            createVacancyMutation.mutate({
-              node_id: Number(addVacancy.deptId),
-              position_code: data.position,
-              position_name: data.position,
-              user_id: null,
-              city_code: data.cityCode,
-              is_manager: data.isManager,
-              position_description: data.description,
-              job_offer_link: data.jobOffer,
-            })
-          }
+          onSubmit={(data) => createEmployeeVacancyMutation.mutate(data)}
         />
       )}
 
