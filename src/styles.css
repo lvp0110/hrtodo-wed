@@ -50,18 +50,26 @@ body {
   margin: 0;
   color: var(--sea-ink);
   font-family: var(--font-sans);
+  background-color: transparent;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html.light {
+  background-color: #e7f3ec;
+}
+
+html.dark body {
   background-color: var(--bg-base);
   background:
     radial-gradient(1100px 620px at -8% -10%, var(--hero-a), transparent 58%),
     radial-gradient(1050px 620px at 112% -12%, var(--hero-b), transparent 62%),
     radial-gradient(720px 380px at 50% 115%, rgba(79, 184, 178, 0.1), transparent 68%),
     linear-gradient(180deg, color-mix(in srgb, var(--sand) 68%, white) 0%, var(--foam) 44%, var(--bg-base) 100%);
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-body::before {
+html.dark body::before {
   content: "";
   position: fixed;
   inset: 0;
@@ -74,7 +82,7 @@ body::before {
     radial-gradient(circle at 42% 82%, rgba(47, 106, 74, 0.14), transparent 36%);
 }
 
-body::after {
+html.dark body::after {
   content: "";
   position: fixed;
   inset: 0;
@@ -87,6 +95,10 @@ body::after {
   background-size: 28px 28px;
   -webkit-mask-image: radial-gradient(circle at 50% 30%, black, transparent 78%);
   mask-image: radial-gradient(circle at 50% 30%, black, transparent 78%);
+}
+
+html.light .react-flow {
+  background-color: transparent;
 }
 
 a {

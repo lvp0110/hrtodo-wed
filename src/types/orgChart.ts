@@ -51,7 +51,6 @@ export type EditVacancyFormFields = {
   cityCode: string;
   officeCode: string;
   nodeId: number;
-  userId: number | null;
   isManager: boolean;
   jobOffer: string;
   description: string;

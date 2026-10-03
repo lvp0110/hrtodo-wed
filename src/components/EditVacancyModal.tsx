@@ -1,20 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { CloseButton } from "#/components/CloseButton";
 import { DepartmentTreeSelect } from "#/components/DepartmentTreeSelect";
-import { EmployeeSelect } from "#/components/EmployeeSelect";
 import { dictQueries, officesApi, orgNodesApi } from "#/services/api";
 import { findManagerForVacancy } from "#/lib/orgTree";
-import {
-  employeeVacancyConflictWarning,
-  findEmployeeVacancyConflict,
-} from "#/lib/vacancyValidation";
 import type {
   EditVacancyFormFields,
   VacancyModalData,
 } from "#/types/orgChart";
-import type { City, Employer, OrgNode } from "#/types/api";
+import type { City, OrgNode } from "#/types/api";
 
 interface EditVacancyModalProps {
   data: VacancyModalData;
@@ -35,7 +30,6 @@ export function EditVacancyModal({
   error = null,
 }: EditVacancyModalProps) {
   const cities = useQuery(dictQueries.cities);
-  const employees = useQuery(dictQueries.employees);
   const orgTree = useQuery({
     queryKey: ["orgTree"],
     queryFn: () => orgNodesApi.getTreeVacancies().then((res) => res.data ?? []),
@@ -45,9 +39,8 @@ export function EditVacancyModal({
     if (e.target === e.currentTarget) onClose();
   }
 
-  const dictsReady =
-    cities.isSuccess && employees.isSuccess && orgTree.isSuccess;
-  const dictsError = cities.isError || employees.isError || orgTree.isError;
+  const dictsReady = cities.isSuccess && orgTree.isSuccess;
+  const dictsError = cities.isError || orgTree.isError;
 
   return (
     <div
@@ -84,7 +77,6 @@ export function EditVacancyModal({
             <EditVacancyForm
               data={data}
               cities={cities.data}
-              employees={employees.data}
               orgNodes={orgTree.data ?? []}
               onClose={onClose}
               onSubmit={onSubmit}
@@ -101,7 +93,6 @@ export function EditVacancyModal({
 interface EditVacancyFormProps {
   data: VacancyModalData;
   cities: City[];
-  employees: Employer[];
   orgNodes: OrgNode[];
   onClose: () => void;
   onSubmit: (data: EditVacancyFormFields) => void;
@@ -112,36 +103,12 @@ interface EditVacancyFormProps {
 function EditVacancyForm({
   data,
   cities,
-  employees,
   orgNodes,
   onClose,
   onSubmit,
   isPending,
   error,
 }: EditVacancyFormProps) {
-  const employeeOptions = useMemo(() => {
-    const activeEmployees = employees.filter(
-      (employee) => employee.status !== "archived",
-    );
-    if (!data.employer?.id) return activeEmployees;
-    const alreadyExists = activeEmployees.some(
-      (employee) => employee.id === data.employer?.id,
-    );
-    if (alreadyExists) return activeEmployees;
-
-    const [surname = "", first_name = "", second_name = ""] = data.employer.name.split(" ");
-    return [
-      ...activeEmployees,
-      {
-        id: data.employer.id,
-        surname,
-        first_name,
-        second_name,
-        email: data.employer.email ?? "",
-      } as Employer,
-    ];
-  }, [employees, data.employer]);
-
   const {
     register,
     handleSubmit,
@@ -156,7 +123,6 @@ function EditVacancyForm({
       cityCode: data.cityCode,
       officeCode: data.officeCode ?? "",
       nodeId: data.nodeId,
-      userId: data.employer?.id ?? null,
       isManager: data.isManager,
       description: data.description,
       jobOffer: data.jobOffer,
@@ -165,34 +131,7 @@ function EditVacancyForm({
 
   const cityCode = watch("cityCode");
   const nodeId = watch("nodeId");
-  const position = watch("position");
-  const userId = watch("userId");
   const isManager = watch("isManager");
-  const [confirmedConflictKey, setConfirmedConflictKey] = useState<string | null>(
-    null,
-  );
-  const assignmentConflict = useMemo(
-    () =>
-      findEmployeeVacancyConflict(
-        orgNodes,
-        data.id,
-        nodeId,
-        position,
-        userId,
-      ),
-    [orgNodes, data.id, nodeId, position, userId],
-  );
-  const conflictKey = assignmentConflict
-    ? `${assignmentConflict.vacancyId}:${nodeId}:${position.trim().toLowerCase()}:${userId}`
-    : null;
-  const confirming = conflictKey !== null && confirmedConflictKey === conflictKey;
-  const assignmentWarning = assignmentConflict
-    ? `${employeeVacancyConflictWarning(assignmentConflict)} ${
-        confirming
-          ? "Нажмите «Всё равно сохранить», чтобы отправить."
-          : "Нажмите «Сохранить», чтобы подтвердить отправку."
-      }`
-    : null;
   const manager = useMemo(
     () => findManagerForVacancy(orgNodes, nodeId, data.id, isManager),
     [orgNodes, nodeId, data.id, isManager],
@@ -222,10 +161,6 @@ function EditVacancyForm({
   const officesDisabled = !cityCode || officesQuery.isPending || officesQuery.isError;
 
   function handleFormSubmit(formData: EditVacancyFormFields) {
-    if (conflictKey && confirmedConflictKey !== conflictKey) {
-      setConfirmedConflictKey(conflictKey);
-      return;
-    }
     onSubmit(formData);
   }
 
@@ -328,15 +263,15 @@ function EditVacancyForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <div className="mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
           Сотрудник
-        </label>
-        <EmployeeSelect
-          employees={employeeOptions}
-          value={watch("userId")}
-          onChange={(userId) => setValue("userId", userId, { shouldValidate: true })}
-          hint="Назначает сотрудника на вакансию или оставляет её свободной"
-        />
+        </div>
+        <p className="text-sm text-gray-900 dark:text-gray-100">
+          {data.employer?.name || "Вакантно"}
+        </p>
+        <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+          Назначение, перевод и снятие — в карточке сотрудника.
+        </p>
       </div>
 
       <div>
@@ -393,12 +328,6 @@ function EditVacancyForm({
         </span>
       </label>
 
-      {assignmentWarning && (
-        <p className="text-sm text-amber-600 dark:text-amber-400">
-          {assignmentWarning}
-        </p>
-      )}
-
       {error && (
         <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
       )}
@@ -415,15 +344,11 @@ function EditVacancyForm({
         </button>
         <button
           type="submit"
-          data-hint={
-            confirming
-              ? "Отправляет изменения, несмотря на совпадение назначения"
-              : "Сохраняет изменения вакансии и сотрудника"
-          }
+          data-hint="Сохраняет изменения данных должности"
           disabled={!isValid || isPending}
           className="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          {isPending ? "Сохраняем…" : confirming ? "Всё равно сохранить" : "Сохранить"}
+          {isPending ? "Сохраняем…" : "Сохранить"}
         </button>
       </div>
     </form>

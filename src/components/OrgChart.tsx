@@ -825,7 +825,12 @@ export function OrgChart() {
           memberIds={focusIds}
           layoutKey={expandedKey}
         />
-        <Background gap={24} size={1} />
+        <Background
+          gap={24}
+          size={1}
+          bgColor={colorMode === "light" ? "transparent" : undefined}
+          color={colorMode === "light" ? "rgba(23, 58, 64, 0.16)" : undefined}
+        />
       </ReactFlow>
       </div>
 
@@ -902,7 +907,6 @@ export function OrgChart() {
               node_id: Number(addVacancyModal.deptId),
               position_code: data.position,
               position_name: data.position,
-              user_id: null,
               city_code: data.cityCode,
               is_manager: data.isManager,
               position_description: data.description,

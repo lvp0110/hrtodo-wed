@@ -76,12 +76,12 @@ export interface EmployeeCreateReq {
   phone?: string;
   personal_number?: string;
   work_number?: string;
-  hire_date?: string;
   gender?: string;
 }
 
 /**
- * Обычное редактирование не меняет status.
+ * Обычное редактирование не меняет status и hire_date.
+ * Дата устройства ставится сервером при первом назначении.
  * Архив — только POST /employees/{id}/archive.
  */
 export interface EmployeeUpdateReq {
@@ -92,7 +92,6 @@ export interface EmployeeUpdateReq {
   phone?: string;
   personal_number?: string;
   work_number?: string;
-  hire_date?: string;
   gender?: string;
   city_id?: number | null;
   office_id?: number | null;
@@ -242,7 +241,6 @@ export interface VacancyReq {
   node_id: number;
   position_code: string;
   position_name: string;
-  user_id?: number | null;
   office_code?: string;
   city_code?: string;
   is_manager: boolean;
@@ -252,7 +250,6 @@ export interface VacancyReq {
 
 export interface VacancyUpdateReq {
   node_id: number;
-  user_id: number | null;
   city_code?: string;
   office_code?: string;
   position_code: string;

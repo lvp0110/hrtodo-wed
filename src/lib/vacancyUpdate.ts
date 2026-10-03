@@ -6,7 +6,6 @@ export function toVacancyUpdateReq(
 ): VacancyUpdateReq {
   return {
     node_id: data.nodeId,
-    user_id: data.userId,
     city_code: data.cityCode || undefined,
     office_code: data.officeCode || undefined,
     position_code: data.position,

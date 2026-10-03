@@ -49,7 +49,7 @@ function RootShell() {
 
   if (sessionQuery.isPending) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-gray-50 text-sm text-gray-500 dark:bg-gray-950 dark:text-gray-400">
+      <div className="flex h-screen w-screen items-center justify-center bg-transparent text-sm text-gray-500 dark:bg-gray-950 dark:text-gray-400">
         Загрузка…
       </div>
     );

@@ -998,6 +998,7 @@ function EmployeesPage() {
         if (cityId || org.officeId) {
           await employeesApi.update(employeeId, {
             ...toEmployeeCreateReq(fields),
+            email: fields.email.trim(),
             city_id: cityId,
             office_id: org.officeId,
           });
@@ -1005,16 +1006,8 @@ function EmployeesPage() {
       }
 
       try {
-        await vacanciesApi.update(vacancy.id, {
-          node_id: vacancy.nodeId,
-          user_id: employeeId,
-          city_code: vacancy.cityCode || org.cityCode || undefined,
-          office_code: vacancy.officeCode || org.officeCode || undefined,
-          position_code: vacancy.position,
-          position_name: vacancy.position,
-          is_manager: vacancy.isManager,
-          position_description: vacancy.description,
-          job_offer_link: vacancy.jobOffer,
+        await employeesApi.assign(employeeId, {
+          position_slot_id: vacancy.id,
         });
       } catch (error) {
         if (createdEmployeeId !== null) {
@@ -1054,7 +1047,6 @@ function EmployeesPage() {
           node_id: data.nodeId,
           position_code: data.position,
           position_name: data.position,
-          user_id: employeeId,
           city_code: data.cityCode,
           office_code: data.officeCode || undefined,
           is_manager: data.isManager,
@@ -1063,22 +1055,15 @@ function EmployeesPage() {
         });
 
         if (employeeId) {
-          await vacanciesApi.update(vacancyRes.data.id, {
-            node_id: data.nodeId,
-            user_id: employeeId,
-            city_code: data.cityCode || undefined,
-            office_code: data.officeCode || undefined,
-            position_code: data.position,
-            position_name: data.position,
-            is_manager: data.isManager,
-            position_description: positionDescription,
-            job_offer_link: "",
+          await employeesApi.assign(employeeId, {
+            position_slot_id: vacancyRes.data.id,
           });
         }
 
         if (employeeId && (data.cityId || data.officeId)) {
           await employeesApi.update(employeeId, {
             ...toEmployeeCreateReq(data),
+            email: data.email.trim(),
             city_id: data.cityId,
             office_id: data.officeId,
           });
@@ -1310,7 +1295,7 @@ function EmployeesPage() {
   });
 
   return (
-    <div className="employees-page absolute inset-0 flex flex-col overflow-hidden bg-gray-50 px-4 py-6 min-[1070px]:px-8 dark:bg-gray-950">
+    <div className="employees-page absolute inset-0 flex flex-col overflow-hidden bg-transparent px-4 py-6 min-[1070px]:px-8 dark:bg-gray-950">
       <div className="mb-6 shrink-0">
         <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
           Сотрудники
@@ -2124,7 +2109,7 @@ function EmployeesPage() {
             ? "Безвозвратно удаляет вакансию"
             : "Безвозвратно удаляет сотрудника из архива"
         }
-        archiveHint="Снимает сотрудника со всех позиций и переносит его в архив"
+        archiveHint="Освобождает текущую должность и переносит сотрудника в архив"
         onDelete={(row) => {
           if (row.kind === "vacancy") {
             const vacancyTitle = row.org.position || "эту вакансию";

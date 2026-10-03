@@ -24,7 +24,6 @@ const emptyDraft: EmployeeVacancyCreateFields = {
   work_number: "",
   email: "",
   gender: "",
-  hireDate: "",
   cityCode: "",
   cityId: null,
   officeCode: "",
@@ -63,7 +62,6 @@ function isDraftEmpty(draft: EmployeeVacancyCreateFields): boolean {
     draft.work_number === "" &&
     draft.email === "" &&
     draft.gender === "" &&
-    draft.hireDate === "" &&
     draft.cityCode === "" &&
     draft.cityId === null &&
     draft.officeCode === "" &&
@@ -184,8 +182,7 @@ function hasEmployeeDraftData(draft: EmployeeVacancyCreateFields): boolean {
     Boolean(draft.personal_number.trim()) ||
     Boolean(draft.work_number.trim()) ||
     Boolean(draft.email.trim()) ||
-    Boolean(draft.gender) ||
-    Boolean(draft.hireDate)
+    Boolean(draft.gender)
   );
 }
 
@@ -531,15 +528,7 @@ function EmployeeNameFields({
             {option.label}
           </option>
         ))}
-      </select>
-      <input
-        type="date"
-        value={draft.hireDate}
-        onChange={(e) => updateDraft("hireDate", e.target.value)}
-        className={compactInputClass}
-        title="Дата устройства"
-        data-hint="Указывает дату выхода сотрудника на работу"
-      />
+        </select>
     </>
   );
 }

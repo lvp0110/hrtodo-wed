@@ -50,9 +50,6 @@ function composeMessage(greeting: string, extra: string): string {
   return extraTrimmed ? `${greeting}\n\n${extraTrimmed}` : greeting;
 }
 
-const inputClass =
-  "w-full max-w-xs px-2 py-1.5 text-sm rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent border-gray-200 dark:border-gray-700";
-
 const emailInputClass =
   "w-full px-3 py-2 text-sm rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent border-gray-200 dark:border-gray-700";
 
@@ -97,7 +94,6 @@ export function PrepareWorkplaceModal({
   onApply,
   onMessageChange,
 }: PrepareWorkplaceModalProps) {
-  const [hireDate, setHireDate] = useState(initial.hireDate);
   const [recipientEmail, setRecipientEmail] = useState("");
   const [extraMessage, setExtraMessage] = useState(() =>
     parseExtraMessage(initial.message ?? ""),
@@ -192,7 +188,7 @@ export function PrepareWorkplaceModal({
   }
 
   function persistDraft() {
-    onApply({ ...initial, hireDate, message });
+    onApply({ ...initial, message });
   }
 
   function handleDismiss() {
@@ -256,11 +252,6 @@ export function PrepareWorkplaceModal({
     },
     { key: "email", label: "Эл. почта", value: initial.email || "—" },
     { key: "gender", label: "Пол", value: genderLabel },
-    {
-      key: "hireDate",
-      label: "Дата устройства",
-      value: hireDate || "—",
-    },
     { key: "city", label: "Город", value: cityName },
     { key: "office", label: "Офис", value: officeName },
     { key: "department", label: "Отдел", value: departmentName },
@@ -366,18 +357,9 @@ export function PrepareWorkplaceModal({
                         {row.label}
                       </th>
                       <td className={tdClass}>
-                        {row.key === "hireDate" ? (
-                          <input
-                            type="date"
-                            value={hireDate}
-                            onChange={(e) => setHireDate(e.target.value)}
-                            className={inputClass}
-                          />
-                        ) : (
-                          <span className="whitespace-pre-wrap break-words">
-                            {row.value}
-                          </span>
-                        )}
+                        <span className="whitespace-pre-wrap break-words">
+                          {row.value}
+                        </span>
                       </td>
                     </tr>
                   ))}

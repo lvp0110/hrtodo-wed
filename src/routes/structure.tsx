@@ -1291,7 +1291,6 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
               node_id: Number(addVacancy.deptId),
               position_code: data.position,
               position_name: data.position,
-              user_id: null,
               city_code: data.cityCode,
               is_manager: data.isManager,
               position_description: data.description,
@@ -1333,7 +1332,7 @@ function StructurePage() {
   const tree = treeQuery.data ?? [];
 
   return (
-    <div className="absolute inset-0 overflow-auto bg-gray-50 px-8 py-6 dark:bg-gray-950">
+    <div className="absolute inset-0 overflow-auto bg-transparent px-8 py-6 dark:bg-gray-950">
       <div className="mb-6">
         <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
           Структура

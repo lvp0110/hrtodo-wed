@@ -1,17 +1,21 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { IdCard, Pencil } from "lucide-react";
 import { CloseButton } from "#/components/CloseButton";
+import { EmployeeCardPanel } from "#/components/EmployeeCardPanel";
 import { GENDER_OPTIONS, normalizeGender } from "#/lib/employeeDisplay";
 import type { Employer } from "#/types/api";
 import type { EmployeeEditFields } from "#/lib/employeeUpdate";
 
 const inputClass =
-  "w-full px-3 py-2 text-sm rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent";
+  "w-full px-3 py-2 text-sm rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 dark:disabled:bg-gray-800/60 dark:disabled:text-gray-400";
 
-function toDateInputValue(date: string | null | undefined): string {
-  if (!date?.trim()) return "";
-  const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) return "";
-  return parsed.toISOString().slice(0, 10);
+function headerIconClass(active: boolean) {
+  return `rounded p-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+    active
+      ? "bg-blue-600 text-white hover:bg-blue-700"
+      : "text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+  }`;
 }
 
 interface EmployeeInfoModalProps {
@@ -29,6 +33,9 @@ export function EmployeeInfoModal({
   isPending = false,
   error = null,
 }: EmployeeInfoModalProps) {
+  const [editing, setEditing] = useState(false);
+  const [cardOpen, setCardOpen] = useState(false);
+
   function handleBackdropClick(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose();
   }
@@ -47,7 +54,6 @@ export function EmployeeInfoModal({
       work_number: employee.work_number ?? "",
       email: employee.email ?? "",
       gender: normalizeGender(employee.gender),
-      hireDate: toDateInputValue(employee.hire_date),
     },
   });
 
@@ -56,8 +62,13 @@ export function EmployeeInfoModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onMouseDown={handleBackdropClick}
     >
-      <div className="mx-4 w-full max-w-md overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900">
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+      <div
+        className={`mx-4 flex max-h-[calc(100dvh-2rem)] w-full items-stretch overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900 ${
+          cardOpen ? "max-w-4xl" : "max-w-md"
+        }`}
+      >
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <div className="flex min-h-16 items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
           <div>
             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
               Редактирование сотрудника
@@ -68,13 +79,49 @@ export function EmployeeInfoModal({
               </p>
             )}
           </div>
-          <CloseButton onClick={onClose} />
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              aria-pressed={editing}
+              aria-label={editing ? "Завершить редактирование" : "Редактировать"}
+              title={editing ? "Завершить редактирование" : "Редактировать"}
+              data-hint="Включает и выключает редактирование полей карточки"
+              disabled={isPending}
+              onClick={() => setEditing((value) => !value)}
+              className={headerIconClass(editing)}
+            >
+              <Pencil size={16} />
+            </button>
+            <button
+              type="button"
+              aria-pressed={cardOpen}
+              aria-label={
+                cardOpen ? "Скрыть карточку сотрудника" : "Карточка сотрудника"
+              }
+              title={
+                cardOpen ? "Скрыть карточку сотрудника" : "Карточка сотрудника"
+              }
+              data-hint="Открывает карточку сотрудника справа от формы"
+              onClick={() => setCardOpen((value) => !value)}
+              className={headerIconClass(cardOpen)}
+            >
+              <IdCard size={28} />
+            </button>
+            <CloseButton onClick={onClose} />
+          </div>
         </div>
 
         <form
-          onSubmit={handleSubmit(onSubmit)}
-          className="space-y-4 px-6 py-5"
+          onSubmit={handleSubmit((fields) => {
+            if (!editing) return;
+            onSubmit(fields);
+          })}
+          className="px-6 py-5"
         >
+          <fieldset
+            disabled={!editing}
+            className="m-0 min-w-0 space-y-4 border-0 p-0"
+          >
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Фамилия <span className="text-red-400">*</span>
@@ -176,22 +223,12 @@ export function EmployeeInfoModal({
             </select>
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Дата устройства на работу
-            </label>
-            <input
-              type="date"
-              {...register("hireDate")}
-              className={`${inputClass} border-gray-200 dark:border-gray-700`}
-            />
-          </div>
-
           {error && (
             <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
           )}
+          </fieldset>
 
-          <div className="flex gap-3 pt-1">
+          <div className="mt-4 flex gap-3 pt-1">
             <button
               type="button"
               onClick={onClose}
@@ -204,13 +241,15 @@ export function EmployeeInfoModal({
             <button
               type="submit"
               data-hint="Сохраняет изменения карточки сотрудника"
-              disabled={!isValid || isPending}
+              disabled={!editing || !isValid || isPending}
               className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isPending ? "Сохраняем…" : "Сохранить"}
             </button>
           </div>
         </form>
+      </div>
+      {cardOpen && <EmployeeCardPanel employee={employee} />}
       </div>
     </div>
   );

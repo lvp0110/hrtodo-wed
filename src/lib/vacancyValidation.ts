@@ -19,12 +19,9 @@ function positionMatches(
   return code === key || name === key;
 }
 
-/** Тот же сотрудник уже на этой должности в этом отделе. */
-export function findEmployeeVacancyConflict(
+/** Текущая должность сотрудника. Одновременно он занимает только одну. */
+export function findEmployeeAssignment(
   nodes: OrgNode[],
-  vacancyId: number,
-  nodeId: number,
-  positionKey: string,
   userId: number | null,
 ): VacancyConflict | null {
   if (!userId) return null;
@@ -32,16 +29,13 @@ export function findEmployeeVacancyConflict(
   function walk(nodeList: OrgNode[]): VacancyConflict | null {
     for (const node of nodeList) {
       for (const vacancy of node.vacancies ?? []) {
-        if (vacancy.id === vacancyId) continue;
         if (vacancy.employer?.id !== userId) continue;
-        if (vacancy.node_id !== nodeId) continue;
-        if (!positionMatches(vacancy.position, positionKey)) continue;
 
         return {
           vacancyId: vacancy.id,
           deptName: node.name,
           position:
-            vacancy.position?.name ?? vacancy.position?.code ?? positionKey,
+            vacancy.position?.name ?? vacancy.position?.code ?? "должность",
         };
       }
 
@@ -87,8 +81,4 @@ export function findExistingPositionSlot(
 
 export function existingPositionSlotWarning(conflict: VacancyConflict): string {
   return `В отделе «${conflict.deptName}» уже есть слот на должность «${conflict.position}». Город и офис это совпадение не снимают.`;
-}
-
-export function employeeVacancyConflictWarning(conflict: VacancyConflict): string {
-  return `Сотрудник уже назначен на должность «${conflict.position}» в отделе «${conflict.deptName}».`;
 }
