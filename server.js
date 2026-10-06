@@ -55,6 +55,14 @@ app.use(
   }),
 );
 
+// public/ (фоны, favicon, manifest) vite кладёт в корень dist.
+// Без этого /backgrounds/*.jpg попадает в SPA-fallback и приходит как HTML.
+app.use(
+  express.static(path.join(__dirname, "dist"), {
+    index: false,
+  }),
+);
+
 // SPA fallback — index.html с инъекцией env-переменных, без кеша.
 app.get("*", (_, res) => {
   const indexPath = path.join(__dirname, "dist", "index.html");
