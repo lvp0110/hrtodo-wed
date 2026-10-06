@@ -49,7 +49,7 @@ function SettingsLayout() {
         </nav>
       </header>
 
-      <div className="flex-1 overflow-auto bg-gray-50 px-8 py-6 dark:bg-gray-950">
+      <div className="flex-1 overflow-auto bg-transparent px-8 py-6 dark:bg-gray-950">
         <Outlet />
       </div>
     </div>

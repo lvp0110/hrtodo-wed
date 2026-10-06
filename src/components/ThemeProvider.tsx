@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { HrBackground } from "#/components/HrBackground";
 import {
   applyTheme,
   readThemeMode,
@@ -49,7 +50,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     [mode, resolved, setMode],
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>
+      <HrBackground />
+      {children}
+    </ThemeContext.Provider>
+  );
 }
 
 export function useTheme() {

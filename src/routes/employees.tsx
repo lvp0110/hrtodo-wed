@@ -1049,7 +1049,7 @@ function EmployeesPage() {
   });
 
   return (
-    <div className="employees-page absolute inset-0 flex flex-col overflow-hidden bg-gray-50 px-4 py-6 min-[1070px]:px-8 dark:bg-gray-950">
+    <div className="employees-page absolute inset-0 flex flex-col overflow-hidden bg-transparent px-4 py-6 min-[1070px]:px-8 dark:bg-gray-950">
       <div className="mb-6 shrink-0">
         <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
           Сотрудники

@@ -181,7 +181,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <PageHintsProvider>
-    <div className="flex h-screen w-screen flex-col bg-gray-50 dark:bg-gray-950 sm:flex-row">
+    <div className="flex h-screen w-screen flex-col bg-transparent dark:bg-gray-950 sm:flex-row">
       <div className="relative hidden w-[70px] shrink-0 sm:block">
         <aside
           className={`absolute inset-y-0 left-0 z-20 flex flex-col overflow-hidden border-r border-gray-200 bg-white py-4 transition-[width] duration-200 ease-out dark:border-gray-800 dark:bg-gray-900 ${

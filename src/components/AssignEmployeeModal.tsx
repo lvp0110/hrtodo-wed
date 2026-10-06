@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { CloseButton } from "#/components/CloseButton";
+import { DateInput } from "#/components/DateInput";
 import { EmployeeSelect } from "#/components/EmployeeSelect";
 import { GENDER_OPTIONS } from "#/lib/employeeDisplay";
 import {
@@ -50,6 +51,7 @@ export function AssignEmployeeModal({
 
   const {
     register,
+    control,
     handleSubmit,
     watch,
     setValue,
@@ -303,10 +305,18 @@ export function AssignEmployeeModal({
                   <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Дата устройства на работу
                   </label>
-                  <input
-                    type="date"
-                    {...register("hireDate")}
-                    className={`${inputClass} border-gray-200 dark:border-gray-700`}
+                  <Controller
+                    name="hireDate"
+                    control={control}
+                    render={({ field }) => (
+                      <DateInput
+                        name={field.name}
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        className={`${inputClass} border-gray-200 dark:border-gray-700`}
+                      />
+                    )}
                   />
                 </div>
               </>
