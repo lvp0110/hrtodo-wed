@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { DateInput } from "#/components/DateInput";
 import { CloseButton } from "#/components/CloseButton";
 import { GENDER_OPTIONS } from "#/lib/employeeDisplay";
 import type { EmployeeVacancyCreateFields } from "#/lib/employeeUpdate";
@@ -367,10 +368,9 @@ export function PrepareWorkplaceModal({
                       </th>
                       <td className={tdClass}>
                         {row.key === "hireDate" ? (
-                          <input
-                            type="date"
+                          <DateInput
                             value={hireDate}
-                            onChange={(e) => setHireDate(e.target.value)}
+                            onChange={setHireDate}
                             className={inputClass}
                           />
                         ) : (

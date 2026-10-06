@@ -1,5 +1,6 @@
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { CloseButton } from "#/components/CloseButton";
+import { DateInput } from "#/components/DateInput";
 import { GENDER_OPTIONS, normalizeGender } from "#/lib/employeeDisplay";
 import type { Employer } from "#/types/api";
 import type { EmployeeEditFields } from "#/lib/employeeUpdate";
@@ -35,6 +36,7 @@ export function EmployeeInfoModal({
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isValid },
   } = useForm<EmployeeEditFields>({
@@ -180,10 +182,18 @@ export function EmployeeInfoModal({
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Дата устройства на работу
             </label>
-            <input
-              type="date"
-              {...register("hireDate")}
-              className={`${inputClass} border-gray-200 dark:border-gray-700`}
+            <Controller
+              name="hireDate"
+              control={control}
+              render={({ field }) => (
+                <DateInput
+                  name={field.name}
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  className={`${inputClass} border-gray-200 dark:border-gray-700`}
+                />
+              )}
             />
           </div>
 

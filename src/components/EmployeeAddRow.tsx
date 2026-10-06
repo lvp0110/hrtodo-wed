@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore, type ClipboardEvent
 import { Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { CloseButton } from "#/components/CloseButton";
+import { DateInput } from "#/components/DateInput";
 import { dictInputClass } from "#/components/settings/DictFormModal";
 import { DepartmentTreeSelect } from "#/components/DepartmentTreeSelect";
 import { PrepareWorkplaceModal } from "#/components/PrepareWorkplaceModal";
@@ -579,10 +580,9 @@ function EmployeeNameFields({
           </option>
         ))}
       </select>
-      <input
-        type="date"
+      <DateInput
         value={draft.hireDate}
-        onChange={(e) => updateDraft("hireDate", e.target.value)}
+        onChange={(value) => updateDraft("hireDate", value)}
         className={compactInputClass}
         title="Дата устройства"
         data-hint="Указывает дату выхода сотрудника на работу"

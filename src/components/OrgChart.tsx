@@ -825,7 +825,12 @@ export function OrgChart() {
           memberIds={focusIds}
           layoutKey={expandedKey}
         />
-        <Background gap={24} size={1} />
+        <Background
+          gap={24}
+          size={1}
+          bgColor={colorMode === "light" ? "transparent" : undefined}
+          color={colorMode === "light" ? "rgba(23, 58, 64, 0.16)" : undefined}
+        />
       </ReactFlow>
       </div>
 

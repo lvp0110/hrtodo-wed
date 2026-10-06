@@ -63,8 +63,8 @@ export const Route = createFileRoute("/structure")({
   component: StructurePage,
 });
 
-/** Сколько уровней дерева раскрыто по умолчанию. */
-const DEFAULT_EXPANDED_LEVELS = 3;
+/** Раскрытые отделы текущей вкладки. Пустое значение — список свёрнут. */
+const EXPANDED_STORAGE_KEY = "hrtodo:structure-expanded";
 
 /** Размер названия узла уменьшается с уровнем подчинения. */
 const NODE_TITLE_CLASS = [
@@ -134,12 +134,14 @@ function CountBadge({
   count,
   label,
   className,
+  showZero = false,
 }: {
   count: number;
   label: string;
   className: string;
+  showZero?: boolean;
 }) {
-  if (count <= 0) return null;
+  if (count <= 0 && !showZero) return null;
   return (
     <span
       title={label}
@@ -151,16 +153,29 @@ function CountBadge({
   );
 }
 
-function collectDefaultExpanded(
-  nodes: OrgNode[],
-  level: number,
-  acc: Set<number>,
-) {
-  for (const node of nodes) {
-    if (level < DEFAULT_EXPANDED_LEVELS) acc.add(node.id);
-    if (node.children?.length) {
-      collectDefaultExpanded(node.children, level + 1, acc);
+function readExpandedIds(): Set<number> {
+  try {
+    const raw = sessionStorage.getItem(EXPANDED_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(
+      parsed.filter((id): id is number => typeof id === "number"),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function writeExpandedIds(ids: Set<number>) {
+  try {
+    if (ids.size === 0) {
+      sessionStorage.removeItem(EXPANDED_STORAGE_KEY);
+      return;
     }
+    sessionStorage.setItem(EXPANDED_STORAGE_KEY, JSON.stringify([...ids]));
+  } catch {
+    /* приватный режим */
   }
 }
 
@@ -538,7 +553,6 @@ function TreeNode({
 }) {
   const departmentCount = node.children?.length ?? 0;
   const vacancies = node.vacancies ?? [];
-  const vacancyCount = vacancies.filter((vacancy) => !isOpenVacancy(vacancy)).length;
   const emptyVacancyCount =
     vacancies.filter(isOpenVacancy).length + (node.empty_vacancy?.length ?? 0);
   const isOpen = ctx.expanded.has(node.id);
@@ -631,29 +645,19 @@ function TreeNode({
         <div className="ml-auto flex shrink-0 items-center gap-1">
           <CountBadge
             count={departmentCount}
-            label="Количество дочерних отделов"
+            label="Общее количество отделов"
             className="bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
           />
-          {isOpen ? (
-            <>
-              <CountBadge
-                count={vacancyCount}
-                label="Количество вакансий"
-                className="bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300"
-              />
-              {ctx.showVacancies && (
-                <CountBadge
-                  count={emptyVacancyCount}
-                  label="Количество пустых вакансий"
-                  className="bg-amber-500/10 text-amber-500"
-                />
-              )}
-            </>
-          ) : (
+          <CountBadge
+            count={ctx.employeeTotals.get(node.id) ?? 0}
+            label="Общее количество сотрудников"
+            className="bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300"
+          />
+          {isOpen && ctx.showVacancies && (
             <CountBadge
-              count={ctx.employeeTotals.get(node.id) ?? 0}
-              label="Общее количество сотрудников"
-              className="bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300"
+              count={emptyVacancyCount}
+              label="Количество пустых вакансий"
+              className="bg-amber-500/10 text-amber-500"
             />
           )}
           <button
@@ -792,13 +796,159 @@ function HeldNodeCard({
   );
 }
 
+function StructureRoot({
+  node,
+  source,
+  ctx,
+}: {
+  node: OrgNode;
+  source: OrgNode;
+  ctx: TreeContext;
+}) {
+  const departmentCount = source.children?.length ?? 0;
+  const employeeCount = ctx.employeeTotals.get(source.id) ?? 0;
+  const isDropTarget = ctx.dropTargetId === source.id;
+  const canAccept = ctx.canDrop(source.id);
+  const vacancies = (node.vacancies ?? []).filter(
+    (vacancy) => ctx.showVacancies || !isOpenVacancy(vacancy),
+  );
+  const emptyVacancies = ctx.showVacancies ? (node.empty_vacancy ?? []) : [];
+  const children = node.children ?? [];
+
+  return (
+    <section>
+      <div
+        onClick={() => {
+          if (ctx.takeSuppressedClick()) return;
+          if (canAccept) ctx.onDrop(source.id);
+        }}
+        onMouseEnter={() => {
+          if (canAccept) ctx.onHoverTarget(source.id);
+        }}
+        onMouseLeave={(e) => {
+          const next = e.relatedTarget;
+          if (next instanceof Node && e.currentTarget.contains(next)) return;
+          ctx.onLeaveTarget(source.id);
+        }}
+        onDragOver={(e) => {
+          if (!canAccept) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          ctx.onHoverTarget(source.id);
+        }}
+        onDragLeave={(e) => {
+          const next = e.relatedTarget;
+          if (next instanceof Node && e.currentTarget.contains(next)) return;
+          ctx.onLeaveTarget(source.id);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (canAccept) ctx.onDrop(source.id);
+        }}
+        className={`group mb-2 flex items-center gap-2 rounded-md px-1 py-1 ${
+          canAccept ? "cursor-copy" : ""
+        } ${
+          isDropTarget
+            ? "bg-blue-50 ring-2 ring-blue-400 dark:bg-blue-500/10"
+            : ""
+        }`}
+      >
+        <NodeTypeControl node={source} ctx={ctx} />
+        <h2 className="truncate text-lg font-semibold text-gray-900 dark:text-gray-100">
+          {source.name}
+        </h2>
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          <CountBadge
+            count={departmentCount}
+            label="Общее количество отделов"
+            showZero
+            className="bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+          />
+          <CountBadge
+            count={employeeCount}
+            label="Общее количество сотрудников"
+            showZero
+            className="bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300"
+          />
+          <button
+            type="button"
+            title="Редактировать отдел"
+            aria-label="Редактировать отдел"
+            data-hint="Открывает редактирование отдела"
+            disabled={ctx.busy}
+            onClick={(e) => {
+              e.stopPropagation();
+              ctx.onEditDept(source);
+            }}
+            className="rounded p-1 text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 group-hover:opacity-100 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+          >
+            <Pencil size={14} />
+          </button>
+          <button
+            type="button"
+            title="Удалить отдел со всем содержимым"
+            data-hint="Удаляет отдел вместе с вложенными отделами и вакансиями"
+            disabled={ctx.busy}
+            onClick={(e) => {
+              e.stopPropagation();
+              ctx.onDeleteNode(source);
+            }}
+            className="rounded p-1 text-gray-400 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 disabled:opacity-30 group-hover:opacity-100 dark:hover:bg-red-500/10"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
+      <div className="rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900">
+        {vacancies.map((vacancy, index) => (
+          <VacancyRow
+            key={`v-${vacancy.id}-${index}`}
+            vacancy={vacancy}
+            depth={0}
+            deptName={source.name}
+            ctx={ctx}
+          />
+        ))}
+        {emptyVacancies.map((vacancy, index) => (
+          <EmptyVacancyRow key={`e-${index}`} vacancy={vacancy} depth={0} />
+        ))}
+        {children.map((child) => (
+          <TreeNode key={child.id} node={child} depth={0} ctx={ctx} />
+        ))}
+        {children.length === 0 &&
+          vacancies.length === 0 &&
+          emptyVacancies.length === 0 && (
+            <p className="px-3 py-2 text-sm text-gray-400 dark:text-gray-500">
+              Ничего не найдено
+            </p>
+          )}
+        <div className="flex items-center gap-4 pl-7">
+          <button
+            type="button"
+            onClick={() => ctx.onAddDept(source)}
+            data-hint="Открывает форму нового отдела внутри этого"
+            className="flex items-center gap-1 py-1.5 text-xs font-medium text-gray-400 transition-colors hover:text-blue-500 dark:text-gray-500 dark:hover:text-blue-400"
+          >
+            <Plus size={13} /> Добавить отдел
+          </button>
+          <button
+            type="button"
+            onClick={() => ctx.onAddVacancy(source)}
+            data-hint="Открывает форму новой вакансии в этом отделе"
+            className="flex items-center gap-1 py-1.5 text-xs font-medium text-gray-400 transition-colors hover:text-blue-500 dark:text-gray-500 dark:hover:text-blue-400"
+          >
+            <Plus size={13} /> Добавить вакансию
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function StructureTree({ tree }: { tree: OrgNode[] }) {
   const queryClient = useQueryClient();
-  const [expanded, setExpanded] = useState<Set<number>>(() => {
-    const acc = new Set<number>();
-    collectDefaultExpanded(tree, 1, acc);
-    return acc;
-  });
+  const [expanded, setExpanded] = useState<Set<number>>(readExpandedIds);
   /** Узлы, которые пользователь свернул поверх авто-раскрытия фильтра. */
   const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
@@ -828,6 +978,10 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
   }, [tree]);
 
   const employeeTotals = useMemo(() => collectEmployeeTotals(tree), [tree]);
+
+  useEffect(() => {
+    writeExpandedIds(expanded);
+  }, [expanded]);
 
   const filteredTree = useMemo(() => {
     const base = vacancyFilter ? filterDepartmentsWithVacancies(tree) : null;
@@ -1238,16 +1392,23 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
         </div>
       </div>
       <div className="flex items-stretch gap-4">
-        <div className="max-w-3xl min-w-0 flex-1 rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900">
+        <div className="max-w-3xl min-w-0 flex-1 space-y-4">
           {filteredTree.nodes.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-gray-400 dark:text-gray-500">
-              {vacancyFilter && !searchQuery.trim()
-                ? "Нет отделов с вакансиями"
-                : "Ничего не найдено"}
-            </p>
+            <div className="rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900">
+              <p className="px-3 py-2 text-sm text-gray-400 dark:text-gray-500">
+                {vacancyFilter && !searchQuery.trim()
+                  ? "Нет отделов с вакансиями"
+                  : "Ничего не найдено"}
+              </p>
+            </div>
           ) : (
             filteredTree.nodes.map((node) => (
-              <TreeNode key={node.id} node={node} depth={0} ctx={ctx} />
+              <StructureRoot
+                key={node.id}
+                node={node}
+                source={findNodeById(tree, node.id) ?? node}
+                ctx={ctx}
+              />
             ))
           )}
         </div>
@@ -1409,7 +1570,7 @@ function StructurePage() {
   const tree = treeQuery.data ?? [];
 
   return (
-    <div className="absolute inset-0 overflow-auto bg-gray-50 px-8 py-6 dark:bg-gray-950">
+    <div className="absolute inset-0 overflow-auto bg-transparent px-8 py-6 dark:bg-gray-950">
       <div className="mb-6">
         <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
           Структура
