@@ -231,6 +231,19 @@ export const employeesApi = {
   archive: (id: number): Promise<void> =>
     request(`/employees/${id}/archive`, { method: "POST" }),
 
+  /**
+   * Перевести сотрудника на другую вакансию — POST /employees/{id}/assignments.
+   * Текущая вакансия остаётся в своём отделе и становится свободной.
+   */
+  assignPosition: (
+    employeeId: number,
+    positionSlotId: number,
+  ): Promise<ApiResponse<unknown>> =>
+    request(`/employees/${employeeId}/assignments`, {
+      method: "POST",
+      body: { position_slot_id: positionSlotId },
+    }),
+
   /** Удалить сотрудника — DELETE /employees/{id} */
   delete: (id: number): Promise<void> =>
     request(`/employees/${id}`, { method: "DELETE" }),

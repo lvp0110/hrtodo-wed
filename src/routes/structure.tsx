@@ -31,6 +31,7 @@ import {
   dictQueries,
   employeeReportQuery,
   employeesApi,
+  officesApi,
   orgNodesApi,
   vacanciesApi,
 } from "#/services/api";
@@ -43,6 +44,12 @@ import { EditVacancyModal } from "#/components/EditVacancyModal";
 import { EmployeeInfoModal } from "#/components/EmployeeInfoModal";
 import { dictInputClass } from "#/components/settings/DictFormModal";
 import { formatApiError, formatVacancyError } from "#/lib/apiError";
+import {
+  employeeVacancyConflictWarning,
+  existingPositionSlotWarning,
+  findEmployeeVacancyConflict,
+  findExistingPositionSlot,
+} from "#/lib/vacancyValidation";
 import type {
   AddVacancyState,
   DeptFields,
@@ -50,6 +57,8 @@ import type {
   VacancyModalData,
 } from "#/types/orgChart";
 import type {
+  City,
+  EmployeeReportItem,
   Employer,
   EmptyVacancy,
   NodeCreateReq,
@@ -107,6 +116,53 @@ function employerName(v: Vacancy): string {
   if (isOpenVacancy(v)) return "Вакантно";
   const { first_name, second_name, surname } = v.employer;
   return [surname, first_name, second_name].filter(Boolean).join(" ");
+}
+
+function isReplacementPosition(original: string, next: string): boolean {
+  const trimmed = next.trim();
+  return trimmed.length > 0 && trimmed.toLowerCase() !== original.trim().toLowerCase();
+}
+
+type TransferVacancyDraft = {
+  position: string;
+  cityCode: string;
+  officeCode: string;
+  description: string;
+  jobOffer: string;
+  isManager: boolean;
+};
+
+function transferDraftFromVacancy(
+  vacancy: Vacancy,
+  deptName: string,
+  reports: Array<EmployeeReportItem[] | undefined>,
+): TransferVacancyDraft {
+  const data = withReportVacancyFields(
+    toVacancyModalData(vacancy, deptName),
+    reports,
+  );
+  return {
+    position: data.position,
+    cityCode: data.cityCode,
+    officeCode: data.officeCode ?? "",
+    description: data.description,
+    jobOffer: data.jobOffer,
+    isManager: data.isManager,
+  };
+}
+
+function isNewVacancyDraft(
+  original: TransferVacancyDraft,
+  draft: TransferVacancyDraft,
+): boolean {
+  return (
+    isReplacementPosition(original.position, draft.position) ||
+    draft.cityCode !== original.cityCode ||
+    draft.officeCode !== original.officeCode ||
+    draft.description !== original.description ||
+    draft.jobOffer !== original.jobOffer ||
+    draft.isManager !== original.isManager
+  );
 }
 
 /** Уникальные сотрудники отдела и всех вложенных отделов. */
@@ -299,6 +355,16 @@ function findNodeById(nodes: OrgNode[], id: number): OrgNode | undefined {
   return undefined;
 }
 
+function findVacancyById(nodes: OrgNode[], id: number): Vacancy | undefined {
+  for (const node of nodes) {
+    const found = node.vacancies?.find((vacancy) => vacancy.id === id);
+    if (found) return found;
+    const nested = node.children && findVacancyById(node.children, id);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
 /** `id` — потомок `ancestorId` в дереве (для запрета переноса в свою ветку). */
 function isDescendantOf(
   nodes: OrgNode[],
@@ -326,6 +392,12 @@ interface TreeContext {
     id: number,
     event: ReactPointerEvent<HTMLDivElement>,
   ) => void;
+  draggingVacancyId: number | null;
+  onVacancyPointerDown: (
+    vacancy: Vacancy,
+    deptName: string,
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => void;
   takeSuppressedClick: () => boolean;
   onHoverTarget: (id: number) => void;
   onLeaveTarget: (id: number) => void;
@@ -346,7 +418,13 @@ interface TreeContext {
   onCloseTypeMenu: () => void;
   onChangeType: (node: OrgNode, typeCode: string) => void;
   showVacancies: boolean;
+  pinnedOpenVacancyIds: Set<number>;
   employeeTotals: Map<number, number>;
+}
+
+function isVacancyVisible(vacancy: Vacancy, ctx: TreeContext): boolean {
+  if (!isOpenVacancy(vacancy)) return true;
+  return ctx.showVacancies || ctx.pinnedOpenVacancyIds.has(vacancy.id);
 }
 
 function VacancyRow({
@@ -362,13 +440,42 @@ function VacancyRow({
 }) {
   const filled = !!vacancy.employer?.id;
   const position = vacancy.position?.name ?? vacancy.position?.code ?? "—";
+  const isDragging = ctx.draggingVacancyId === vacancy.id;
   const linkClass =
     "min-w-0 truncate border-0 bg-transparent p-0 text-left text-blue-600 hover:underline dark:text-blue-400";
   return (
     <div
-      className="group flex items-center gap-2 rounded-md py-1.5 pr-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-800/50"
+      onPointerDown={(e) => {
+        if (!filled) return;
+        if (
+          e.pointerType === "mouse" ||
+          (e.target as HTMLElement).closest("[data-drag-handle]")
+        ) {
+          ctx.onVacancyPointerDown(vacancy, deptName, e);
+        }
+      }}
+      onClickCapture={(e) => {
+        if (!ctx.takeSuppressedClick()) return;
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      className={`group flex items-center gap-2 rounded-md py-1.5 pr-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-800/50 ${
+        filled ? "select-none" : ""
+      } ${isDragging ? "opacity-40" : ""}`}
       style={{ paddingLeft: depth * 20 + 28, paddingBottom: 10 }}
     >
+      {filled && (
+        <span
+          data-drag-handle
+          data-hint="Берёт сотрудника вместе с вакансией, чтобы перенести в другой отдел"
+          className="inline-flex shrink-0"
+        >
+          <GripVertical
+            size={14}
+            className="cursor-grab text-gray-300 active:cursor-grabbing dark:text-gray-600"
+          />
+        </span>
+      )}
       {vacancy.is_manager && (
         <Star size={12} className="shrink-0 fill-amber-400 text-amber-400" />
       )}
@@ -610,7 +717,7 @@ function TreeNode({
           e.stopPropagation();
           if (canAccept) ctx.onDrop(node.id);
         }}
-        data-hint="Раскрывает или сворачивает отдел. Во время переноса вставляет сюда переносимый отдел"
+        data-hint="Раскрывает или сворачивает отдел. Во время переноса вставляет сюда переносимый отдел или сотрудника"
         className={`group flex select-none items-center gap-2 rounded-md border border-solid border-[#7198bb] py-2 pr-3 pl-1 transition-colors ${
           canAccept ? "cursor-copy" : "cursor-pointer"
         } ${isDragging ? "opacity-40" : ""} ${
@@ -693,7 +800,7 @@ function TreeNode({
       {isOpen && (
         <div>
           {(node.vacancies ?? [])
-            .filter((vacancy) => ctx.showVacancies || !isOpenVacancy(vacancy))
+            .filter((vacancy) => isVacancyVisible(vacancy, ctx))
             .map((v, i) => (
               <VacancyRow
                 key={`v-${v.id}-${i}`}
@@ -796,6 +903,241 @@ function HeldNodeCard({
   );
 }
 
+function HeldVacancyCard({
+  vacancy,
+  deptName,
+  draft,
+  original,
+  cities,
+  notice,
+  onDraftChange,
+  onCancel,
+  onDragFinished,
+}: {
+  vacancy: Vacancy;
+  deptName: string;
+  draft: TransferVacancyDraft;
+  original: TransferVacancyDraft;
+  cities: City[];
+  notice: string | null;
+  onDraftChange: (draft: TransferVacancyDraft) => void;
+  onCancel: () => void;
+  onDragFinished: () => void;
+}) {
+  const changed = isNewVacancyDraft(original, draft);
+  const shownPosition = draft.position.trim() || original.position || "—";
+  const selectedCityId =
+    cities.find((city) => city.code === draft.cityCode)?.id ?? null;
+  const officesQuery = useQuery({
+    queryKey: ["offices", "city", selectedCityId] as const,
+    queryFn: () =>
+      officesApi.getByCity(selectedCityId!).then((res) => res.data ?? []),
+    enabled: selectedCityId !== null,
+  });
+  const fieldLabel =
+    "mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400";
+  const fieldInput = `${dictInputClass} border-gray-200 px-2 py-1.5 dark:border-gray-700`;
+
+  useEffect(() => {
+    if (!officesQuery.isSuccess || !draft.officeCode) return;
+    const stillThere = officesQuery.data?.some(
+      (office) => office.code === draft.officeCode,
+    );
+    if (stillThere) return;
+    onDraftChange({ ...draft, officeCode: "" });
+  }, [
+    officesQuery.isSuccess,
+    officesQuery.data,
+    draft.officeCode,
+    draft.cityCode,
+    draft,
+    onDraftChange,
+  ]);
+
+  return (
+    <aside
+      aria-label="Переносимый сотрудник"
+      className="sticky top-6 max-h-[calc(100dvh-4.5rem)] overflow-y-auto rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+      onKeyDown={(event) => {
+        const target = event.target;
+        if (
+          event.key === "Escape" &&
+          target instanceof HTMLElement &&
+          target.closest("input, select, textarea")
+        ) {
+          event.stopPropagation();
+        }
+      }}
+    >
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+          Перенос сотрудника
+        </p>
+        <button
+          type="button"
+          title="Отменить перенос"
+          data-hint="Возвращает сотрудника на место и отменяет перенос"
+          onClick={onCancel}
+          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+        >
+          <X size={14} />
+        </button>
+      </div>
+      <div
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", String(vacancy.id));
+        }}
+        onDragEnd={onDragFinished}
+        data-hint="Перетаскивает сотрудника вместе с вакансией в другой отдел"
+        className="flex cursor-grab items-center gap-2 rounded-md border border-solid border-[#7198bb] py-2 pr-3 pl-2 active:cursor-grabbing"
+      >
+        <GripVertical
+          size={14}
+          className="shrink-0 text-gray-300 dark:text-gray-600"
+        />
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+            {employerName(vacancy)}
+          </span>
+          <span className="block truncate text-xs text-gray-400 dark:text-gray-500">
+            {shownPosition}
+          </span>
+        </span>
+      </div>
+      <div className="mt-3 space-y-2">
+        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+          Новая вакансия
+        </p>
+        <label className="block">
+          <span className={fieldLabel}>
+            Должность <span className="text-red-400">*</span>
+          </span>
+          <input
+            value={draft.position}
+            onChange={(event) =>
+              onDraftChange({ ...draft, position: event.target.value })
+            }
+            aria-label="Должность новой вакансии"
+            data-hint="Название вакансии, на которую перейдёт сотрудник"
+            className={fieldInput}
+          />
+        </label>
+        <label className="block">
+          <span className={fieldLabel}>
+            Город <span className="text-red-400">*</span>
+          </span>
+          <select
+            value={draft.cityCode}
+            onChange={(event) =>
+              onDraftChange({
+                ...draft,
+                cityCode: event.target.value,
+                officeCode:
+                  event.target.value === draft.cityCode ? draft.officeCode : "",
+              })
+            }
+            aria-label="Город новой вакансии"
+            data-hint="Город, по которому выбирается офис новой вакансии"
+            className={fieldInput}
+          >
+            <option value="" disabled hidden>
+              Выберите город
+            </option>
+            {cities.map((city) => (
+              <option key={city.code} value={city.code}>
+                {city.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className={fieldLabel}>
+            Офис <span className="text-red-400">*</span>
+          </span>
+          <select
+            value={draft.officeCode}
+            disabled={!draft.cityCode || officesQuery.isPending}
+            onChange={(event) =>
+              onDraftChange({ ...draft, officeCode: event.target.value })
+            }
+            aria-label="Офис новой вакансии"
+            data-hint="Офис сохраняется вместе с новой вакансией"
+            className={`${fieldInput} disabled:opacity-60`}
+          >
+            <option value="">
+              {!draft.cityCode
+                ? "Сначала выберите город"
+                : officesQuery.isPending
+                  ? "Загрузка…"
+                  : "Выберите офис"}
+            </option>
+            {officesQuery.data?.map((office) => (
+              <option key={office.id} value={office.code}>
+                {office.name}
+              </option>
+            ))}
+          </select>
+          {officesQuery.isError && (
+            <p className="mt-1 text-xs text-red-400">
+              Не удалось загрузить список офисов
+            </p>
+          )}
+        </label>
+        <label className="block">
+          <span className={fieldLabel}>Описание вакансии</span>
+          <textarea
+            value={draft.description}
+            rows={2}
+            onChange={(event) =>
+              onDraftChange({ ...draft, description: event.target.value })
+            }
+            aria-label="Описание новой вакансии"
+            data-hint="Описание, которое сохранится у новой вакансии"
+            className={`${fieldInput} resize-y`}
+          />
+        </label>
+        <label className="block">
+          <span className={fieldLabel}>Предложение о работе</span>
+          <textarea
+            value={draft.jobOffer}
+            rows={2}
+            onChange={(event) =>
+              onDraftChange({ ...draft, jobOffer: event.target.value })
+            }
+            aria-label="Предложение о работе новой вакансии"
+            data-hint="Текст предложения, который сохранится у новой вакансии"
+            className={`${fieldInput} resize-y`}
+          />
+        </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={draft.isManager}
+            onChange={(event) =>
+              onDraftChange({ ...draft, isManager: event.target.checked })
+            }
+            data-hint="Отмечает новую должность как руководящую"
+            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600"
+          />
+          <span className="text-xs text-gray-700 dark:text-gray-300">
+            Руководящая должность
+          </span>
+        </label>
+      </div>
+      {notice && (
+        <p className="mt-2 text-xs text-red-500 dark:text-red-400">{notice}</p>
+      )}
+      <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
+        {changed
+          ? `«${original.position || "—"}» останется в отделе «${deptName}» свободной. Сотрудник перейдёт на новую вакансию с этими данными.`
+          : "Поля заполнены текущей вакансией. Измените их, чтобы создать новую: прежняя останется в исходном отделе свободной. Затем нажмите нужный отдел."}
+      </p>
+    </aside>
+  );
+}
+
 function StructureRoot({
   node,
   source,
@@ -809,8 +1151,8 @@ function StructureRoot({
   const employeeCount = ctx.employeeTotals.get(source.id) ?? 0;
   const isDropTarget = ctx.dropTargetId === source.id;
   const canAccept = ctx.canDrop(source.id);
-  const vacancies = (node.vacancies ?? []).filter(
-    (vacancy) => ctx.showVacancies || !isOpenVacancy(vacancy),
+  const vacancies = (node.vacancies ?? []).filter((vacancy) =>
+    isVacancyVisible(vacancy, ctx),
   );
   const emptyVacancies = ctx.showVacancies ? (node.empty_vacancy ?? []) : [];
   const children = node.children ?? [];
@@ -954,9 +1296,27 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [vacancyFilter, setVacancyFilter] = useState(false);
   const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [draggingVacancy, setDraggingVacancy] = useState<{
+    vacancy: Vacancy;
+    deptName: string;
+    original: TransferVacancyDraft;
+    draft: TransferVacancyDraft;
+  } | null>(null);
+  const [transferNotice, setTransferNotice] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<number | null>(null);
-  const pickRef = useRef<{ id: number; x: number; y: number } | null>(null);
+  const pickRef = useRef<
+    | { kind: "node"; id: number; x: number; y: number }
+    | {
+        kind: "vacancy";
+        vacancy: Vacancy;
+        deptName: string;
+        x: number;
+        y: number;
+      }
+    | null
+  >(null);
   const suppressClickRef = useRef(false);
+  const reportsRef = useRef<Array<EmployeeReportItem[] | undefined>>([]);
   const [deptModal, setDeptModal] = useState<DeptModalState | null>(null);
   const [addVacancy, setAddVacancy] = useState<AddVacancyState | null>(null);
   const [editVacancyModal, setEditVacancyModal] =
@@ -964,9 +1324,13 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
   const [selectedEmployee, setSelectedEmployee] = useState<Employer | null>(
     null,
   );
+  const [pinnedOpenVacancyIds, setPinnedOpenVacancyIds] = useState<Set<number>>(
+    new Set(),
+  );
   const [typeMenuNodeId, setTypeMenuNodeId] = useState<number | null>(null);
   const activeReportQuery = useQuery(employeeReportQuery("active"));
   const archivedReportQuery = useQuery(employeeReportQuery("archived"));
+  reportsRef.current = [activeReportQuery.data, archivedReportQuery.data];
 
   const nodeTypesQuery = useQuery(dictQueries.nodeTypes);
   const citiesQuery = useQuery(dictQueries.cities);
@@ -1033,6 +1397,79 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
     },
   });
 
+  const moveVacancyMutation = useMutation({
+    mutationFn: async (vars: {
+      vacancy: Vacancy;
+      deptName: string;
+      nodeId: number;
+      draft: TransferVacancyDraft;
+      replacing: boolean;
+    }) => {
+      const data = withReportVacancyFields(
+        toVacancyModalData(vars.vacancy, vars.deptName),
+        [activeReportQuery.data, archivedReportQuery.data],
+      );
+      if (!vars.replacing) {
+        return vacanciesApi.update(
+          vars.vacancy.id,
+          toVacancyUpdateReq({
+            position: data.position,
+            cityCode: data.cityCode,
+            officeCode: data.officeCode ?? "",
+            nodeId: vars.nodeId,
+            userId: data.employer?.id ?? null,
+            isManager: data.isManager,
+            jobOffer: data.jobOffer,
+            description: data.description,
+          }),
+        );
+      }
+
+      const employeeId = data.employer?.id;
+      if (!employeeId) {
+        throw new Error("У переносимой вакансии нет сотрудника");
+      }
+
+      const position = vars.draft.position.trim();
+      const created = await vacanciesApi.create({
+        node_id: vars.nodeId,
+        position_code: position,
+        position_name: position,
+        office_code: vars.draft.officeCode,
+        is_manager: vars.draft.isManager,
+        position_description: vars.draft.description,
+        job_offer_link: vars.draft.jobOffer,
+      });
+      const slotId = created.data?.id;
+      if (!slotId) {
+        throw new Error("Сервер не вернул созданную вакансию");
+      }
+
+      try {
+        await employeesApi.assignPosition(employeeId, slotId);
+      } catch (error) {
+        try {
+          await vacanciesApi.delete(slotId);
+        } catch {
+          // Оставляем исходную ошибку переноса.
+        }
+        throw error;
+      }
+
+      return created;
+    },
+    onSuccess: (_data, vars) => {
+      revealNode(vars.nodeId);
+      if (vars.replacing) {
+        revealNode(vars.vacancy.node_id);
+        setPinnedOpenVacancyIds((prev) => new Set(prev).add(vars.vacancy.id));
+      }
+      queryClient.invalidateQueries({ queryKey: ["employees", "report"] });
+      queryClient.invalidateQueries({ queryKey: ["dict", "employees"] });
+      invalidate();
+    },
+  });
+
   const deleteNodeMutation = useMutation({
     mutationFn: (id: number) => orgNodesApi.deleteNode(id),
     onSuccess: invalidate,
@@ -1091,6 +1528,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
 
   const busy =
     moveMutation.isPending ||
+    moveVacancyMutation.isPending ||
     deleteNodeMutation.isPending ||
     deleteVacancyMutation.isPending ||
     changeTypeMutation.isPending;
@@ -1112,14 +1550,22 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
     });
   };
 
-  const canDrop = (targetId: number) =>
-    draggingId !== null &&
-    targetId !== draggingId &&
-    !isDescendantOf(tree, draggingId, targetId);
+  const canDrop = (targetId: number) => {
+    if (draggingVacancy) {
+      return draggingVacancy.vacancy.node_id !== targetId;
+    }
+    return (
+      draggingId !== null &&
+      targetId !== draggingId &&
+      !isDescendantOf(tree, draggingId, targetId)
+    );
+  };
 
   const cancelDrag = () => {
     setDraggingId(null);
+    setDraggingVacancy(null);
     setDropTargetId(null);
+    setTransferNotice(null);
   };
 
   const onRowPointerDown = (
@@ -1129,7 +1575,24 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
     if (event.button !== 0) return;
     const target = event.target as HTMLElement | null;
     if (target?.closest("button, a, input, textarea, [data-node-type]")) return;
-    pickRef.current = { id, x: event.clientX, y: event.clientY };
+    pickRef.current = { kind: "node", id, x: event.clientX, y: event.clientY };
+  };
+
+  const onVacancyPointerDown = (
+    vacancy: Vacancy,
+    deptName: string,
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (event.button !== 0 || !vacancy.employer?.id) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("button, a, input, textarea")) return;
+    pickRef.current = {
+      kind: "vacancy",
+      vacancy,
+      deptName,
+      x: event.clientX,
+      y: event.clientY,
+    };
   };
 
   const takeSuppressedClick = () => {
@@ -1151,7 +1614,24 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
       if (dx * dx + dy * dy < 36) return;
       pickRef.current = null;
       suppressClickRef.current = true;
-      setDraggingId(pick.id);
+      if (pick.kind === "node") {
+        setDraggingVacancy(null);
+        setDraggingId(pick.id);
+      } else {
+        const draft = transferDraftFromVacancy(
+          pick.vacancy,
+          pick.deptName,
+          reportsRef.current,
+        );
+        setDraggingId(null);
+        setTransferNotice(null);
+        setDraggingVacancy({
+          vacancy: pick.vacancy,
+          deptName: pick.deptName,
+          original: draft,
+          draft,
+        });
+      }
       setDropTargetId(null);
     };
     const onUp = () => {
@@ -1170,24 +1650,86 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
   }, []);
 
   useEffect(() => {
-    if (draggingId === null) return;
+    if (draggingId === null && draggingVacancy === null) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") cancelDrag();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [draggingId]);
+  }, [draggingId, draggingVacancy]);
 
   useEffect(() => {
     if (draggingId !== null && !findNodeById(tree, draggingId)) cancelDrag();
   }, [draggingId, tree]);
 
+  useEffect(() => {
+    if (
+      draggingVacancy &&
+      !findVacancyById(tree, draggingVacancy.vacancy.id)
+    ) {
+      setDraggingVacancy(null);
+      setDropTargetId(null);
+    }
+  }, [draggingVacancy, tree]);
+
   const onDrop = (targetId: number) => {
     const id = draggingId;
+    const vacancyDrag = draggingVacancy;
     const ok = canDrop(targetId);
+    if (!ok) {
+      setDropTargetId(null);
+      return;
+    }
+    if (vacancyDrag) {
+      const { vacancy, draft, original } = vacancyDrag;
+      const replacing = isNewVacancyDraft(original, draft);
+      if (replacing && !draft.position.trim()) {
+        setTransferNotice("Укажите должность новой вакансии");
+        setDropTargetId(null);
+        return;
+      }
+      if (replacing && !draft.officeCode) {
+        setTransferNotice("Выберите офис новой вакансии");
+        setDropTargetId(null);
+        return;
+      }
+      const positionKey = draft.position.trim() || original.position;
+      const conflict = findEmployeeVacancyConflict(
+        tree,
+        vacancy.id,
+        targetId,
+        positionKey,
+        vacancy.employer?.id ?? null,
+      );
+      const slot = replacing
+        ? findExistingPositionSlot(tree, targetId, positionKey)
+        : null;
+      const warning = [
+        conflict ? employeeVacancyConflictWarning(conflict) : "",
+        slot ? existingPositionSlotWarning(slot) : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      if (warning && !window.confirm(`${warning} Перенести всё равно?`)) {
+        setDropTargetId(null);
+        return;
+      }
+      setTransferNotice(null);
+      setDraggingId(null);
+      setDraggingVacancy(null);
+      setDropTargetId(null);
+      moveVacancyMutation.mutate({
+        vacancy,
+        deptName: vacancyDrag.deptName,
+        nodeId: targetId,
+        draft,
+        replacing,
+      });
+      return;
+    }
+    if (id === null) return;
     setDraggingId(null);
     setDropTargetId(null);
-    if (id === null || !ok) return;
     const node = findNodeById(tree, id);
     if (node) moveMutation.mutate({ node, parentId: targetId });
   };
@@ -1268,6 +1810,8 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
     dropTargetId,
     canDrop,
     onRowPointerDown,
+    draggingVacancyId: draggingVacancy?.vacancy.id ?? null,
+    onVacancyPointerDown,
     takeSuppressedClick,
     onHoverTarget: setDropTargetId,
     onLeaveTarget: (id) => setDropTargetId((cur) => (cur === id ? null : cur)),
@@ -1316,6 +1860,7 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
       changeTypeMutation.mutate({ node, typeCode });
     },
     showVacancies: vacancyFilter,
+    pinnedOpenVacancyIds,
     employeeTotals,
   };
 
@@ -1412,19 +1957,40 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
             ))
           )}
         </div>
-        {heldNode && (
-          <div className="w-72 shrink-0">
-            <HeldNodeCard
-              node={heldNode}
-              typeLabel={
-                nodeTypesQuery.data?.find(
-                  (type) =>
-                    type.code.toUpperCase() === heldNode.type.toUpperCase(),
-                )?.name ?? heldNode.type
-              }
-              onCancel={cancelDrag}
-              onDragFinished={() => setDropTargetId(null)}
-            />
+        {(heldNode || draggingVacancy) && (
+          <div className={`${draggingVacancy ? "w-80" : "w-72"} shrink-0`}>
+            {heldNode ? (
+              <HeldNodeCard
+                node={heldNode}
+                typeLabel={
+                  nodeTypesQuery.data?.find(
+                    (type) =>
+                      type.code.toUpperCase() === heldNode.type.toUpperCase(),
+                  )?.name ?? heldNode.type
+                }
+                onCancel={cancelDrag}
+                onDragFinished={() => setDropTargetId(null)}
+              />
+            ) : (
+              draggingVacancy && (
+                <HeldVacancyCard
+                  vacancy={draggingVacancy.vacancy}
+                  deptName={draggingVacancy.deptName}
+                  draft={draggingVacancy.draft}
+                  original={draggingVacancy.original}
+                  cities={citiesQuery.data ?? []}
+                  notice={transferNotice}
+                  onDraftChange={(draft) => {
+                    setTransferNotice(null);
+                    setDraggingVacancy((current) =>
+                      current ? { ...current, draft } : current,
+                    );
+                  }}
+                  onCancel={cancelDrag}
+                  onDragFinished={() => setDropTargetId(null)}
+                />
+              )
+            )}
           </div>
         )}
       </div>
@@ -1541,18 +2107,21 @@ function StructureTree({ tree }: { tree: OrgNode[] }) {
       {(deleteNodeMutation.isError ||
         deleteVacancyMutation.isError ||
         changeTypeMutation.isError ||
+        moveVacancyMutation.isError ||
         (moveMutation.isError && !deptModal)) && (
         <ApiErrorModal
           error={
             deleteNodeMutation.error ??
             deleteVacancyMutation.error ??
             changeTypeMutation.error ??
+            moveVacancyMutation.error ??
             moveMutation.error
           }
           onClose={() => {
             deleteNodeMutation.reset();
             deleteVacancyMutation.reset();
             changeTypeMutation.reset();
+            moveVacancyMutation.reset();
             moveMutation.reset();
           }}
         />
@@ -1577,11 +2146,12 @@ function StructurePage() {
           <CommentHeadingIcon />
         </h1>
         <PageDescription className="mt-2 max-w-3xl">
-          Карандаш открывает редактирование отдела. Потяните отдел — он
-          закрепится справа от списка. Прокрутите список или найдите родителя
-          и нажмите на него, чтобы вставить. Стрелка раскрывает ветку и во
-          время переноса, Esc отменяет. Корзина для удаления — по наведению на
-          строку.
+          Карандаш открывает редактирование отдела. Потяните отдел или
+          сотрудника — карточка закрепится справа от списка. На ней можно
+          изменить данные новой вакансии: прежняя останется в исходном отделе
+          свободной. Прокрутите список или найдите отдел и нажмите на него,
+          чтобы вставить. Стрелка раскрывает ветку и во время переноса, Esc
+          отменяет. Корзина для удаления — по наведению на строку.
         </PageDescription>
       </div>
 
