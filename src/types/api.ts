@@ -227,6 +227,101 @@ export interface VacancyUpdateReq {
   job_offer_link: string;
 }
 
+/** Элемент справочника из GET /hr/vacations/filters. code может отсутствовать. */
+export interface VacationNamedRef {
+  id: number;
+  code?: string;
+  name: string;
+}
+
+export type VacationFilterValue = string | VacationNamedRef;
+
+/** GET /hr/vacations/filters */
+export interface VacationFilters {
+  years?: number[] | null;
+  legal_entities?: VacationNamedRef[] | null;
+  positions?: VacationNamedRef[] | null;
+  managers?: VacationNamedRef[] | null;
+  categories?: VacationNamedRef[] | null;
+  period_statuses?: VacationFilterValue[] | null;
+  request_statuses?: VacationFilterValue[] | null;
+  employment_types?: VacationFilterValue[] | null;
+}
+
+/** GET /hr/vacation-schedules — годовой график юрлица. */
+export interface VacationSchedule {
+  id: number;
+  legal_entity_id: number;
+  legal_entity_name: string;
+  year: number;
+  status: string;
+  submitted_at?: string | null;
+  approved_at?: string | null;
+  approval_comment?: string | null;
+  closed_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Строка GET /hr/vacations, модель VacationListItem.
+ * available_days — положено, planned_total_days — уже распределено, remaining_days — остаток.
+ */
+export interface VacationListItem {
+  period_id: number;
+  version_id?: number;
+  version_no?: number;
+  assignment_id: number;
+  employee_id: number;
+  employee_full_name: string;
+  legal_entity_id: number;
+  legal_entity_name: string;
+  position_id: number;
+  position_name: string;
+  manager_assignment_id?: number | null;
+  manager_employee_id?: number | null;
+  manager_full_name?: string | null;
+  category_id: number;
+  category_code?: string;
+  category_name: string;
+  employment_type: string;
+  planned_start_date: string;
+  planned_end_date: string;
+  planned_days: number;
+  period_status: string;
+  confirmation_status: string;
+  reschedule_status?: string | null;
+  last_notification_at?: string | null;
+  last_delivery_status?: string | null;
+  available_days: number;
+  planned_total_days: number;
+  remaining_days: number;
+}
+
+/** GET /hr/vacations */
+export interface VacationListPage {
+  items?: VacationListItem[] | null;
+  page?: number;
+  page_size?: number;
+  total_items?: number;
+  total_pages?: number;
+}
+
+/** GET /hr/vacations/summary */
+export interface VacationSummary {
+  employees_total?: number;
+  employees_planned?: number;
+  employees_not_planned?: number;
+  days_need_review?: number;
+  upcoming_14_days?: number;
+  upcoming_30_days?: number;
+  awaiting_confirmation?: number;
+  confirmed?: number;
+  pending_reschedules?: number;
+  delivery_errors?: number;
+  employees_outside_schedule?: number;
+}
+
 /** Фильтры для POST /export/excel */
 export interface ExportRequest {
   full_name?: string;

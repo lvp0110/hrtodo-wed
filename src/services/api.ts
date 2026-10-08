@@ -30,6 +30,10 @@ import type {
   Vacancy,
   VacancyReq,
   VacancyUpdateReq,
+  VacationFilters,
+  VacationListPage,
+  VacationSchedule,
+  VacationSummary,
 } from "#/types/api";
 
 const BASE_URL = "/api";
@@ -204,6 +208,60 @@ export const vacanciesApi = {
   /** Удалить вакансию */
   delete: (id: number): Promise<void> =>
     request(`/vacancies/${id}`, { method: "DELETE" }),
+};
+
+export type VacationFilterParams = {
+  year?: number;
+  legal_entity_id?: number;
+  manager_assignment_id?: number;
+  employee_id?: number;
+  position_id?: number;
+  category_id?: number;
+  month?: number;
+  period_status?: string;
+  confirmation_status?: string;
+  reschedule_status?: string;
+  search?: string;
+};
+
+export type VacationListParams = VacationFilterParams & {
+  page?: number;
+  page_size?: number;
+  sort?: "employee" | "start_date" | "days" | "status";
+  order?: "asc" | "desc";
+};
+
+function toQuery(
+  params: Record<string, string | number | boolean | undefined | null>,
+): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") continue;
+    search.set(key, String(value));
+  }
+  const qs = search.toString();
+  return qs ? `?${qs}` : "";
+}
+
+export const vacationsApi = {
+  /** Значения селектов сводной таблицы — GET /hr/vacations/filters */
+  filters: (year: number): Promise<ApiResponse<VacationFilters>> =>
+    request(`/hr/vacations/filters?year=${year}`),
+
+  /** Показатели сводной таблицы — GET /hr/vacations/summary */
+  summary: (params: VacationFilterParams): Promise<ApiResponse<VacationSummary>> =>
+    request(`/hr/vacations/summary${toQuery(params)}`),
+
+  /** Строки графика отпусков — GET /hr/vacations */
+  list: (params: VacationListParams): Promise<ApiResponse<VacationListPage>> =>
+    request(`/hr/vacations${toQuery(params)}`),
+
+  /** Годовые графики юрлиц — GET /hr/vacation-schedules */
+  schedules: (params: {
+    year?: number;
+    legal_entity_id?: number;
+  }): Promise<ApiResponse<VacationSchedule[]>> =>
+    request(`/hr/vacation-schedules${toQuery(params)}`),
 };
 
 export const employeesApi = {

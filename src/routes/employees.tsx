@@ -33,6 +33,10 @@ import {
 import { EmployeesRowCard } from "#/components/EmployeesRowCard";
 import { EditVacancyModal } from "#/components/EditVacancyModal";
 import { DictTable } from "#/components/settings/DictTable";
+import {
+  VacationSchedulePanel,
+  VacationScheduleToggle,
+} from "#/components/VacationSchedulePanel";
 import { dictInputClass } from "#/components/settings/DictFormModal";
 import type {
   City,
@@ -618,6 +622,7 @@ function EmployeesPage() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<EmployeeFilters>(emptyFilters);
   const [archiveView, setArchiveView] = useState(false);
+  const [vacationView, setVacationView] = useState(false);
   const [rowKindFilter, setRowKindFilter] = useState<RowKindFilter>("all");
   const [managersOnlyFilter, setManagersOnlyFilter] = useState(false);
   const [managerFilterId, setManagerFilterId] = useState<number | null>(null);
@@ -1052,17 +1057,19 @@ function EmployeesPage() {
     <div className="employees-page absolute inset-0 flex flex-col overflow-hidden bg-transparent px-4 py-6 min-[1070px]:px-8 dark:bg-gray-950">
       <div className="mb-6 shrink-0">
         <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
-          Сотрудники
+          {vacationView ? "График отпусков" : "Сотрудники"}
           <CommentHeadingIcon />
         </h1>
         <PageDescription className="mt-2 max-w-3xl">
-          Фильтры сужают таблицу, счётчики переключают сотрудников, вакансии и
-          архив. Клик по ФИО открывает карточку, по городу, офису и отделу
-          фильтрует список, по должности открывает вакансию. Звезда оставляет
-          руководителей или их подчинённых. Кнопка с таблицей выгружает текущую
-          выборку в Excel.
+          {vacationView
+            ? "Периоды отпусков, статусы графиков и остаток дней. Фильтры запрашивают сводную таблицу на сервере. Повторное нажатие на пальму возвращает список сотрудников."
+            : "Фильтры сужают таблицу, счётчики переключают сотрудников, вакансии и архив. Клик по ФИО открывает карточку, по городу, офису и отделу фильтрует список, по должности открывает вакансию. Звезда оставляет руководителей или их подчинённых. Кнопка с таблицей выгружает текущую выборку в Excel. Кнопка с пальмой переключает таблицу на график отпусков."}
         </PageDescription>
       </div>
+      {vacationView ? (
+        <VacationSchedulePanel onClose={() => setVacationView(false)} />
+      ) : (
+      <>
       <div className="mb-6 flex shrink-0 flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:gap-3">
         <label className="max-md:w-full min-w-[160px] flex-1">
           <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -1307,6 +1314,11 @@ function EmployeesPage() {
           >
             <FileSpreadsheet size={20} />
           </button>
+
+          <VacationScheduleToggle
+            active={false}
+            onClick={() => setVacationView(true)}
+          />
 
           <div className="shrink-0">
             <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -1812,6 +1824,8 @@ function EmployeesPage() {
         }
       />
       </div>
+      </>
+      )}
 
       {selectedEmployee && (
         <EmployeeInfoModal
