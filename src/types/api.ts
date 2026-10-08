@@ -57,8 +57,10 @@ export interface Employer {
   phone?: string;
   personal_number?: string;
   work_number?: string;
-  hire_date?: string;
+  hire_date?: string | null;
   gender?: string;
+  archived_at?: string | null;
+  archived_by?: string | null;
   city?: Entity | null;
   city_id?: number | null;
   office?: (Entity & { id?: number }) | null;
@@ -74,12 +76,12 @@ export interface EmployeeCreateReq {
   phone?: string;
   personal_number?: string;
   work_number?: string;
-  hire_date?: string;
   gender?: string;
 }
 
 /**
- * Обычное редактирование не меняет status.
+ * Обычное редактирование не меняет status и hire_date.
+ * Дата устройства ставится сервером при первом назначении.
  * Архив — только POST /employees/{id}/archive.
  */
 export interface EmployeeUpdateReq {
@@ -90,7 +92,6 @@ export interface EmployeeUpdateReq {
   phone?: string;
   personal_number?: string;
   work_number?: string;
-  hire_date?: string;
   gender?: string;
   city_id?: number | null;
   office_id?: number | null;
@@ -118,6 +119,39 @@ export interface EmployeeReportPosition {
 export interface EmployeeReportItem {
   employee: Employer;
   positions: EmployeeReportPosition[];
+}
+
+export type EmployeeHistoryEndType =
+  | "transferred"
+  | "unassigned"
+  | "archived"
+  | "correction";
+
+export interface EmployeePositionHistory {
+  id: number;
+  employee_id: number;
+  position_slot_id?: number | null;
+  node_id?: number | null;
+  office_id?: number | null;
+  position_code: string;
+  position_name: string;
+  node_code: string;
+  node_name: string;
+  office_code: string;
+  office_name: string;
+  is_manager: boolean;
+  started_at: string;
+  started_by?: string | null;
+  ended_at?: string | null;
+  ended_by?: string | null;
+  end_type?: EmployeeHistoryEndType | null;
+  end_reason?: string | null;
+  created_at: string;
+}
+
+export interface AssignEmployeeReq {
+  position_slot_id: number;
+  reason?: string;
 }
 
 export interface OrgNodeType {
@@ -207,7 +241,6 @@ export interface VacancyReq {
   node_id: number;
   position_code: string;
   position_name: string;
-  user_id?: number | null;
   office_code?: string;
   city_code?: string;
   is_manager: boolean;
@@ -217,7 +250,6 @@ export interface VacancyReq {
 
 export interface VacancyUpdateReq {
   node_id: number;
-  user_id: number | null;
   city_code?: string;
   office_code?: string;
   position_code: string;

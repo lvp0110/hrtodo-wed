@@ -6,8 +6,7 @@ import { DateInput } from "#/components/DateInput";
 import { EmployeeSelect } from "#/components/EmployeeSelect";
 import { GENDER_OPTIONS } from "#/lib/employeeDisplay";
 import {
-  employeeVacancyConflictWarning,
-  findEmployeeVacancyConflict,
+  findEmployeeAssignment,
 } from "#/lib/vacancyValidation";
 import { dictQueries, orgNodesApi } from "#/services/api";
 import type { EmployeeEditFields } from "#/lib/employeeUpdate";
@@ -45,9 +44,6 @@ export function AssignEmployeeModal({
   });
 
   const [localError, setLocalError] = useState<string | null>(null);
-  const [confirmedConflictKey, setConfirmedConflictKey] = useState<string | null>(
-    null,
-  );
 
   const {
     register,
@@ -68,32 +64,17 @@ export function AssignEmployeeModal({
       work_number: "",
       email: "",
       gender: "",
-      hireDate: "",
     },
   });
 
   const mode = watch("mode");
   const existingUserId = watch("existingUserId");
-  const assignmentConflict = useMemo(() => {
+  const currentAssignment = useMemo(() => {
     if (mode !== "existing" || !existingUserId) return null;
-    return findEmployeeVacancyConflict(
-      orgTree.data ?? [],
-      vacancy.id,
-      vacancy.nodeId,
-      vacancy.position,
-      existingUserId,
-    );
-  }, [mode, existingUserId, orgTree.data, vacancy.id, vacancy.nodeId, vacancy.position]);
-  const conflictKey = assignmentConflict
-    ? `${assignmentConflict.vacancyId}:${existingUserId}`
-    : null;
-  const confirming = conflictKey !== null && confirmedConflictKey === conflictKey;
-  const assignmentWarning = assignmentConflict
-    ? `${employeeVacancyConflictWarning(assignmentConflict)} ${
-        confirming
-          ? "Нажмите «Всё равно назначить», чтобы отправить."
-          : "Нажмите «Назначить», чтобы подтвердить отправку."
-      }`
+    return findEmployeeAssignment(orgTree.data ?? [], existingUserId);
+  }, [mode, existingUserId, orgTree.data]);
+  const assignmentWarning = currentAssignment
+    ? `Сотрудник занимает должность «${currentAssignment.position}» в отделе «${currentAssignment.deptName}». Назначение переведёт его, прежняя должность освободится.`
     : null;
 
   function handleBackdropClick(e: React.MouseEvent) {
@@ -110,11 +91,6 @@ export function AssignEmployeeModal({
       }
     } else if (!data.surname.trim() || !data.first_name.trim()) {
       setLocalError("Укажите фамилию и имя");
-      return;
-    }
-
-    if (conflictKey && confirmedConflictKey !== conflictKey) {
-      setConfirmedConflictKey(conflictKey);
       return;
     }
 
@@ -300,7 +276,6 @@ export function AssignEmployeeModal({
                     ))}
                   </select>
                 </div>
-
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Дата устройства на работу
@@ -344,15 +319,11 @@ export function AssignEmployeeModal({
               </button>
               <button
                 type="submit"
-                data-hint={
-                  confirming
-                    ? "Назначает сотрудника, несмотря на совпадение с другой вакансией"
-                    : "Назначает выбранного сотрудника на вакансию"
-                }
+                data-hint="Назначает выбранного сотрудника на вакансию. Если должность уже есть, выполняется перевод"
                 disabled={isPending}
                 className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {isPending ? "Назначаем…" : confirming ? "Всё равно назначить" : "Назначить"}
+                {isPending ? "Назначаем…" : "Назначить"}
               </button>
             </div>
           </form>

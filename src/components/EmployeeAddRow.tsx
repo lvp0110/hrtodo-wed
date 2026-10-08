@@ -26,7 +26,6 @@ const emptyDraft: EmployeeVacancyCreateFields = {
   work_number: "",
   email: "",
   gender: "",
-  hireDate: "",
   cityCode: "",
   cityId: null,
   officeCode: "",
@@ -65,7 +64,6 @@ function isDraftEmpty(draft: EmployeeVacancyCreateFields): boolean {
     draft.work_number === "" &&
     draft.email === "" &&
     draft.gender === "" &&
-    draft.hireDate === "" &&
     draft.cityCode === "" &&
     draft.cityId === null &&
     draft.officeCode === "" &&
@@ -231,8 +229,7 @@ function hasEmployeeDraftData(draft: EmployeeVacancyCreateFields): boolean {
     Boolean(draft.personal_number.trim()) ||
     Boolean(draft.work_number.trim()) ||
     Boolean(draft.email.trim()) ||
-    Boolean(draft.gender) ||
-    Boolean(draft.hireDate)
+    Boolean(draft.gender)
   );
 }
 
@@ -654,10 +651,12 @@ function EmployeeAddActions({
 
 interface EmployeeAddRowProps extends EmployeeAddSharedProps {
   columnsCount: number;
+  trailingEmptyColumns?: number;
 }
 
 export function EmployeeAddRow({
   columnsCount,
+  trailingEmptyColumns = 0,
   cities,
   orgNodes,
   isPending,
@@ -773,6 +772,13 @@ export function EmployeeAddRow({
             </label>
           </div>
         </td>
+        {Array.from({ length: trailingEmptyColumns }, (_, index) => (
+          <td
+            key={`card-column-${index}`}
+            rowSpan={2}
+            className="bg-blue-50 dark:bg-blue-950/40"
+          />
+        ))}
       </tr>
       <tr className="bg-blue-50 text-sm font-normal normal-case tracking-normal text-gray-700 dark:bg-blue-950/40 dark:text-gray-200">
         <td colSpan={4} className="bg-blue-50 px-4 pb-3 pt-0 align-top dark:bg-blue-950/40">

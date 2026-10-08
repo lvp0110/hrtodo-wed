@@ -907,7 +907,6 @@ export function OrgChart() {
               node_id: Number(addVacancyModal.deptId),
               position_code: data.position,
               position_name: data.position,
-              user_id: null,
               city_code: data.cityCode,
               is_manager: data.isManager,
               position_description: data.description,

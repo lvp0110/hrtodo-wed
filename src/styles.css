@@ -203,4 +203,13 @@ a {
   .employees-dict-table td:nth-child(6) {
     width: 22%;
   }
+
+  .employees-dict-table.employees-card-columns table {
+    table-layout: auto;
+  }
+
+  .employees-dict-table.employees-card-columns th:nth-child(n),
+  .employees-dict-table.employees-card-columns td:nth-child(n) {
+    width: auto;
+  }
 }

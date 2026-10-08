@@ -14,11 +14,13 @@ import type {
   OfficeReq,
   CountryReq,
   EmployeeCreateReq,
+  EmployeePositionHistory,
   EmployeeReportItem,
   EmployeeStatus,
   EmployeeUpdateReq,
   Employer,
   ExportRequest,
+  AssignEmployeeReq,
   AuthSession,
   LoginRequest,
   NodeCreateReq,
@@ -226,10 +228,38 @@ export const employeesApi = {
 
   /**
    * Архивировать — POST /employees/{id}/archive, ответ 204.
-   * Бэк ставит status=archived и снимает сотрудника со всех позиций.
+   * Бэк освобождает текущую должность и фиксирует дату и автора.
+   * reason необязателен.
    */
-  archive: (id: number): Promise<void> =>
-    request(`/employees/${id}/archive`, { method: "POST" }),
+  archive: (id: number, reason?: string): Promise<void> =>
+    request(`/employees/${id}/archive`, {
+      method: "POST",
+      ...(reason?.trim() ? { body: { reason: reason.trim() } } : {}),
+    }),
+
+  /** Журнал должностей — GET /employees/{id}/history */
+  history: (id: number): Promise<ApiResponse<EmployeePositionHistory[]>> =>
+    request(`/employees/${id}/history`),
+
+  /**
+   * Назначить или перевести — POST /employees/{id}/assignments.
+   * Первое назначение ставит hire_date. Повторное закрывает текущую должность.
+   */
+  assign: (
+    id: number,
+    body: AssignEmployeeReq,
+  ): Promise<ApiResponse<EmployeePositionHistory>> =>
+    request(`/employees/${id}/assignments`, { method: "POST", body }),
+
+  /**
+   * Снять с должности без перевода — POST /employees/{id}/assignments/close.
+   * reason необязателен.
+   */
+  closeAssignment: (id: number, reason?: string): Promise<void> =>
+    request(`/employees/${id}/assignments/close`, {
+      method: "POST",
+      ...(reason?.trim() ? { body: { reason: reason.trim() } } : {}),
+    }),
 
   /** Удалить сотрудника — DELETE /employees/{id} */
   delete: (id: number): Promise<void> =>
