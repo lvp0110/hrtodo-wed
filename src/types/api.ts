@@ -322,6 +322,117 @@ export interface VacationSummary {
   employees_outside_schedule?: number;
 }
 
+export interface LegalEntity {
+  id: number;
+  code: string;
+  short_name: string;
+  full_name: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LegalEntityReq {
+  code: string;
+  short_name: string;
+  full_name: string;
+  is_active: boolean;
+}
+
+export interface LegalPosition {
+  id: number;
+  legal_entity_id: number;
+  code: string;
+  name: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LegalPositionCreateReq {
+  legal_entity_id: number;
+  code: string;
+  name: string;
+  is_active: boolean;
+}
+
+export interface LegalPositionUpdateReq {
+  code: string;
+  name: string;
+  is_active: boolean;
+}
+
+export interface EmployeeCategory {
+  id: number;
+  code: string;
+  name: string;
+  vacation_management_mode: string;
+  is_active: boolean;
+}
+
+export interface AccountingAssignment {
+  id: number;
+  employee_id: number;
+  employee_full_name?: string;
+  legal_entity_id: number;
+  legal_entity_name?: string;
+  legal_position_id: number;
+  legal_position_name?: string;
+  category_id: number;
+  category_name?: string;
+  manager_assignment_id?: number | null;
+  manager_full_name?: string | null;
+  employment_type: string;
+  personnel_number?: string | null;
+  work_fraction?: number | null;
+  is_manager: boolean;
+  started_on: string;
+  ended_on?: string | null;
+  end_reason?: string | null;
+}
+
+export interface AccountingStructureEmployee {
+  assignment_id: number;
+  employee_id: number;
+  full_name: string;
+  position_id: number;
+  position_name: string;
+  category_id: number;
+  category_code: string;
+  employment_type: string;
+}
+
+export interface AccountingStructureManager {
+  assignment_id: number;
+  employee_id: number;
+  full_name: string;
+  position_id: number;
+  position_name: string;
+  employees?: AccountingStructureEmployee[] | null;
+}
+
+export interface AccountingStructure {
+  legal_entity_id: number;
+  legal_entity_name: string;
+  managers?: AccountingStructureManager[] | null;
+  unassigned?: AccountingStructureEmployee[] | null;
+}
+
+export interface AccountingAssignmentReq {
+  employee_id: number;
+  legal_entity_id: number;
+  legal_position_id: number;
+  category_id: number;
+  manager_assignment_id: number | null;
+  employment_type: "primary" | "part_time";
+  personnel_number: string | null;
+  work_fraction: number | null;
+  is_manager: boolean;
+  started_on: string;
+  ended_on: string | null;
+  end_reason: string | null;
+}
+
 /** Фильтры для POST /export/excel */
 export interface ExportRequest {
   full_name?: string;

@@ -12,6 +12,7 @@ interface DictFormModalProps {
   error?: string | null;
   submitLabel?: string;
   pendingLabel?: string;
+  panelClassName?: string;
 }
 
 export function DictFormModal({
@@ -25,6 +26,7 @@ export function DictFormModal({
   error = null,
   submitLabel = "Сохранить",
   pendingLabel = "Сохраняем…",
+  panelClassName = "max-w-md",
 }: DictFormModalProps) {
   function handleBackdropClick(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose();
@@ -35,7 +37,7 @@ export function DictFormModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onMouseDown={handleBackdropClick}
     >
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+      <div className={`mx-4 w-full overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900 ${panelClassName}`}>
         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
@@ -50,7 +52,7 @@ export function DictFormModal({
           <CloseButton onClick={onClose} />
         </div>
 
-        <form onSubmit={onSubmit} className="px-6 py-5 space-y-4">
+        <form onSubmit={onSubmit} className="max-h-[calc(100vh-8rem)] space-y-4 overflow-y-auto px-6 py-5">
           {children}
 
           {error && (

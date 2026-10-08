@@ -34,6 +34,15 @@ import type {
   VacationListPage,
   VacationSchedule,
   VacationSummary,
+  LegalEntity,
+  LegalEntityReq,
+  LegalPosition,
+  LegalPositionCreateReq,
+  LegalPositionUpdateReq,
+  EmployeeCategory,
+  AccountingAssignment,
+  AccountingAssignmentReq,
+  AccountingStructure,
 } from "#/types/api";
 
 const BASE_URL = "/api";
@@ -262,6 +271,93 @@ export const vacationsApi = {
     legal_entity_id?: number;
   }): Promise<ApiResponse<VacationSchedule[]>> =>
     request(`/hr/vacation-schedules${toQuery(params)}`),
+};
+
+export const hrAccountingApi = {
+  /** GET /hr/legal-entities */
+  legalEntities: (
+    includeInactive = false,
+  ): Promise<ApiResponse<LegalEntity[]>> =>
+    request(
+      `/hr/legal-entities${toQuery({ include_inactive: includeInactive })}`,
+    ),
+
+  /** POST /hr/legal-entities */
+  createLegalEntity: (body: LegalEntityReq): Promise<ApiResponse<LegalEntity>> =>
+    request("/hr/legal-entities", { method: "POST", body }),
+
+  /** PUT /hr/legal-entities/{id} */
+  updateLegalEntity: (
+    id: number,
+    body: LegalEntityReq,
+  ): Promise<ApiResponse<LegalEntity>> =>
+    request(`/hr/legal-entities/${id}`, { method: "PUT", body }),
+
+  /** DELETE /hr/legal-entities/{id} — деактивация */
+  deactivateLegalEntity: (id: number): Promise<void> =>
+    request(`/hr/legal-entities/${id}`, { method: "DELETE" }),
+
+  /** GET /hr/legal-positions?legal_entity_id= */
+  legalPositions: (
+    legalEntityId: number,
+    includeInactive = false,
+  ): Promise<ApiResponse<LegalPosition[]>> =>
+    request(
+      `/hr/legal-positions${toQuery({
+        legal_entity_id: legalEntityId,
+        include_inactive: includeInactive,
+      })}`,
+    ),
+
+  /** POST /hr/legal-positions */
+  createLegalPosition: (
+    body: LegalPositionCreateReq,
+  ): Promise<ApiResponse<LegalPosition>> =>
+    request("/hr/legal-positions", { method: "POST", body }),
+
+  /** PUT /hr/legal-positions/{id} */
+  updateLegalPosition: (
+    id: number,
+    body: LegalPositionUpdateReq,
+  ): Promise<ApiResponse<LegalPosition>> =>
+    request(`/hr/legal-positions/${id}`, { method: "PUT", body }),
+
+  /** DELETE /hr/legal-positions/{id} — деактивация */
+  deactivateLegalPosition: (id: number): Promise<void> =>
+    request(`/hr/legal-positions/${id}`, { method: "DELETE" }),
+
+  /** GET /hr/employee-categories */
+  employeeCategories: (
+    includeInactive = false,
+  ): Promise<ApiResponse<EmployeeCategory[]>> =>
+    request(
+      `/hr/employee-categories${toQuery({ include_inactive: includeInactive })}`,
+    ),
+
+  /** GET /hr/accounting-assignments */
+  assignments: (params: {
+    legal_entity_id?: number;
+    employee_id?: number;
+    active_only?: boolean;
+  }): Promise<ApiResponse<AccountingAssignment[]>> =>
+    request(`/hr/accounting-assignments${toQuery(params)}`),
+
+  /** POST /hr/accounting-assignments */
+  createAssignment: (
+    body: AccountingAssignmentReq,
+  ): Promise<ApiResponse<AccountingAssignment>> =>
+    request("/hr/accounting-assignments", { method: "POST", body }),
+
+  /** PUT /hr/accounting-assignments/{id} */
+  updateAssignment: (
+    id: number,
+    body: AccountingAssignmentReq,
+  ): Promise<ApiResponse<AccountingAssignment>> =>
+    request(`/hr/accounting-assignments/${id}`, { method: "PUT", body }),
+
+  /** GET /hr/accounting-structure?legal_entity_id= */
+  structure: (legalEntityId: number): Promise<ApiResponse<AccountingStructure>> =>
+    request(`/hr/accounting-structure?legal_entity_id=${legalEntityId}`),
 };
 
 export const employeesApi = {
