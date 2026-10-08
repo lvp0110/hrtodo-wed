@@ -37,6 +37,11 @@ const vacationTabs: { id: VacationAccountingTab; label: string; hint: string }[]
     label: "Руководители",
     hint: "Учётные назначения сотрудников с признаком руководителя",
   },
+  {
+    id: "schedule",
+    label: "График",
+    hint: "Создаёт годовой график юрлица и заполняет периоды отпуска по учётным назначениям",
+  },
 ];
 
 function SettingsLayout() {

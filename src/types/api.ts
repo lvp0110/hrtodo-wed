@@ -48,6 +48,26 @@ export interface OrgNodeTypeReq {
 /** active попадает в /dict/employees и может быть назначен; archived снят с позиций. */
 export type EmployeeStatus = "active" | "archived";
 
+/** POST /hr/employees/{id}/telegram-link */
+export interface TelegramLink {
+  recipient_id: string;
+  deep_link: string;
+  expires_at: string;
+}
+
+/** GET /hr/messaging/accounts */
+export interface MessagingAccount {
+  id: number;
+  employee_id: number;
+  employee_name?: string;
+  provider?: string;
+  connection_status: string;
+  is_active?: boolean;
+  is_verified?: boolean;
+  last_error?: string | null;
+  updated_at?: string;
+}
+
 export interface Employer {
   id: number;
   first_name: string;
@@ -320,6 +340,43 @@ export interface VacationSummary {
   pending_reschedules?: number;
   delivery_errors?: number;
   employees_outside_schedule?: number;
+}
+
+/** GET /hr/vacation-entitlements — расчёт дней по назначению и году. */
+export interface VacationEntitlement {
+  id: number;
+  assignment_id: number;
+  employee_id: number;
+  employee_full_name?: string;
+  legal_entity_id: number;
+  legal_entity_name?: string;
+  year: number;
+  total_days: number;
+  planned_days: number;
+  remaining_days: number;
+  granted_days?: number;
+  carried_over_days?: number;
+  adjustment_days?: number;
+}
+
+/** POST/PUT /hr/vacations. Число дней считает backend. */
+export interface VacationPeriodReq {
+  schedule_id: number;
+  assignment_id: number;
+  start_date: string;
+  end_date: string;
+  day_source: "current_year";
+  change_reason: string | null;
+}
+
+export interface VacationScheduleCreateReq {
+  legal_entity_id: number;
+  year: number;
+}
+
+export interface VacationScheduleTransitionReq {
+  action: "submit" | "approve" | "return" | "close";
+  comment: string;
 }
 
 export interface LegalEntity {

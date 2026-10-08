@@ -19,6 +19,8 @@ import type {
   EmployeeUpdateReq,
   Employer,
   ExportRequest,
+  MessagingAccount,
+  TelegramLink,
   AuthSession,
   LoginRequest,
   NodeCreateReq,
@@ -31,8 +33,13 @@ import type {
   VacancyReq,
   VacancyUpdateReq,
   VacationFilters,
+  VacationEntitlement,
+  VacationListItem,
   VacationListPage,
+  VacationPeriodReq,
   VacationSchedule,
+  VacationScheduleCreateReq,
+  VacationScheduleTransitionReq,
   VacationSummary,
   LegalEntity,
   LegalEntityReq,
@@ -271,6 +278,46 @@ export const vacationsApi = {
     legal_entity_id?: number;
   }): Promise<ApiResponse<VacationSchedule[]>> =>
     request(`/hr/vacation-schedules${toQuery(params)}`),
+
+  /** POST /hr/vacation-schedules — график в статусе draft и расчёт дней. */
+  createSchedule: (
+    body: VacationScheduleCreateReq,
+  ): Promise<ApiResponse<VacationSchedule>> =>
+    request("/hr/vacation-schedules", { method: "POST", body }),
+
+  /** POST /hr/vacation-schedules/{id}/recalculate — дни для новых назначений. */
+  recalculateSchedule: (id: number): Promise<void> =>
+    request(`/hr/vacation-schedules/${id}/recalculate`, { method: "POST" }),
+
+  /** POST /hr/vacation-schedules/{id}/transition */
+  transitionSchedule: (
+    id: number,
+    body: VacationScheduleTransitionReq,
+  ): Promise<ApiResponse<VacationSchedule>> =>
+    request(`/hr/vacation-schedules/${id}/transition`, { method: "POST", body }),
+
+  /** GET /hr/vacation-entitlements */
+  entitlements: (params: {
+    year: number;
+    legal_entity_id?: number;
+    employee_id?: number;
+  }): Promise<ApiResponse<VacationEntitlement[] | null>> =>
+    request(`/hr/vacation-entitlements${toQuery(params)}`),
+
+  /** POST /hr/vacations */
+  createPeriod: (body: VacationPeriodReq): Promise<ApiResponse<VacationListItem>> =>
+    request("/hr/vacations", { method: "POST", body }),
+
+  /** PUT /hr/vacations/{id} */
+  updatePeriod: (
+    id: number,
+    body: VacationPeriodReq,
+  ): Promise<ApiResponse<VacationListItem>> =>
+    request(`/hr/vacations/${id}`, { method: "PUT", body }),
+
+  /** DELETE /hr/vacations/{id} — отмена периода в черновике. */
+  deletePeriod: (id: number): Promise<void> =>
+    request(`/hr/vacations/${id}`, { method: "DELETE" }),
 };
 
 export const hrAccountingApi = {
@@ -358,6 +405,16 @@ export const hrAccountingApi = {
   /** GET /hr/accounting-structure?legal_entity_id= */
   structure: (legalEntityId: number): Promise<ApiResponse<AccountingStructure>> =>
     request(`/hr/accounting-structure?legal_entity_id=${legalEntityId}`),
+};
+
+export const messagingApi = {
+  /** POST /hr/employees/{id}/telegram-link — одноразовая ссылка, тело не нужно. */
+  createTelegramLink: (employeeId: number): Promise<ApiResponse<TelegramLink>> =>
+    request(`/hr/employees/${employeeId}/telegram-link`, { method: "POST" }),
+
+  /** GET /hr/messaging/accounts?employee_id= */
+  accounts: (employeeId: number): Promise<ApiResponse<MessagingAccount[] | null>> =>
+    request(`/hr/messaging/accounts?employee_id=${employeeId}`),
 };
 
 export const employeesApi = {

@@ -1,6 +1,7 @@
 import { Controller, useForm } from "react-hook-form";
 import { CloseButton } from "#/components/CloseButton";
 import { DateInput } from "#/components/DateInput";
+import { TelegramConnect } from "#/components/TelegramConnect";
 import { GENDER_OPTIONS, normalizeGender } from "#/lib/employeeDisplay";
 import type { Employer } from "#/types/api";
 import type { EmployeeEditFields } from "#/lib/employeeUpdate";
@@ -58,8 +59,8 @@ export function EmployeeInfoModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onMouseDown={handleBackdropClick}
     >
-      <div className="mx-4 w-full max-w-md overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900">
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+      <div className="mx-4 flex max-h-[calc(100vh-4rem)] w-full max-w-md flex-col overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900">
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
           <div>
             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
               Редактирование сотрудника
@@ -75,7 +76,7 @@ export function EmployeeInfoModal({
 
         <form
           onSubmit={handleSubmit(onSubmit)}
-          className="space-y-4 px-6 py-5"
+          className="space-y-4 overflow-y-auto px-6 py-5"
         >
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -196,6 +197,8 @@ export function EmployeeInfoModal({
               )}
             />
           </div>
+
+          <TelegramConnect key={employee.id} employeeId={employee.id} />
 
           {error && (
             <p className="text-sm text-red-500 dark:text-red-400">{error}</p>

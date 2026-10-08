@@ -13,6 +13,7 @@ import {
 } from "#/components/settings/DictFormModal";
 import { formatApiError } from "#/lib/apiError";
 import { dictQueries, hrAccountingApi } from "#/services/api";
+import { VacationScheduleEditor } from "#/components/VacationScheduleEditor";
 import type {
   AccountingAssignment,
   AccountingAssignmentReq,
@@ -25,7 +26,7 @@ import type {
   LegalPositionUpdateReq,
 } from "#/types/api";
 
-export type VacationAccountingTab = "entities" | "positions" | "managers";
+export type VacationAccountingTab = "entities" | "positions" | "managers" | "schedule";
 
 export const vacationAccountingHint = `Записка: порядок работы HR с юридическим лицом
 Юридическое лицо существует независимо от текущей управленческой структуры компании. Сотрудник связывается с юрлицом через учётное назначение.
@@ -102,7 +103,17 @@ HR создаёт сотруднику учётное назначение и у
 Для совместительства указывается тип part_time. Основное активное назначение primary у сотрудника может быть только одно.
 После этого HR может создавать годовой график соответствующего юрлица:
 - POST /hr/vacation-schedules
-При создании графика система автоматически включит активные учётные назначения и рассчитает положенные сотрудникам дни отпуска. Telegram-привязка сотрудника — отдельный следующий процесс и не относится к его оформлению в юридическом лице.`;
+При создании графика система рассчитает положенные дни по назначениям, которые уже есть. Сам период отпуска в график не попадает, пока HR не создаст его отдельно.
+9. Заполнить отпуск и отправить график
+Таблица графика показывает периоды, а не учётные назначения.
+- График юрлица и года: GET /hr/vacation-schedules?legal_entity_id={id}&year={year}
+- Если графика нет: POST /hr/vacation-schedules, статус draft
+- Если сотрудник добавлен позже: POST /hr/vacation-schedules/{id}/recalculate
+- Положено и остаток: GET /hr/vacation-entitlements?legal_entity_id={id}&year={year}
+- Период создаётся для assignment_id: POST /hr/vacations
+- Изменение и удаление: PUT /hr/vacations/{period_id}, DELETE /hr/vacations/{period_id}
+- Отправка всего графика: POST /hr/vacation-schedules/{id}/transition с action submit
+У совместителя отпуск заполняется отдельно в каждом юрлице: даты начала совпадают, даты окончания могут различаться. Telegram-привязка сотрудника — отдельный следующий процесс и не относится к его оформлению в юридическом лице.`;
 
 const inputClass = `${dictInputClass} border-gray-200 dark:border-gray-700`;
 
@@ -134,6 +145,7 @@ export function VacationAccountingSettings({
 }) {
   if (tab === "entities") return <LegalEntitiesSection />;
   if (tab === "positions") return <LegalPositionsSection />;
+  if (tab === "schedule") return <VacationScheduleEditor />;
   return <ManagersSection />;
 }
 
