@@ -197,13 +197,17 @@ export function AppShell({ children }: { children: ReactNode }) {
                 : "items-center justify-between px-3"
             }`}
           >
-            <div
-              className={`text-sm font-semibold tracking-wide text-gray-500 dark:text-gray-400 ${
-                collapsed ? "text-xs" : ""
-              }`}
-            >
-              {collapsed ? "HR" : "HR TODO"}
-            </div>
+            <img
+              src={collapsed ? "/logo192.png?v=3" : "/logo-wordmark.png?v=2"}
+              width={collapsed ? 32 : 160}
+              height={collapsed ? 32 : 40}
+              alt=""
+              className={
+                collapsed
+                  ? "h-8 w-8 shrink-0"
+                  : "h-8 w-auto max-w-[calc(100%-1.75rem)] shrink rounded-md bg-white object-contain object-left px-1.5 py-0.5"
+              }
+            />
             <button
               type="button"
               title={collapsed ? "Развернуть" : "Свернуть"}
