@@ -34,6 +34,7 @@ import type {
   VacancyUpdateReq,
   VacationFilters,
   VacationEntitlement,
+  VacationConfirmReq,
   VacationListItem,
   VacationListPage,
   VacationPeriodReq,
@@ -318,6 +319,13 @@ export const vacationsApi = {
   /** DELETE /hr/vacations/{id} — отмена периода в черновике. */
   deletePeriod: (id: number): Promise<void> =>
     request(`/hr/vacations/${id}`, { method: "DELETE" }),
+
+  /** POST /hr/vacations/{id}/confirm — подтверждение периода сотрудником или руководителем. */
+  confirmPeriod: (
+    id: number,
+    body: VacationConfirmReq,
+  ): Promise<ApiResponse<unknown>> =>
+    request(`/hr/vacations/${id}/confirm`, { method: "POST", body }),
 };
 
 export const hrAccountingApi = {

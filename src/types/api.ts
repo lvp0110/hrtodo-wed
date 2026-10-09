@@ -379,6 +379,11 @@ export interface VacationScheduleTransitionReq {
   comment: string;
 }
 
+/** POST /hr/vacations/{id}/confirm. Роль зависит от категории назначения. */
+export interface VacationConfirmReq {
+  role: "employee" | "manager";
+}
+
 export interface LegalEntity {
   id: number;
   code: string;

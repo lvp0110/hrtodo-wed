@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type SelectHTMLAttributes } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Palmtree, Search } from "lucide-react";
+import { ApiErrorModal } from "#/components/ApiErrorModal";
 import { EmployeesRowCard } from "#/components/EmployeesRowCard";
 import { dictInputClass } from "#/components/settings/DictFormModal";
 import { DictTable } from "#/components/settings/DictTable";
@@ -35,6 +36,23 @@ const CONFIRMATION_LABELS: Record<string, string> = {
   pending: "Ожидает",
   confirmed: "Подтверждено",
 };
+
+const CONFIRMABLE_PERIODS = new Set([
+  "planned",
+  "awaiting_confirmation",
+  "rescheduled",
+]);
+
+function confirmationRole(row: VacationListItem): "employee" | "manager" {
+  return row.category_code === "manager_on_behalf" ? "manager" : "employee";
+}
+
+function canConfirmPeriod(row: VacationListItem): boolean {
+  return (
+    row.confirmation_status !== "confirmed" &&
+    CONFIRMABLE_PERIODS.has(row.period_status)
+  );
+}
 
 const RESCHEDULE_LABELS: Record<string, string> = {
   pending: "На рассмотрении",
@@ -217,6 +235,7 @@ function ScheduleChip({
 }
 
 export function VacationSchedulePanel({ onClose }: { onClose: () => void }) {
+  const queryClient = useQueryClient();
   const currentYear = new Date().getFullYear();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -298,6 +317,14 @@ export function VacationSchedulePanel({ onClose }: { onClose: () => void }) {
     queryKey: ["hr", "vacation-schedules", year] as const,
     queryFn: () =>
       vacationsApi.schedules({ year }).then((res) => res.data ?? []),
+  });
+
+  const confirmMutation = useMutation({
+    mutationFn: (row: VacationListItem) =>
+      vacationsApi.confirmPeriod(row.period_id, { role: confirmationRole(row) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["hr", "vacations"] });
+    },
   });
 
   const years = useMemo(() => {
@@ -546,7 +573,16 @@ export function VacationSchedulePanel({ onClose }: { onClose: () => void }) {
                 {
                   key: "status",
                   label: "Статус",
-                  content: <StatusDetails row={row} />,
+                  content: (
+                    <StatusDetails
+                      row={row}
+                      confirming={
+                        confirmMutation.isPending &&
+                        confirmMutation.variables?.period_id === row.period_id
+                      }
+                      onConfirm={() => confirmMutation.mutate(row)}
+                    />
+                  ),
                 },
                 { key: "balance", label: "Остаток", content: balanceText(row) },
               ]}
@@ -605,7 +641,16 @@ export function VacationSchedulePanel({ onClose }: { onClose: () => void }) {
               key: "status",
               header: "Статус",
               className: "whitespace-normal align-top",
-              render: (row) => <StatusDetails row={row} />,
+              render: (row) => (
+                <StatusDetails
+                  row={row}
+                  confirming={
+                    confirmMutation.isPending &&
+                    confirmMutation.variables?.period_id === row.period_id
+                  }
+                  onConfirm={() => confirmMutation.mutate(row)}
+                />
+              ),
             },
             {
               key: "balance",
@@ -641,25 +686,50 @@ export function VacationSchedulePanel({ onClose }: { onClose: () => void }) {
           </button>
         </div>
       </div>
+      {confirmMutation.isError && (
+        <ApiErrorModal
+          error={confirmMutation.error}
+          onClose={() => confirmMutation.reset()}
+        />
+      )}
     </div>
   );
 }
 
-function StatusDetails({ row }: { row: VacationListItem }) {
+function StatusDetails({
+  row,
+  confirming,
+  onConfirm,
+}: {
+  row: VacationListItem;
+  confirming: boolean;
+  onConfirm: () => void;
+}) {
   return (
-    <span>
-      {labelOf(PERIOD_STATUS_LABELS, row.period_status)}
+    <div>
+      <div>{labelOf(PERIOD_STATUS_LABELS, row.period_status)}</div>
       {row.confirmation_status && (
-        <span className="mt-0.5 block text-xs text-gray-400">
+        <div className="mt-0.5 text-xs text-gray-400">
           Подтверждение: {labelOf(CONFIRMATION_LABELS, row.confirmation_status)}
-        </span>
+        </div>
+      )}
+      {canConfirmPeriod(row) && (
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={confirming}
+          data-hint="Подтверждает этот отпуск и переводит его статус в «Подтверждён»"
+          className="mt-1.5 rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {confirming ? "Подтверждаем…" : "Подтвердить"}
+        </button>
       )}
       {row.reschedule_status && (
-        <span className="mt-0.5 block text-xs text-gray-400">
+        <div className="mt-0.5 text-xs text-gray-400">
           Перенос: {labelOf(RESCHEDULE_LABELS, row.reschedule_status)}
-        </span>
+        </div>
       )}
-    </span>
+    </div>
   );
 }
 
