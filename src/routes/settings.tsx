@@ -40,7 +40,7 @@ const vacationTabs: { id: VacationAccountingTab; label: string; hint: string }[]
   {
     id: "schedule",
     label: "График",
-    hint: "Создаёт годовой график юрлица и заполняет периоды отпуска по учётным назначениям",
+    hint: "Показывает годовой график по всем юрлицам. Фильтр оставляет одно юридическое лицо",
   },
 ];
 

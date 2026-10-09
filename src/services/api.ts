@@ -34,9 +34,9 @@ import type {
   VacancyUpdateReq,
   VacationFilters,
   VacationEntitlement,
-  VacationConfirmReq,
   VacationListItem,
   VacationListPage,
+  VacationConfirmReq,
   VacationPeriodReq,
   VacationSchedule,
   VacationScheduleCreateReq,
@@ -309,12 +309,26 @@ export const vacationsApi = {
   createPeriod: (body: VacationPeriodReq): Promise<ApiResponse<VacationListItem>> =>
     request("/hr/vacations", { method: "POST", body }),
 
-  /** PUT /hr/vacations/{id} */
+  /** PUT /hr/vacations/{id} — новые даты, пока график в статусе draft. */
   updatePeriod: (
     id: number,
     body: VacationPeriodReq,
   ): Promise<ApiResponse<VacationListItem>> =>
     request(`/hr/vacations/${id}`, { method: "PUT", body }),
+
+  /** POST /hr/vacations/{id}/reschedule-requests — перенос после отправки графика. */
+  createRescheduleRequest: (
+    periodId: number,
+    body: {
+      proposed_start_date: string;
+      proposed_end_date: string;
+      reason: string | null;
+    },
+  ): Promise<ApiResponse<unknown>> =>
+    request(`/hr/vacations/${periodId}/reschedule-requests`, {
+      method: "POST",
+      body,
+    }),
 
   /** DELETE /hr/vacations/{id} — отмена периода в черновике. */
   deletePeriod: (id: number): Promise<void> =>

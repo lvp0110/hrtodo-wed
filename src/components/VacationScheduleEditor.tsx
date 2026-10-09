@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { ApiErrorModal } from "#/components/ApiErrorModal";
 import { DateInput } from "#/components/DateInput";
 import {
@@ -45,6 +45,28 @@ function displayDate(value: string | null | undefined): string {
   return `${day}.${month}.${year}`;
 }
 
+const RESCHEDULABLE_PERIODS = new Set([
+  "planned",
+  "awaiting_confirmation",
+  "confirmed",
+  "rescheduled",
+]);
+
+function entitlementFromPeriod(period: VacationListItem, year: number): VacationEntitlement {
+  return {
+    id: 0,
+    assignment_id: period.assignment_id,
+    employee_id: period.employee_id,
+    employee_full_name: period.employee_full_name,
+    legal_entity_id: period.legal_entity_id,
+    legal_entity_name: period.legal_entity_name,
+    year,
+    total_days: period.available_days,
+    planned_days: period.planned_total_days,
+    remaining_days: period.remaining_days,
+  };
+}
+
 function inclusiveDays(start: string, end: string): number | null {
   const startMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(start);
   const endMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(end);
@@ -59,14 +81,17 @@ function inclusiveDays(start: string, end: string): number | null {
   return days >= 1 ? days : null;
 }
 
-async function loadPeriods(legalEntityId: number, year: number): Promise<VacationListItem[]> {
+async function loadPeriods(
+  legalEntityId: number | null,
+  year: number,
+): Promise<VacationListItem[]> {
   const pageSize = 200;
   const items: VacationListItem[] = [];
   let page = 1;
   let totalPages = 1;
   do {
     const params: VacationListParams = {
-      legal_entity_id: legalEntityId,
+      legal_entity_id: legalEntityId ?? undefined,
       year,
       page,
       page_size: pageSize,
@@ -87,12 +112,18 @@ export function VacationScheduleEditor() {
   const [entityId, setEntityId] = useState("");
   const [year, setYear] = useState(currentYear);
   const [periodForm, setPeriodForm] = useState<
-    | { mode: "create"; assignment: AccountingAssignment; entitlement: VacationEntitlement }
+    | {
+        mode: "create";
+        assignment: AccountingAssignment;
+        entitlement: VacationEntitlement;
+        schedule: VacationSchedule;
+      }
     | {
         mode: "edit";
         assignment: AccountingAssignment;
         entitlement: VacationEntitlement;
         period: VacationListItem;
+        schedule: VacationSchedule;
       }
     | null
   >(null);
@@ -105,39 +136,36 @@ export function VacationScheduleEditor() {
     queryFn: () => hrAccountingApi.legalEntities(false).then((res) => res.data ?? []),
   });
 
+  const entityFilter = selectedId === null ? {} : { legal_entity_id: selectedId };
+
   const schedulesQuery = useQuery({
-    queryKey: ["hr", "vacation-schedules", selectedId ?? "none", year] as const,
+    queryKey: ["hr", "vacation-schedules", selectedId ?? "all", year] as const,
     queryFn: () =>
-      vacationsApi
-        .schedules({ legal_entity_id: selectedId as number, year })
-        .then((res) => res.data ?? []),
-    enabled: selectedId !== null,
+      vacationsApi.schedules({ ...entityFilter, year }).then((res) => res.data ?? []),
   });
-  const schedule = schedulesQuery.data?.[0] ?? null;
-  const isDraft = schedule?.status === "draft";
+  const scheduleByEntity = new Map(
+    (schedulesQuery.data ?? []).map((item) => [item.legal_entity_id, item]),
+  );
+  const selectedSchedule = selectedId === null ? null : (schedulesQuery.data?.[0] ?? null);
+  const isDraft = selectedSchedule?.status === "draft";
 
   const assignmentsQuery = useQuery({
-    queryKey: ["hr", "accounting-assignments", "by-entity", selectedId ?? "none"] as const,
+    queryKey: ["hr", "accounting-assignments", "schedule", selectedId ?? "all"] as const,
     queryFn: () =>
       hrAccountingApi
-        .assignments({ legal_entity_id: selectedId as number, active_only: true })
+        .assignments({ ...entityFilter, active_only: true })
         .then((res) => res.data ?? []),
-    enabled: selectedId !== null,
   });
 
   const entitlementsQuery = useQuery({
-    queryKey: ["hr", "vacation-entitlements", selectedId ?? "none", year] as const,
+    queryKey: ["hr", "vacation-entitlements", selectedId ?? "all", year] as const,
     queryFn: () =>
-      vacationsApi
-        .entitlements({ legal_entity_id: selectedId as number, year })
-        .then((res) => res.data ?? []),
-    enabled: selectedId !== null && schedule !== null,
+      vacationsApi.entitlements({ ...entityFilter, year }).then((res) => res.data ?? []),
   });
 
   const periodsQuery = useQuery({
-    queryKey: ["hr", "vacations", "schedule-periods", selectedId ?? "none", year] as const,
-    queryFn: () => loadPeriods(selectedId as number, year),
-    enabled: selectedId !== null && schedule !== null,
+    queryKey: ["hr", "vacations", "schedule-periods", selectedId ?? "all", year] as const,
+    queryFn: () => loadPeriods(selectedId, year),
   });
 
   const invalidatePlan = () => {
@@ -177,6 +205,29 @@ export function VacationScheduleEditor() {
     },
   });
 
+  const rescheduleMutation = useMutation({
+    mutationFn: ({
+      id,
+      startDate,
+      endDate,
+      reason,
+    }: {
+      id: number;
+      startDate: string;
+      endDate: string;
+      reason: string | null;
+    }) =>
+      vacationsApi.createRescheduleRequest(id, {
+        proposed_start_date: startDate,
+        proposed_end_date: endDate,
+        reason,
+      }),
+    onSuccess: () => {
+      invalidatePlan();
+      setPeriodForm(null);
+    },
+  });
+
   const deletePeriodMutation = useMutation({
     mutationFn: (id: number) => vacationsApi.deletePeriod(id),
     onSuccess: invalidatePlan,
@@ -184,7 +235,7 @@ export function VacationScheduleEditor() {
 
   const submitMutation = useMutation({
     mutationFn: (comment: string) =>
-      vacationsApi.transitionSchedule(schedule?.id as number, {
+      vacationsApi.transitionSchedule(selectedSchedule?.id as number, {
         action: "submit",
         comment,
       }),
@@ -194,9 +245,17 @@ export function VacationScheduleEditor() {
     },
   });
 
-  const assignments = [...(assignmentsQuery.data ?? [])].sort((a, b) =>
-    (a.employee_full_name ?? "").localeCompare(b.employee_full_name ?? "", "ru"),
-  );
+  const viewingAll = selectedId === null;
+  const assignments = [...(assignmentsQuery.data ?? [])].sort((a, b) => {
+    if (viewingAll) {
+      const byEntity = (a.legal_entity_name ?? "").localeCompare(
+        b.legal_entity_name ?? "",
+        "ru",
+      );
+      if (byEntity !== 0) return byEntity;
+    }
+    return (a.employee_full_name ?? "").localeCompare(b.employee_full_name ?? "", "ru");
+  });
   const entitlementByAssignment = new Map(
     (entitlementsQuery.data ?? []).map((item) => [item.assignment_id, item]),
   );
@@ -209,7 +268,12 @@ export function VacationScheduleEditor() {
   const missingEntitlements = assignments.some(
     (assignment) => !entitlementByAssignment.has(assignment.id),
   );
-  const pendingPeriod = periodForm?.mode === "edit" ? updatePeriodMutation : createPeriodMutation;
+  const pendingPeriod =
+    periodForm?.mode !== "edit"
+      ? createPeriodMutation
+      : periodForm.schedule.status === "draft"
+        ? updatePeriodMutation
+        : rescheduleMutation;
   const actionError = recalculateMutation.error ?? deletePeriodMutation.error ?? null;
 
   return (
@@ -217,7 +281,7 @@ export function VacationScheduleEditor() {
       <div className="flex flex-wrap items-end gap-3">
         <label className="min-w-[220px]">
           <span className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-            Юридическое лицо
+            Юрлицо
           </span>
           <select
             value={entityId}
@@ -225,10 +289,10 @@ export function VacationScheduleEditor() {
               setEntityId(event.target.value);
               createScheduleMutation.reset();
             }}
-            data-hint="Показывает годовой график отпусков выбранного юридического лица"
+            data-hint="Оставляет график выбранного юридического лица. Пустое значение показывает все юрлица"
             className={inputClass}
           >
-            <option value="">Выберите юрлицо</option>
+            <option value="">Все юрлица</option>
             {(entitiesQuery.data ?? []).map((entity) => (
               <option key={entity.id} value={entity.id}>
                 {entity.short_name}
@@ -256,16 +320,16 @@ export function VacationScheduleEditor() {
             ))}
           </select>
         </label>
-        {schedule && (
+        {selectedSchedule && (
           <p className="pb-2 text-sm text-gray-600 dark:text-gray-300">
-            Статус: {SCHEDULE_STATUS_LABELS[schedule.status] ?? schedule.status}
+            Статус: {SCHEDULE_STATUS_LABELS[selectedSchedule.status] ?? selectedSchedule.status}
           </p>
         )}
         <div className="ml-auto flex flex-wrap gap-2">
-          {isDraft && (
+          {isDraft && selectedSchedule && (
             <button
               type="button"
-              onClick={() => recalculateMutation.mutate(schedule.id)}
+              onClick={() => recalculateMutation.mutate(selectedSchedule.id)}
               disabled={recalculateMutation.isPending}
               data-hint="Пересчитывает положенные дни и включает сотрудников, добавленных после создания графика"
               className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
@@ -289,20 +353,17 @@ export function VacationScheduleEditor() {
         </div>
       </div>
 
-      {selectedId === null && (
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Выберите юридическое лицо, чтобы создать или заполнить его график.
-        </p>
-      )}
-
-      {selectedId !== null && schedulesQuery.isPending && (
+      {(schedulesQuery.isPending || assignmentsQuery.isPending) && (
         <p className="text-sm text-gray-400">Загрузка графика…</p>
       )}
       {schedulesQuery.isError && (
         <p className="text-sm text-red-500">{formatApiError(schedulesQuery.error)}</p>
       )}
+      {assignmentsQuery.isError && (
+        <p className="text-sm text-red-500">{formatApiError(assignmentsQuery.error)}</p>
+      )}
 
-      {selectedId !== null && !schedulesQuery.isPending && !schedule && (
+      {selectedId !== null && !schedulesQuery.isPending && !selectedSchedule && (
         <div className="rounded-lg border border-dashed border-gray-300 px-4 py-5 dark:border-gray-600">
           <p className="max-w-2xl text-sm text-gray-600 dark:text-gray-300">
             Графика на {year} год ещё нет. Создание рассчитает положенные дни по текущим
@@ -325,85 +386,129 @@ export function VacationScheduleEditor() {
         </div>
       )}
 
-      {schedule && isDraft && missingEntitlements && !entitlementsQuery.isPending && (
+      {selectedSchedule && isDraft && missingEntitlements && !entitlementsQuery.isPending && (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
           Часть сотрудников добавлена после создания графика. Нажмите «Пересчитать дни», чтобы
           рассчитать им отпуск и дать создать период.
         </p>
       )}
 
-      {schedule && !isDraft && (
+      {selectedSchedule && !isDraft && (
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Периоды можно менять, пока график в статусе «Черновик».
+          График уже отправлен. Новые периоды и удаление доступны только в черновике. Даты
+          существующего отпуска переносятся запросом сотрудника.
         </p>
       )}
 
-      {schedule && (
+      {!schedulesQuery.isPending &&
+        !assignmentsQuery.isPending &&
+        !schedulesQuery.isError &&
+        !assignmentsQuery.isError &&
+        (viewingAll || selectedSchedule) && (
         <div className="space-y-3">
-          {assignmentsQuery.isPending && <p className="text-sm text-gray-400">Загрузка назначений…</p>}
-          {assignmentsQuery.isError && (
-            <p className="text-sm text-red-500">{formatApiError(assignmentsQuery.error)}</p>
-          )}
-          {!assignmentsQuery.isPending && assignments.length === 0 && (
+          {assignments.length === 0 && (
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              В этом юрлице нет активных назначений. Сначала привяжите сотрудников к должностям.
+              {viewingAll
+                ? "Активных назначений нет. Сначала привяжите сотрудников к должностям."
+                : "В этом юрлице нет активных назначений. Сначала привяжите сотрудников к должностям."}
             </p>
           )}
-          {assignments.map((assignment) => (
-            <AssignmentPlan
-              key={assignment.id}
-              assignment={assignment}
-              entitlement={entitlementByAssignment.get(assignment.id)}
-              periods={periodsByAssignment.get(assignment.id) ?? []}
-              editable={isDraft}
-              onAdd={(entitlement) => {
-                createPeriodMutation.reset();
-                updatePeriodMutation.reset();
-                setPeriodForm({ mode: "create", assignment, entitlement });
-              }}
-              onEdit={(period, entitlement) => {
-                createPeriodMutation.reset();
-                updatePeriodMutation.reset();
-                setPeriodForm({ mode: "edit", assignment, entitlement, period });
-              }}
-              onDelete={(period) => {
-                const start = displayDate(period.planned_start_date);
-                const end = displayDate(period.planned_end_date);
-                if (
-                  confirm(
-                    `Удалить период ${start} — ${end} у ${assignment.employee_full_name || "сотрудника"}?`,
-                  )
-                ) {
-                  deletePeriodMutation.mutate(period.period_id);
+          {assignments.map((assignment) => {
+            const assignmentSchedule = viewingAll
+              ? (scheduleByEntity.get(assignment.legal_entity_id) ?? null)
+              : selectedSchedule;
+            return (
+              <AssignmentPlan
+                key={assignment.id}
+                assignment={assignment}
+                entitlement={entitlementByAssignment.get(assignment.id)}
+                periods={periodsByAssignment.get(assignment.id) ?? []}
+                editable={assignmentSchedule?.status === "draft"}
+                scheduleStatus={assignmentSchedule?.status}
+                entityName={viewingAll ? assignment.legal_entity_name || "Юрлицо" : undefined}
+                scheduleNote={
+                  viewingAll
+                    ? assignmentSchedule
+                      ? (SCHEDULE_STATUS_LABELS[assignmentSchedule.status] ??
+                        assignmentSchedule.status)
+                      : `График на ${year} ещё не создан`
+                    : undefined
                 }
-              }}
-            />
-          ))}
+                onAdd={(entitlement) => {
+                  if (!assignmentSchedule) return;
+                  createPeriodMutation.reset();
+                  updatePeriodMutation.reset();
+                  rescheduleMutation.reset();
+                  setPeriodForm({
+                    mode: "create",
+                    assignment,
+                    entitlement,
+                    schedule: assignmentSchedule,
+                  });
+                }}
+                onEdit={(period) => {
+                  if (!assignmentSchedule) return;
+                  createPeriodMutation.reset();
+                  updatePeriodMutation.reset();
+                  rescheduleMutation.reset();
+                  setPeriodForm({
+                    mode: "edit",
+                    assignment,
+                    entitlement:
+                      entitlementByAssignment.get(assignment.id) ??
+                      entitlementFromPeriod(period, assignmentSchedule.year),
+                    period,
+                    schedule: assignmentSchedule,
+                  });
+                }}
+                onDelete={(period) => {
+                  const start = displayDate(period.planned_start_date);
+                  const end = displayDate(period.planned_end_date);
+                  if (
+                    confirm(
+                      `Удалить период ${start} — ${end} у ${assignment.employee_full_name || "сотрудника"}?`,
+                    )
+                  ) {
+                    deletePeriodMutation.mutate(period.period_id);
+                  }
+                }}
+              />
+            );
+          })}
         </div>
       )}
 
-      {periodForm && schedule && (
+      {periodForm && (
         <PeriodForm
           state={periodForm}
-          schedule={schedule}
+          schedule={periodForm.schedule}
           isPending={pendingPeriod.isPending}
           error={formatApiError(pendingPeriod.error)}
           onClose={() => {
             createPeriodMutation.reset();
             updatePeriodMutation.reset();
+            rescheduleMutation.reset();
             setPeriodForm(null);
           }}
           onSubmit={(body) => {
             if (periodForm.mode === "create") createPeriodMutation.mutate(body);
-            else updatePeriodMutation.mutate({ id: periodForm.period.period_id, body });
+            else if (periodForm.schedule.status === "draft")
+              updatePeriodMutation.mutate({ id: periodForm.period.period_id, body });
+            else
+              rescheduleMutation.mutate({
+                id: periodForm.period.period_id,
+                startDate: body.start_date,
+                endDate: body.end_date,
+                reason: body.change_reason,
+              });
           }}
         />
       )}
 
-      {submitOpen && schedule && (
+      {submitOpen && selectedSchedule && (
         <SubmitScheduleForm
-          year={schedule.year}
-          entityName={schedule.legal_entity_name}
+          year={selectedSchedule.year}
+          entityName={selectedSchedule.legal_entity_name}
           isPending={submitMutation.isPending}
           error={formatApiError(submitMutation.error)}
           onClose={() => {
@@ -432,6 +537,9 @@ function AssignmentPlan({
   entitlement,
   periods,
   editable,
+  scheduleStatus,
+  entityName,
+  scheduleNote,
   onAdd,
   onEdit,
   onDelete,
@@ -440,8 +548,11 @@ function AssignmentPlan({
   entitlement?: VacationEntitlement;
   periods: VacationListItem[];
   editable: boolean;
+  scheduleStatus?: string;
+  entityName?: string;
+  scheduleNote?: string;
   onAdd: (entitlement: VacationEntitlement) => void;
-  onEdit: (period: VacationListItem, entitlement: VacationEntitlement) => void;
+  onEdit: (period: VacationListItem) => void;
   onDelete: (period: VacationListItem) => void;
 }) {
   const canAdd = editable && entitlement != null && entitlement.remaining_days > 0;
@@ -454,11 +565,15 @@ function AssignmentPlan({
             {assignment.employee_full_name || "Сотрудник"}
           </p>
           <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+            {entityName ? `${entityName} · ` : ""}
             {assignment.legal_position_name || "Должность"}
             {" · "}
             {EMPLOYMENT_LABELS[assignment.employment_type] ?? assignment.employment_type}
             {assignment.manager_full_name ? ` · начальник ${assignment.manager_full_name}` : ""}
           </p>
+          {scheduleNote && (
+            <p className="mt-1 text-xs text-gray-400">{scheduleNote}</p>
+          )}
         </div>
         <p className="text-sm text-gray-700 dark:text-gray-200">
           {entitlement
@@ -472,32 +587,38 @@ function AssignmentPlan({
           <li className="text-sm text-gray-400">Периодов отпуска нет</li>
         )}
         {periods.map((period) => (
-          <li key={period.period_id} className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-100">
+          <li key={period.period_id} className="flex flex-wrap items-center gap-2 text-sm text-gray-800 dark:text-gray-100">
             <span>
               {displayDate(period.planned_start_date)} — {displayDate(period.planned_end_date)}
               <span className="ml-2 text-gray-400">{period.planned_days} дн.</span>
             </span>
+            {(scheduleStatus === "draft" ||
+              (scheduleStatus != null &&
+                scheduleStatus !== "closed" &&
+                RESCHEDULABLE_PERIODS.has(period.period_status))) && (
+              <button
+                type="button"
+                onClick={() => onEdit(period)}
+                data-hint={
+                  scheduleStatus === "draft"
+                    ? "Открывает изменение дат этого периода, пока график в черновике"
+                    : "Открывает запрос на перенос дат этого отпуска"
+                }
+                className="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+              >
+                Перенести даты
+              </button>
+            )}
             {editable && entitlement && (
-              <span className="inline-flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => onEdit(period, entitlement)}
-                  aria-label="Изменить период"
-                  data-hint="Открывает изменение дат этого периода отпуска"
-                  className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-100"
-                >
-                  <Pencil size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(period)}
-                  aria-label="Удалить период"
-                  data-hint="Удаляет этот период из черновика графика"
-                  className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </span>
+              <button
+                type="button"
+                onClick={() => onDelete(period)}
+                aria-label="Удалить период"
+                data-hint="Удаляет этот период из черновика графика"
+                className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+              >
+                <Trash2 size={14} />
+              </button>
             )}
           </li>
         ))}
@@ -547,6 +668,7 @@ function PeriodForm({
   onSubmit: (body: VacationPeriodReq) => void;
 }) {
   const isEdit = state.mode === "edit";
+  const requestsReschedule = isEdit && schedule.status !== "draft";
   const [startDate, setStartDate] = useState(
     isEdit ? calendarDate(state.period.planned_start_date) : "",
   );
@@ -581,16 +703,22 @@ function PeriodForm({
 
   return (
     <DictFormModal
-      title={isEdit ? "Изменить период" : "Период отпуска"}
+      title={isEdit ? "Перенос дат отпуска" : "Период отпуска"}
       subtitle={state.assignment.employee_full_name || "Сотрудник"}
       onClose={onClose}
       onSubmit={handleSubmit}
       isPending={isPending}
       canSubmit={canSubmit}
       error={error}
-      submitLabel={isEdit ? "Сохранить" : "Добавить"}
-      pendingLabel={isEdit ? "Сохраняем…" : "Добавляем…"}
+      submitLabel={requestsReschedule ? "Запросить перенос" : isEdit ? "Перенести" : "Добавить"}
+      pendingLabel={requestsReschedule ? "Отправляем…" : isEdit ? "Переносим…" : "Добавляем…"}
     >
+      {requestsReschedule && (
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          График уже отправлен, поэтому даты не переписываются сразу. Запрос на перенос принимает
+          только сотрудник, на которого записан этот отпуск.
+        </p>
+      )}
       <p className="text-sm text-gray-500 dark:text-gray-400">
         Осталось распределить {available} из {state.entitlement.total_days}. Дни считает сервер
         по календарю, включая обе даты.
@@ -616,7 +744,14 @@ function PeriodForm({
       {days != null && withinYear && !withinBalance && (
         <p className="text-sm text-red-500">Доступно только {available} дн.</p>
       )}
-      <Field label="Причина" hint="Необязательный комментарий к периоду">
+      <Field
+        label="Причина"
+        hint={
+          isEdit
+            ? "Почему переносятся даты. Можно оставить пустым"
+            : "Необязательный комментарий к периоду"
+        }
+      >
         <textarea
           value={changeReason}
           onChange={(event) => setChangeReason(event.target.value)}

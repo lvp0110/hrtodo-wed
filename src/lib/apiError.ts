@@ -168,6 +168,38 @@ export function formatApiError(error: unknown): string | null {
     return "Сервер не принял данные. Проверьте заполненные поля.";
   }
 
+  if (/schedule is not draft|period is unavailable/i.test(message)) {
+    return "Даты можно менять напрямую, только пока график в статусе «Черновик».";
+  }
+
+  if (
+    /only the assigned employee can request reschedule|user is not linked to an employee/i.test(
+      message,
+    )
+  ) {
+    return "Запросить перенос может только сотрудник, на которого записан этот отпуск. После отправки графика даты напрямую не меняются.";
+  }
+
+  const daysMatch = message.match(/only (\d+) vacation days/i);
+  if (daysMatch) {
+    return `Доступно только ${daysMatch[1]} дн.`;
+  }
+
+  if (/vacation periods overlap/i.test(message)) {
+    return "Новые даты пересекаются с другим периодом этого сотрудника.";
+  }
+
+  if (/vacation start must match/i.test(message)) {
+    return "У совместителя дата начала должна совпадать с отпуском в другом юрлице.";
+  }
+
+  if (/vacation dates must be inside schedule year/i.test(message)) {
+    const yearMatch = message.match(/year (\d+)/);
+    return yearMatch
+      ? `Обе даты должны быть в ${yearMatch[1]} году.`
+      : "Обе даты должны быть в году графика.";
+  }
+
   if (code === 409) {
     return "Сервер не разрешил это действие: данные конфликтуют с уже существующими.";
   }
