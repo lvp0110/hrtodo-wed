@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState, type SelectHTMLAttributes } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Palmtree, Search } from "lucide-react";
+import { ChevronDown, Palmtree, Search, Trash2 } from "lucide-react";
 import { ApiErrorModal } from "#/components/ApiErrorModal";
 import { EmployeesRowCard } from "#/components/EmployeesRowCard";
+import {
+  HrVacationPeriodModal,
+  type HrVacationDialog,
+} from "#/components/HrVacationPeriodModal";
 import { dictInputClass } from "#/components/settings/DictFormModal";
 import { DictTable } from "#/components/settings/DictTable";
 import { formatApiError } from "#/lib/apiError";
@@ -42,6 +46,24 @@ const CONFIRMABLE_PERIODS = new Set([
   "awaiting_confirmation",
   "rescheduled",
 ]);
+
+const RESCHEDULABLE_PERIODS = new Set([
+  "planned",
+  "awaiting_confirmation",
+  "confirmed",
+  "rescheduled",
+]);
+
+function scheduleFor(
+  schedules: VacationSchedule[],
+  legalEntityId: number,
+): VacationSchedule | undefined {
+  return (
+    schedules.find(
+      (item) => item.legal_entity_id === legalEntityId && item.status === "draft",
+    ) ?? schedules.find((item) => item.legal_entity_id === legalEntityId)
+  );
+}
 
 function confirmationRole(row: VacationListItem): "employee" | "manager" {
   return row.category_code === "manager_on_behalf" ? "manager" : "employee";
@@ -248,6 +270,7 @@ export function VacationSchedulePanel({ onClose }: { onClose: () => void }) {
   const [periodStatus, setPeriodStatus] = useState("");
   const [confirmationStatus, setConfirmationStatus] = useState("");
   const [rescheduleStatus, setRescheduleStatus] = useState("");
+  const [periodDialog, setPeriodDialog] = useState<HrVacationDialog | null>(null);
   const filterKey = [
     debouncedSearch,
     year,
@@ -327,6 +350,14 @@ export function VacationSchedulePanel({ onClose }: { onClose: () => void }) {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => vacationsApi.deletePeriod(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["hr", "vacations"] });
+      queryClient.invalidateQueries({ queryKey: ["hr", "vacation-entitlements"] });
+    },
+  });
+
   const years = useMemo(() => {
     const values = new Set<number>(filtersQuery.data?.years ?? []);
     values.add(year);
@@ -385,6 +416,67 @@ export function VacationSchedulePanel({ onClose }: { onClose: () => void }) {
     : [];
 
   const schedules = schedulesQuery.data ?? [];
+
+  function openDelete(row: VacationListItem) {
+    const start = calendarDate(row.planned_start_date) ?? "—";
+    const end = calendarDate(row.planned_end_date) ?? "—";
+    if (
+      confirm(
+        `Удалить отпуск ${start} — ${end} у ${row.employee_full_name || "сотрудника"}?`,
+      )
+    ) {
+      deleteMutation.mutate(row.period_id);
+    }
+  }
+
+  function periodActions(row: VacationListItem) {
+    const schedule = scheduleFor(schedules, row.legal_entity_id);
+    const draft = schedule?.status === "draft";
+    const canReschedule =
+      schedule != null &&
+      schedule.status !== "draft" &&
+      schedule.status !== "closed" &&
+      RESCHEDULABLE_PERIODS.has(row.period_status);
+    if (!draft && !canReschedule) return null;
+    const deleting =
+      deleteMutation.isPending && deleteMutation.variables === row.period_id;
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        {draft && (
+          <button
+            type="button"
+            onClick={() => setPeriodDialog({ mode: "edit", period: row })}
+            data-hint="Меняет даты этого отпуска, пока график в черновике"
+            className="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            Изменить
+          </button>
+        )}
+        {draft && (
+          <button
+            type="button"
+            onClick={() => openDelete(row)}
+            disabled={deleting}
+            aria-label="Удалить отпуск"
+            data-hint="Удаляет этот отпуск из черновика графика"
+            className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-60 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
+        {canReschedule && (
+          <button
+            type="button"
+            onClick={() => setPeriodDialog({ mode: "reschedule", period: row })}
+            data-hint="Открывает запрос на перенос дат. График уже не в черновике"
+            className="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            Запросить перенос
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -501,6 +593,14 @@ export function VacationSchedulePanel({ onClose }: { onClose: () => void }) {
 
         <button
           type="button"
+          onClick={() => setPeriodDialog({ mode: "create" })}
+          data-hint="Создаёт отпуск за любого сотрудника, пока график юридического лица в черновике"
+          className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          Добавить отпуск
+        </button>
+        <button
+          type="button"
           onClick={resetFilters}
           disabled={!hasFilters}
           data-hint="Очищает фильтры графика отпусков"
@@ -560,6 +660,7 @@ export function VacationSchedulePanel({ onClose }: { onClose: () => void }) {
           renderMobileCard={(row) => (
             <EmployeesRowCard
               headerContent={row.employee_full_name || "—"}
+              actions={periodActions(row)}
               fields={[
                 { key: "entity", label: "Юрлицо", content: row.legal_entity_name || "—" },
                 { key: "position", label: "Должность", content: positionText(row) },
@@ -659,6 +760,12 @@ export function VacationSchedulePanel({ onClose }: { onClose: () => void }) {
               className: "whitespace-nowrap",
               render: (row) => balanceText(row),
             },
+            {
+              key: "actions",
+              header: "Действия",
+              className: "whitespace-normal align-top",
+              render: (row) => periodActions(row),
+            },
           ]}
         />
       </div>
@@ -690,6 +797,30 @@ export function VacationSchedulePanel({ onClose }: { onClose: () => void }) {
         <ApiErrorModal
           error={confirmMutation.error}
           onClose={() => confirmMutation.reset()}
+        />
+      )}
+      {deleteMutation.isError && (
+        <ApiErrorModal
+          error={deleteMutation.error}
+          onClose={() => deleteMutation.reset()}
+        />
+      )}
+      {periodDialog && (
+        <HrVacationPeriodModal
+          key={
+            periodDialog.mode === "create"
+              ? "create"
+              : `${periodDialog.mode}-${periodDialog.period.period_id}`
+          }
+          dialog={periodDialog}
+          year={year}
+          schedules={schedules}
+          preferredLegalEntityId={optionalId(legalEntityId)}
+          onClose={() => setPeriodDialog(null)}
+          onSaved={() => {
+            queryClient.invalidateQueries({ queryKey: ["hr", "vacations"] });
+            queryClient.invalidateQueries({ queryKey: ["hr", "vacation-entitlements"] });
+          }}
         />
       )}
     </div>

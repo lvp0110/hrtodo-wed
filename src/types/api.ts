@@ -401,6 +401,31 @@ export interface LegalEntityReq {
   is_active: boolean;
 }
 
+/**
+ * GET /hr/vacation-notification-settings.
+ * legal_entity_id = null — общая настройка, иначе она заменяет общую для юрлица.
+ */
+export interface VacationNotificationSetting {
+  id: number;
+  legal_entity_id: number | null;
+  first_notice_days: number;
+  repeat_interval_days: number;
+  notification_time: string;
+  timezone: string;
+  is_active: boolean;
+  updated_at?: string;
+}
+
+/** PUT /hr/vacation-notification-settings */
+export interface VacationNotificationSettingReq {
+  legal_entity_id: number | null;
+  first_notice_days: number;
+  repeat_interval_days: number;
+  notification_time: string;
+  timezone: string;
+  is_active: boolean;
+}
+
 export interface LegalPosition {
   id: number;
   legal_entity_id: number;

@@ -14,6 +14,7 @@ import {
 import { formatApiError } from "#/lib/apiError";
 import { dictQueries, hrAccountingApi } from "#/services/api";
 import { VacationScheduleEditor } from "#/components/VacationScheduleEditor";
+import { VacationNotificationSettings } from "#/components/VacationNotificationSettings";
 import type {
   AccountingAssignment,
   AccountingAssignmentReq,
@@ -26,7 +27,12 @@ import type {
   LegalPositionUpdateReq,
 } from "#/types/api";
 
-export type VacationAccountingTab = "entities" | "positions" | "managers" | "schedule";
+export type VacationAccountingTab =
+  | "entities"
+  | "positions"
+  | "managers"
+  | "schedule"
+  | "notifications";
 
 export const vacationAccountingHint = `Записка: порядок работы HR с юридическим лицом
 Юридическое лицо существует независимо от текущей управленческой структуры компании. Сотрудник связывается с юрлицом через учётное назначение.
@@ -110,10 +116,17 @@ HR создаёт сотруднику учётное назначение и у
 - Если графика нет: POST /hr/vacation-schedules, статус draft
 - Если сотрудник добавлен позже: POST /hr/vacation-schedules/{id}/recalculate
 - Положено и остаток: GET /hr/vacation-entitlements?legal_entity_id={id}&year={year}
-- Период создаётся для assignment_id: POST /hr/vacations
-- Изменение и удаление: PUT /hr/vacations/{period_id}, DELETE /hr/vacations/{period_id}
+- Период создаётся для assignment_id, не для employee_id: POST /hr/vacations
+- HR создаёт отпуск за любое назначение. Категория employee_self или manager_on_behalf этому не мешает: она определяет подтверждение и получателей Telegram
+- Изменение и удаление, пока график в draft: PUT /hr/vacations/{period_id}, DELETE /hr/vacations/{period_id}
+- После отправки или утверждения даты меняются запросом переноса
 - Отправка всего графика: POST /hr/vacation-schedules/{id}/transition с action submit
-У совместителя отпуск заполняется отдельно в каждом юрлице: даты начала совпадают, даты окончания могут различаться. Telegram-привязка сотрудника — отдельный следующий процесс и не относится к его оформлению в юридическом лице.`;
+У совместителя отпуск заполняется отдельно в каждом юрлице: даты начала совпадают, даты окончания могут различаться. Telegram-привязка сотрудника — отдельный следующий процесс и не относится к его оформлению в юридическом лице.
+10. Настроить уведомления об отпуске
+Общая настройка задаёт, за сколько дней до отпуска начинать уведомления, как часто их повторять и в какое время. Для юрлица можно сохранить свою настройку: она заменяет общую.
+- Просмотр: GET /hr/vacation-notification-settings
+- Сохранение: PUT /hr/vacation-notification-settings
+Если у юрлица уведомления выключены, они не отправляются и общая настройка для него не используется.`;
 
 const inputClass = `${dictInputClass} border-gray-200 dark:border-gray-700`;
 
@@ -146,6 +159,7 @@ export function VacationAccountingSettings({
   if (tab === "entities") return <LegalEntitiesSection />;
   if (tab === "positions") return <LegalPositionsSection />;
   if (tab === "schedule") return <VacationScheduleEditor />;
+  if (tab === "notifications") return <VacationNotificationSettings />;
   return <ManagersSection />;
 }
 

@@ -42,6 +42,11 @@ const vacationTabs: { id: VacationAccountingTab; label: string; hint: string }[]
     label: "График",
     hint: "Показывает годовой график по всем юрлицам. Фильтр оставляет одно юридическое лицо",
   },
+  {
+    id: "notifications",
+    label: "Уведомления",
+    hint: "Общая настройка уведомлений об отпуске и отдельные настройки юридических лиц",
+  },
 ];
 
 function SettingsLayout() {
@@ -92,7 +97,7 @@ function SettingsLayout() {
         <PageDescription className="mt-2 max-w-3xl whitespace-pre-line">
           {vacationMode
             ? vacationAccountingHint
-            : "Вкладки переключают справочник. «Добавить» открывает форму новой записи, карандаш — редактирование, корзина — удаление. Переключатель «График отпусков» открывает юрлица, должности и руководителей."}
+            : "Вкладки переключают справочник. «Добавить» открывает форму новой записи, карандаш — редактирование, корзина — удаление. Переключатель «График отпусков» открывает юрлица, должности, руководителей и уведомления об отпусках."}
         </PageDescription>
         <nav className="mt-4 flex flex-wrap gap-1">
           {vacationMode

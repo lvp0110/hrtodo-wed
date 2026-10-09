@@ -9,6 +9,7 @@ import {
   dictInputClass,
 } from "#/components/settings/DictFormModal";
 import { formatApiError } from "#/lib/apiError";
+import { findDateOverlap, inclusiveDays } from "#/lib/vacationPeriod";
 import { hrAccountingApi, vacationsApi, type VacationListParams } from "#/services/api";
 import type {
   AccountingAssignment,
@@ -65,20 +66,6 @@ function entitlementFromPeriod(period: VacationListItem, year: number): Vacation
     planned_days: period.planned_total_days,
     remaining_days: period.remaining_days,
   };
-}
-
-function inclusiveDays(start: string, end: string): number | null {
-  const startMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(start);
-  const endMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(end);
-  if (!startMatch || !endMatch) return null;
-  const startUtc = Date.UTC(
-    Number(startMatch[1]),
-    Number(startMatch[2]) - 1,
-    Number(startMatch[3]),
-  );
-  const endUtc = Date.UTC(Number(endMatch[1]), Number(endMatch[2]) - 1, Number(endMatch[3]));
-  const days = Math.round((endUtc - startUtc) / 86_400_000) + 1;
-  return days >= 1 ? days : null;
 }
 
 async function loadPeriods(
@@ -395,8 +382,8 @@ export function VacationScheduleEditor() {
 
       {selectedSchedule && !isDraft && (
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          График уже отправлен. Новые периоды и удаление доступны только в черновике. Даты
-          существующего отпуска переносятся запросом сотрудника.
+          График уже отправлен. Новый отпуск, изменение и удаление доступны только в черновике.
+          Даты существующего отпуска меняются запросом на перенос.
         </p>
       )}
 
@@ -483,6 +470,10 @@ export function VacationScheduleEditor() {
           state={periodForm}
           schedule={periodForm.schedule}
           isPending={pendingPeriod.isPending}
+          occupied={occupiedRanges(
+            periodsByAssignment.get(periodForm.assignment.id) ?? [],
+            periodForm.mode === "edit" ? periodForm.period.period_id : undefined,
+          )}
           error={formatApiError(pendingPeriod.error)}
           onClose={() => {
             createPeriodMutation.reset();
@@ -601,15 +592,15 @@ function AssignmentPlan({
                 onClick={() => onEdit(period)}
                 data-hint={
                   scheduleStatus === "draft"
-                    ? "Открывает изменение дат этого периода, пока график в черновике"
+                    ? "Меняет даты этого периода, пока график в черновике"
                     : "Открывает запрос на перенос дат этого отпуска"
                 }
                 className="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
               >
-                Перенести даты
+                {scheduleStatus === "draft" ? "Изменить" : "Запросить перенос"}
               </button>
             )}
-            {editable && entitlement && (
+            {editable && (
               <button
                 type="button"
                 onClick={() => onDelete(period)}
@@ -634,7 +625,7 @@ function AssignmentPlan({
               ? "Сначала пересчитайте положенные дни графика"
               : entitlement.remaining_days <= 0
                 ? "Все положенные дни этого назначения уже распределены"
-                : "Добавляет ещё одну часть отпуска для этого назначения"
+                : "Создаёт отпуск для этого назначения. Категория сотрудника этому не мешает"
           }
           className="mt-3 text-sm font-medium text-blue-700 hover:text-blue-800 disabled:cursor-not-allowed disabled:text-gray-400 dark:text-blue-300 dark:hover:text-blue-200"
         >
@@ -645,9 +636,25 @@ function AssignmentPlan({
   );
 }
 
+function occupiedRanges(
+  periods: VacationListItem[],
+  exceptPeriodId?: number,
+): { start: string; end: string }[] {
+  return periods
+    .filter(
+      (period) =>
+        period.period_id !== exceptPeriodId && period.period_status !== "cancelled",
+    )
+    .map((period) => ({
+      start: calendarDate(period.planned_start_date),
+      end: calendarDate(period.planned_end_date),
+    }));
+}
+
 function PeriodForm({
   state,
   schedule,
+  occupied,
   isPending,
   error,
   onClose,
@@ -662,6 +669,7 @@ function PeriodForm({
         period: VacationListItem;
       };
   schedule: VacationSchedule;
+  occupied: { start: string; end: string }[];
   isPending: boolean;
   error: string | null;
   onClose: () => void;
@@ -686,7 +694,8 @@ function PeriodForm({
     startDate.startsWith(`${schedule.year}-`) &&
     endDate.startsWith(`${schedule.year}-`);
   const withinBalance = days != null && days <= available;
-  const canSubmit = withinYear && withinBalance;
+  const overlap = withinYear ? findDateOverlap(startDate, endDate, occupied) : null;
+  const canSubmit = withinYear && withinBalance && overlap == null;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -703,16 +712,30 @@ function PeriodForm({
 
   return (
     <DictFormModal
-      title={isEdit ? "Перенос дат отпуска" : "Период отпуска"}
+      title={
+        requestsReschedule
+          ? "Запрос переноса"
+          : isEdit
+            ? "Изменить период"
+            : "Период отпуска"
+      }
       subtitle={state.assignment.employee_full_name || "Сотрудник"}
       onClose={onClose}
       onSubmit={handleSubmit}
       isPending={isPending}
       canSubmit={canSubmit}
       error={error}
-      submitLabel={requestsReschedule ? "Запросить перенос" : isEdit ? "Перенести" : "Добавить"}
-      pendingLabel={requestsReschedule ? "Отправляем…" : isEdit ? "Переносим…" : "Добавляем…"}
+      submitLabel={requestsReschedule ? "Запросить перенос" : isEdit ? "Сохранить" : "Добавить"}
+      pendingLabel={requestsReschedule ? "Отправляем…" : isEdit ? "Сохраняем…" : "Добавляем…"}
     >
+      {!isEdit && (
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {state.assignment.category_name
+            ? `Категория «${state.assignment.category_name}» не запрещает HR создать отпуск. `
+            : "Категория сотрудника не запрещает HR создать отпуск. "}
+          Она определяет, кто подтверждает период и кому уходит уведомление в Telegram.
+        </p>
+      )}
       {requestsReschedule && (
         <p className="text-sm text-gray-500 dark:text-gray-400">
           График уже отправлен, поэтому даты не переписываются сразу. Запрос на перенос принимает
@@ -743,6 +766,12 @@ function PeriodForm({
       )}
       {days != null && withinYear && !withinBalance && (
         <p className="text-sm text-red-500">Доступно только {available} дн.</p>
+      )}
+      {overlap && (
+        <p className="text-sm text-red-500">
+          Даты пересекаются с другим отпуском этого назначения: {displayDate(overlap.start)} —{" "}
+          {displayDate(overlap.end)}.
+        </p>
       )}
       <Field
         label="Причина"

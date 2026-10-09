@@ -42,6 +42,8 @@ import type {
   VacationScheduleCreateReq,
   VacationScheduleTransitionReq,
   VacationSummary,
+  VacationNotificationSetting,
+  VacationNotificationSettingReq,
   LegalEntity,
   LegalEntityReq,
   LegalPosition,
@@ -427,6 +429,17 @@ export const hrAccountingApi = {
   /** GET /hr/accounting-structure?legal_entity_id= */
   structure: (legalEntityId: number): Promise<ApiResponse<AccountingStructure>> =>
     request(`/hr/accounting-structure?legal_entity_id=${legalEntityId}`),
+
+  /** GET /hr/vacation-notification-settings — общая настройка и переопределения юрлиц. */
+  vacationNotificationSettings: (): Promise<
+    ApiResponse<VacationNotificationSetting[] | null>
+  > => request("/hr/vacation-notification-settings"),
+
+  /** PUT /hr/vacation-notification-settings. legal_entity_id = null — общая настройка. */
+  saveVacationNotificationSetting: (
+    body: VacationNotificationSettingReq,
+  ): Promise<ApiResponse<VacationNotificationSetting>> =>
+    request("/hr/vacation-notification-settings", { method: "PUT", body }),
 };
 
 export const messagingApi = {
